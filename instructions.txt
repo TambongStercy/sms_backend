@@ -1,0 +1,329 @@
+Below is a comprehensive list of REST API endpoints (using HTTP methods and route paths) that cover the use cases for your School Management System and mobile app. You can use these endpoints as a blueprint when building your Node.js/TypeScript backend. In a real project you might group these by controllers or modules (for example: AuthController, UserController, AcademicController, ExamController, etc.). Each endpoint should include proper authentication/authorization middleware as needed.
+________________________________________
+1. Authentication & User Management
+Authentication
+•	POST /api/auth/register
+Register a new user (if needed; alternatively, admin may create users).
+•	POST /api/auth/login
+Authenticate a user and issue a JWT or similar token.
+•	POST /api/auth/logout
+Invalidate the user’s token (or remove session).
+•	GET /api/auth/me
+Retrieve the current user’s profile.
+Users & Roles
+•	GET /api/users
+List all users (with pagination/filtering).
+•	POST /api/users
+Create a new user profile.
+•	GET /api/users/:id
+Retrieve details for a single user.
+•	PUT /api/users/:id
+Update user information.
+•	DELETE /api/users/:id
+Delete a user (or mark as inactive).
+•	POST /api/users/:id/roles
+Assign a role to the user. The request body should include role and (optionally) academic_year_id.
+•	GET /api/users/:id/roles
+List all roles for a given user.
+•	DELETE /api/users/:id/roles/:roleId
+Remove a role from the user.
+________________________________________
+2. Academic Year & Configuration
+•	GET /api/academic-years
+List all academic years.
+•	POST /api/academic-years
+Create a new academic year (with start/end dates, etc.).
+•	GET /api/academic-years/:id
+Retrieve details for a specific academic year.
+•	PUT /api/academic-years/:id
+Update an academic year’s configuration.
+•	DELETE /api/academic-years/:id
+Delete an academic year (if allowed).
+________________________________________
+3. Classes, Subclasses & Student Management
+Classes & SubClasses
+•	GET /api/classes
+List all classes.
+•	POST /api/classes
+Create a new class.
+•	GET /api/classes/:id
+Retrieve class details (including its sub-classes).
+•	PUT /api/classes/:id
+Update a class.
+•	DELETE /api/classes/:id
+Delete a class.
+•	GET /api/classes/:classId/subclasses
+List all sub-classes for a class.
+•	POST /api/classes/:classId/subclasses
+Create a new sub-class under a given class.
+•	GET /api/subclasses/:id
+Retrieve details for a sub-class.
+•	PUT /api/subclasses/:id
+Update a sub-class.
+•	DELETE /api/subclasses/:id
+Delete a sub-class.
+Students & Parent-Student Links
+•	GET /api/students
+List all students.
+•	POST /api/students
+Register a new student (capture personal info, photo, etc.).
+•	GET /api/students/:id
+Retrieve a student’s details.
+•	PUT /api/students/:id
+Update student details.
+•	DELETE /api/students/:id
+Delete a student record.
+•	POST /api/parent-students
+Link a parent to a student. The request body should include parent_id and student_id.
+•	GET /api/parent-students
+List all parent–student links.
+•	DELETE /api/parent-students/:id
+Remove a parent–student link.
+•	POST /api/student-subclass-years
+Assign a student to a subclass for an academic year (includes student_id, subclass_id, academic_year_id, and optionally a photo).
+•	GET /api/student-subclass-years
+List all student-class assignments.
+•	PUT /api/student-subclass-years/:id
+Update a student’s subclass assignment.
+•	DELETE /api/student-subclass-years/:id
+Delete a student subclass assignment.
+•	GET /api/students/:id/id-card
+Generate or retrieve a printable/exportable ID card for a student.
+________________________________________
+4. Fees & Payments
+School Fees (Fee Structure & Summary)
+•	GET /api/school-fees
+List fee records (for classes or individual students).
+•	POST /api/school-fees
+Create a fee record for a student (specify expected fees, due date, academic_year_id, etc.).
+•	GET /api/school-fees/:id
+Retrieve details for a specific fee record.
+•	PUT /api/school-fees/:id
+Update a fee record (e.g., if fee amounts change).
+•	DELETE /api/school-fees/:id
+Delete a fee record.
+Payment Transactions (Detailed Payment History)
+•	GET /api/payment-transactions
+List all payment transactions.
+•	POST /api/payment-transactions
+Record a new payment transaction for a student. The body should include student_id, academic_year_id, amount, payment_date, payment_method, and optionally a receipt_number.
+•	GET /api/payment-transactions/:id
+Retrieve details for a specific payment transaction.
+•	PUT /api/payment-transactions/:id
+Update a payment transaction (if corrections are needed).
+•	DELETE /api/payment-transactions/:id
+Delete a payment transaction.
+•	GET /api/reports/fees
+Generate a fee summary report for classes, students, or the whole school (optionally exportable).
+________________________________________
+5. Subjects & Teaching Assignments
+Subjects & Sub-Class Subjects
+•	GET /api/subjects
+List all subjects.
+•	POST /api/subjects
+Create a new subject.
+•	GET /api/subjects/:id
+Retrieve details for a specific subject.
+•	PUT /api/subjects/:id
+Update subject details.
+•	DELETE /api/subjects/:id
+Delete a subject.
+•	GET /api/subclass-subjects
+List all subclass–subject assignments.
+•	POST /api/subclass-subjects
+Assign a subject to a sub-class (include subclass_id, subject_id, and coefficient).
+•	PUT /api/subclass-subjects/:id
+Update a subclass–subject assignment.
+•	DELETE /api/subclass-subjects/:id
+Remove a subclass–subject assignment.
+Subject Teacher Assignments
+•	GET /api/subject-teachers
+List all teacher assignments for subjects.
+•	POST /api/subject-teachers
+Assign a teacher to a subject (include subject_id and teacher_id).
+•	PUT /api/subject-teachers/:id
+Update a teacher assignment for a subject.
+•	DELETE /api/subject-teachers/:id
+Remove a teacher from a subject.
+________________________________________
+6. Exam & Question Bank Management
+Question Bank
+•	GET /api/questions
+List all exam questions.
+•	POST /api/questions
+Create a new question (include subject_id, question_text, question_type, options, correct_answer, and topic).
+•	GET /api/questions/:id
+Retrieve details for a specific question.
+•	PUT /api/questions/:id
+Update a question.
+•	DELETE /api/questions/:id
+Delete a question.
+Exam Paper Generation
+•	GET /api/exam-papers
+List all exam papers.
+•	POST /api/exam-papers
+Create an exam paper (include name, subject_id, academic_year_id, exam_date, and optionally period_id).
+•	GET /api/exam-papers/:id
+Retrieve exam paper details (with associated questions).
+•	PUT /api/exam-papers/:id
+Update exam paper details.
+•	DELETE /api/exam-papers/:id
+Delete an exam paper.
+Exam Paper Questions
+•	POST /api/exam-paper-questions
+Add a question to an exam paper (provide exam_paper_id, question_id, and optional order).
+•	DELETE /api/exam-paper-questions/:examPaperId/:questionId
+Remove a question from an exam paper.
+Marks Entry & Report Cards
+•	GET /api/marks
+List all marks records.
+•	POST /api/marks
+Enter marks for a student (include student_id, subject_id, exam_sequence_id, score, and grade).
+•	PUT /api/marks/:id
+Update a marks record.
+•	DELETE /api/marks/:id
+Delete a marks record.
+•	GET /api/reports/report-cards
+Generate report cards for a student or a class/sub-class. (Parameters can include student ID, class ID, or academic year.)
+•	GET /api/reports/exams
+Generate exam performance reports and statistics.
+________________________________________
+7. Attendance, Discipline & Counseling
+Student & Teacher Absences
+•	GET /api/student-absences
+List all student absence records.
+•	POST /api/student-absences
+Record an absence for a student (include student_id, assigned_by_id, and optionally sub_teach_period_year_id).
+•	PUT /api/student-absences/:id
+Update a student absence record.
+•	DELETE /api/student-absences/:id
+Delete a student absence record.
+•	GET /api/teacher-absences
+List all teacher absence records.
+•	POST /api/teacher-absences
+Record a teacher’s absence (include teacher_id, assigned_by_id, reason, and optionally sub_teach_period_year_id).
+•	PUT /api/teacher-absences/:id
+Update a teacher absence record.
+•	DELETE /api/teacher-absences/:id
+Delete a teacher absence record.
+Discipline Issues
+•	GET /api/discipline-issues
+List all discipline issues.
+•	POST /api/discipline-issues
+Record a discipline issue for a student (include student_id, description, notes, assigned_by_id, and reviewed_by_id).
+•	PUT /api/discipline-issues/:id
+Update a discipline issue record.
+•	DELETE /api/discipline-issues/:id
+Delete a discipline issue record.
+•	POST /api/guidance-remarks
+(Optional) Add guidance counselor remarks linked to a discipline issue or directly to a student.
+________________________________________
+8. Scheduling & Periods
+Periods
+•	GET /api/periods
+List all periods (time slots).
+•	POST /api/periods
+Create a new period (include day_of_week, start_time, and end_time).
+•	GET /api/periods/:id
+Retrieve details for a specific period.
+•	PUT /api/periods/:id
+Update a period.
+•	DELETE /api/periods/:id
+Delete a period.
+SubTeach Periods (Class & Exam Schedules)
+•	GET /api/subteach-periods
+List all sub-teaching period records.
+•	POST /api/subteach-periods
+Create a new sub-teaching period record (include subject_id, teacher_id, period_id, academic_year_id, assigned_by_id).
+•	PUT /api/subteach-periods/:id
+Update a sub-teaching period record.
+•	DELETE /api/subteach-periods/:id
+Delete a sub-teaching period record.
+________________________________________
+9. Assignments (Principals, Vice Principals, Bursars, etc.)
+•	GET /api/vice-principal-assignments
+List all vice principal assignments.
+•	POST /api/vice-principal-assignments
+Assign a vice principal to a sub-class (include user_id, subclass_id, academic_year_id).
+•	PUT /api/vice-principal-assignments/:id
+Update a vice principal assignment.
+•	DELETE /api/vice-principal-assignments/:id
+Delete a vice principal assignment.
+•	GET /api/discipline-master-assignments
+List all discipline master assignments.
+•	POST /api/discipline-master-assignments
+Assign a discipline master (include user_id, subclass_id, academic_year_id).
+•	PUT /api/discipline-master-assignments/:id
+Update a discipline master assignment.
+•	DELETE /api/discipline-master-assignments/:id
+Delete a discipline master assignment.
+•	GET /api/principal-assignments
+List principal assignments.
+•	POST /api/principal-assignments
+Assign a principal for an academic year (include user_id and academic_year_id).
+•	PUT /api/principal-assignments/:id
+Update a principal assignment.
+•	DELETE /api/principal-assignments/:id
+Delete a principal assignment.
+•	GET /api/bursar-assignments
+List bursar assignments.
+•	POST /api/bursar-assignments
+Assign a bursar (include user_id and academic_year_id).
+•	PUT /api/bursar-assignments/:id
+Update a bursar assignment.
+•	DELETE /api/bursar-assignments/:id
+Delete a bursar assignment.
+________________________________________
+10. Communication & Notifications
+Announcements
+•	GET /api/announcements
+List all announcements (optionally filtered by audience or academic year).
+•	POST /api/announcements
+Create a new announcement (include title, message, audience, optionally academic_year_id and created_by_id).
+•	GET /api/announcements/:id
+Retrieve a specific announcement.
+•	PUT /api/announcements/:id
+Update an announcement.
+•	DELETE /api/announcements/:id
+Delete an announcement.
+Mobile Notifications
+•	GET /api/mobile-notifications
+List all mobile notifications (for admin tracking purposes).
+•	POST /api/mobile-notifications
+Send (create) a mobile notification (include user_id, message, and optionally set status).
+•	GET /api/mobile-notifications/:id
+Retrieve details for a mobile notification.
+•	DELETE /api/mobile-notifications/:id
+Delete a mobile notification record.
+________________________________________
+11. Reporting & Dashboard
+•	GET /api/reports/fees
+Generate and export a fee summary report.
+•	GET /api/reports/exams
+Generate exam performance reports and statistics.
+•	GET /api/reports/attendance
+Generate attendance reports.
+•	GET /api/reports/performance
+Generate overall performance analytics (e.g., average marks, top performers).
+•	GET /api/dashboard
+Retrieve dashboard data for mobile/web (includes upcoming deadlines, announcements, attendance summaries, etc.).
+________________________________________
+12. (Future) Salaries & Payroll Management
+•	POST /api/salaries
+Create a salary record (pending final requirements).
+•	GET /api/salaries
+List all salary records.
+•	PUT /api/salaries/:id
+Update a salary record.
+•	DELETE /api/salaries/:id
+Delete a salary record.
+________________________________________
+Final Notes
+•	Versioning:
+Consider prefixing your endpoints with an API version (e.g., /api/v1/…).
+•	Authentication & Authorization:
+Ensure endpoints are secured (using JWT, OAuth, etc.), and that role-based access is enforced in your middleware.
+•	Validation & Error Handling:
+Implement request validation (using libraries like Joi or Zod) and proper error handling for each endpoint.
+This comprehensive endpoint list should serve as a roadmap for implementing your backend REST API in Node.js and TypeScript. You can adjust and refine the endpoints as requirements evolve.
+
