@@ -1,11 +1,15 @@
 // src/api/v1/controllers/authController.ts
 import { Request, Response } from 'express';
 import * as authService from '../services/authService';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { blacklistToken } from '../services/tokenBlacklistService';
 
-interface AuthenticatedRequest extends Request {
-    user?: { id: any }; // Adjust this based on your actual user object
-}
-
+/**
+ * Handle user login
+ * 
+ * @param req - Express request object containing email and password in the body
+ * @param res - Express response object
+ */
 export const login = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
@@ -17,6 +21,12 @@ export const login = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Register a new user
+ * 
+ * @param req - Express request object containing user details in the body
+ * @param res - Express response object
+ */
 export const register = async (req: Request, res: Response) => {
     try {
         const newUser = await authService.register(req.body);
@@ -27,17 +37,56 @@ export const register = async (req: Request, res: Response) => {
     }
 };
 
-export const getProfile = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
+/**
+ * Get the profile of the currently authenticated user
+ * 
+ * @param req - Express request object with authenticated user info
+ * @param res - Express response object
+ */
+export const getProfile = async (req: Request, res: Response) => {
     try {
-        // Assuming an authentication middleware sets req.user with the authenticated user's details.
-        const userId = req.user?.id;
+        // The user object is set by the authentication middleware
+        const authReq = req as AuthenticatedRequest;
+        const userId = authReq.user?.id;
+
         if (!userId) {
-            return res.status(401).json({ error: 'Unauthorized' });
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
         }
+
         const user = await authService.getProfile(userId);
         res.json(user);
     } catch (error: any) {
         console.error('Get profile error:', error);
         res.status(500).json({ error: error.message });
+    }
+};
+
+/**
+ * Handle user logout - invalidates the current token
+ * 
+ * @param req - Express request object with authenticated user info
+ * @param res - Express response object
+ */
+export const logout = (req: Request, res: Response) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        // Check if auth header exists
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            res.status(400).json({ message: 'No token provided' });
+            return;
+        }
+
+        // Extract token from header
+        const token = authHeader.split(' ')[1];
+
+        // Add token to blacklist
+        blacklistToken(token);
+
+        res.status(200).json({ message: 'Logged out successfully' });
+    } catch (error: any) {
+        console.error('Logout error:', error);
+        res.status(500).json({ error: error.message || 'Error during logout' });
     }
 };

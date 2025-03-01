@@ -1,9 +1,139 @@
 // src/api/v1/services/studentService.ts
-import prisma, { Student, Parent_Student, Gender } from '../../../config/db';
+import prisma, { Student, ParentStudent, Gender, Enrollment } from '../../../config/db';
+import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
+import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 
+// Get all students with pagination and filtering
+export async function getAllStudents(
+    paginationOptions?: PaginationOptions,
+    filterOptions?: FilterOptions
+): Promise<PaginatedResult<Student>> {
+    return paginate<Student>(
+        prisma.student,
+        paginationOptions,
+        filterOptions
+    );
+}
 
-export async function getAllStudents(): Promise<Student[]> {
-    return prisma.student.findMany();
+// Get all students with their current enrollment info with pagination and filtering
+export async function getAllStudentsWithCurrentEnrollment(
+    academicYearId?: number,
+    paginationOptions?: PaginationOptions,
+    filterOptions?: FilterOptions
+): Promise<PaginatedResult<any>> {
+    // Get the academic year id
+    const yearId = await getAcademicYearId(academicYearId);
+    if (!yearId) {
+        return {
+            data: [],
+            meta: {
+                total: 0,
+                page: paginationOptions?.page || 1,
+                limit: paginationOptions?.limit || 10,
+                totalPages: 0
+            }
+        };
+    }
+
+    // Process complex filters that span relations
+    const where: any = {};
+    const processedFilters: any = { ...filterOptions };
+
+    // Handle special filters
+    if (filterOptions) {
+        // Filter by class
+        if (filterOptions.class_id) {
+            processedFilters.enrollments = {
+                some: {
+                    academic_year_id: yearId,
+                    subclass: {
+                        class_id: parseInt(filterOptions.class_id as string)
+                    }
+                }
+            };
+            delete processedFilters.class_id;
+        }
+
+        // Filter by subclass
+        if (filterOptions.subclass_id) {
+            processedFilters.enrollments = {
+                ...(processedFilters.enrollments || {}),
+                some: {
+                    ...(processedFilters.enrollments?.some || {}),
+                    academic_year_id: yearId,
+                    subclass_id: parseInt(filterOptions.subclass_id as string)
+                }
+            };
+            delete processedFilters.subclass_id;
+        }
+
+        // Handle name filtering
+        if (filterOptions.name) {
+            processedFilters.name = {
+                contains: filterOptions.name,
+                mode: 'insensitive'
+            };
+        }
+
+        // Apply processed filters
+        Object.assign(where, processedFilters);
+    }
+
+    // Count total students matching the filter
+    const total = await prisma.student.count({ where });
+
+    // Default pagination values
+    const page = paginationOptions?.page || 1;
+    const limit = paginationOptions?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    // Build orderBy
+    let orderBy: any = undefined;
+    if (paginationOptions?.sortBy) {
+        orderBy = {
+            [paginationOptions.sortBy]: paginationOptions.sortOrder || 'asc'
+        };
+    }
+
+    // Get paginated students with their enrollment for the specified academic year
+    const students = await prisma.student.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+            enrollments: {
+                where: {
+                    academic_year_id: yearId
+                },
+                include: {
+                    subclass: {
+                        include: {
+                            class: true
+                        }
+                    }
+                }
+            },
+            parents: {
+                include: {
+                    parent: true
+                }
+            }
+        }
+    });
+
+    // Calculate total pages
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+        data: students,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages
+        }
+    };
 }
 
 export async function createStudent(data: {
@@ -34,18 +164,41 @@ export async function createStudent(data: {
     });
 }
 
-export async function getStudentById(id: number): Promise<Student | null> {
+export async function getStudentById(id: number, academicYearId?: number): Promise<any> {
+    // Get the academic year if provided
+    let yearId = undefined;
+    if (academicYearId !== undefined) {
+        yearId = academicYearId;
+    } else {
+        yearId = await getAcademicYearId();
+    }
+
     return prisma.student.findUnique({
         where: { id },
         include: {
-            parents: true,
-            student_sub_class_years: true,
+            parents: {
+                include: {
+                    parent: true
+                }
+            },
+            enrollments: yearId ? {
+                where: {
+                    academic_year_id: yearId
+                },
+                include: {
+                    subclass: {
+                        include: {
+                            class: true
+                        }
+                    }
+                }
+            } : true,
         },
     });
 }
 
-export async function linkParent(student_id: number, data: { parent_id: number }): Promise<Parent_Student> {
-    return prisma.parent_Student.create({
+export async function linkParent(student_id: number, data: { parent_id: number }): Promise<ParentStudent> {
+    return prisma.parentStudent.create({
         data: {
             student_id,
             parent_id: data.parent_id,
@@ -55,14 +208,56 @@ export async function linkParent(student_id: number, data: { parent_id: number }
 
 export async function enrollStudent(
     student_id: number,
-    data: { subclass_id: number; academic_year_id: number; photo: string }
-): Promise<any> {
-    return prisma.student_SubClass_Year.create({
+    data: {
+        subclass_id: number;
+        academic_year_id?: number;
+        photo: string;
+        repeater?: boolean;
+    }
+): Promise<Enrollment> {
+    // Get current academic year if not provided
+    if (!data.academic_year_id) {
+        data.academic_year_id = await getAcademicYearId() || undefined;
+        if (!data.academic_year_id) {
+            throw new Error("No academic year found and none provided");
+        }
+    }
+
+    return prisma.enrollment.create({
         data: {
             student_id,
             subclass_id: data.subclass_id,
             academic_year_id: data.academic_year_id,
             photo: data.photo,
+            repeater: data.repeater || false,
         },
+    });
+}
+
+// Get students by subclass for a specific academic year
+export async function getStudentsBySubclass(
+    subclass_id: number,
+    academicYearId?: number
+): Promise<Enrollment[]> {
+    // Get the academic year
+    const yearId = await getAcademicYearId(academicYearId);
+    if (!yearId) {
+        return [];
+    }
+
+    // Get students enrolled in this subclass for this academic year
+    return prisma.enrollment.findMany({
+        where: {
+            subclass_id,
+            academic_year_id: yearId
+        },
+        include: {
+            student: true,
+            subclass: {
+                include: {
+                    class: true
+                }
+            }
+        }
     });
 }

@@ -14,12 +14,19 @@
                 margin: 0;
             }
         }
+
+        /* .bg-center {
+            background-image: url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSGiqMOxJRLKN518xigHT9avaGphvFOCaDwqg&s');
+            background-position: center;
+            background-size: cover;
+            background-blend-mode: ;
+        } */
     </style>
 </head>
 
 <body class="bg-white font-sans text-xs">
     <!-- Main Container -->
-    <div class="container mx-auto p-4 max-w-4xl">
+    <div class="container mx-auto p-4 max-w-4xl bg-center bg-opacity-10 relative">
         <!-- Bilingual Header -->
         <div class="flex justify-between mb-4 border-b-2 border-black pb-2">
             <div class="text-center">
@@ -55,16 +62,15 @@
             <p class="font-bold ">2024 - 2025 / Evaluation N° 2</p>
         </div>
 
-        <% function getGrade(mark) { 
-                if (mark>= 18) return 'A+';
-                if (mark >= 16) return 'A';
-                if (mark >= 15) return 'B+';
-                if (mark >= 14) return 'B';
-                if (mark >= 12) return 'C+';
-                if (mark >= 10) return 'C';
-                return 'D';
+        <% function getGrade(mark) { if (mark>= 18) return 'A+';
+            if (mark >= 16) return 'A';
+            if (mark >= 15) return 'B+';
+            if (mark >= 14) return 'B';
+            if (mark >= 12) return 'C+';
+            if (mark >= 10) return 'C';
+            return 'D';
             }
-        %>
+            %>
 
             <!-- Student Information -->
             <div class="flex justify-between items-start mb-4">
@@ -109,114 +115,130 @@
             <div class="mb-6">
                 <% const categories=[...new Set(subjects.map(s=> s.category))]; %>
                     <% categories.forEach((category, index)=> { %>
-                        <table class="w-full border-collapse mb-5">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="border p-1 text-left w-1/2 uppercase">
-                                        <%= category %>
-                                    </th>
-                                    <th class="border p-1">Mark</th>
-                                    <th class="border p-1">Coef</th>
-                                    <th class="border p-1">Mark XCoef</th>
-                                    <th class="border p-1">Rk</th>
-                                    <th class="border p-1 w-1/7">Remarks</th>
-                                    <th class="border p-1">Min</th>
-                                    <th class="border p-1">Avg.</th>
-                                    <th class="border p-1">Max</th>
-                                    <th class="border p-1">S.R.</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <% subjects.filter(s=> s.category === category).forEach(subject => { %>
+                        <% const categorySummary=categorySummaries.find(cs=> cs.category === category); %>
+                            <table class="w-full border-collapse mb-5">
+                                <thead class="bg-gray-50">
                                     <tr>
-                                        <td class="border p-1 font-semibold">
-                                            <div class="font-bold">
-                                                <%= subject.name %>
-                                            </div>
-                                            <div class="text-gray-600 text-xs">
-                                                <%= subject.teacher %>
-                                            </div>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.mark.toFixed(2) %>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.coefficient %>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.weightedMark.toFixed(2) %>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.rank %>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.grade %>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.min.toFixed(2) %>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.avg.toFixed(2) %>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.max.toFixed(2) %>
-                                        </td>
-                                        <td class="border p-1 text-center">
-                                            <%= subject.successRate.toFixed(2) %>%
-                                        </td>
+                                        <th class="border p-1 text-left w-1/2 uppercase">
+                                            <%= category %>
+                                        </th>
+                                        <th class="border p-1">Mark</th>
+                                        <th class="border p-1">Coef</th>
+                                        <th class="border p-1">Mark XCoef</th>
+                                        <th class="border p-1">Rk</th>
+                                        <th class="border p-1 w-1/7">Remarks</th>
+                                        <th class="border p-1">Min</th>
+                                        <th class="border p-1">Avg.</th>
+                                        <th class="border p-1">Max</th>
+                                        <th class="border p-1">S.R.</th>
                                     </tr>
-                                    <% }) %>
-                                        <!-- Summary Row -->
-                                        <tr class="bg-yellow-100">
-                                            <td class="p-1 font-bold">
-                                                <div class="font-bold">Summary</div>
+                                </thead>
+                                <tbody>
+                                    <% subjects.filter(s=> s.category === category).forEach(subject => { %>
+                                        <tr>
+                                            <td class="border p-1 font-semibold">
+                                                <div class="font-bold">
+                                                    <%= subject.name %>
+                                                </div>
+                                                <div class="text-gray-600 text-xs">
+                                                    <%= subject.teacher %>
+                                                </div>
                                             </td>
                                             <td class="border p-1 text-center">
-                                                <%= subjects.filter(s=> s.category === category).map(s =>
-                                                    s.mark).reduce((sum, mark) => sum + mark, 0).toFixed(2) %>
+                                                <%= subject.mark.toFixed(2) %>
                                             </td>
                                             <td class="border p-1 text-center">
-                                                <%= subjects.filter(s=> s.category === category).map(s =>
-                                                    s.coefficient).reduce((sum, coef) => sum + coef, 0) %>
+                                                <%= subject.coefficient %>
                                             </td>
                                             <td class="border p-1 text-center">
-                                                <%= subjects.filter(s=> s.category === category).map(s =>
-                                                    s.weightedMark).reduce((sum, mark) => sum + mark, 0).toFixed(2) %>
+                                                <%= subject.weightedMark.toFixed(2) %>
                                             </td>
-                                            <td class="border p-1 text-center">57th</td>
-                                            <td class="border p-1 text-center">A</td>
-                                            <td class="border p-1 text-center">00.00</td>
-                                            <td class="border p-1 text-center">00.00</td>
-                                            <td class="border p-1 text-center">00.00</td>
-                                            <td class="border p-1 text-center">00.00%</td>
+                                            <td class="border p-1 text-center">
+                                                <%= subject.rank %>
+                                            </td>
+                                            <td class="border p-1 text-center">
+                                                <%= subject.grade %>
+                                            </td>
+                                            <td class="border p-1 text-center">
+                                                <%= subject.min.toFixed(2) %>
+                                            </td>
+                                            <td class="border p-1 text-center">
+                                                <%= subject.avg.toFixed(2) %>
+                                            </td>
+                                            <td class="border p-1 text-center">
+                                                <%= subject.max.toFixed(2) %>
+                                            </td>
+                                            <td class="border p-1 text-center">
+                                                <%= subject.successRate.toFixed(2) %>%
+                                            </td>
                                         </tr>
-
-                                        <!-- Total Row -->
-                                        <% if(categories.length-1===index) { %>
-                                            <tr>
-                                                <td class="p-1 font-bold text-center">
-                                                    <div class="font-bold text-lg">TOTAL</div>
+                                        <% }) %>
+                                            <!-- Summary Row - Using pre-calculated data -->
+                                            <tr class="bg-yellow-100">
+                                                <td class="p-1 font-bold">
+                                                    <div class="font-bold">Summary</div>
                                                 </td>
-                                                <!-- Total marks -->
-                                                <td class="p-1 text-center">
-                                                    <% subjects.map(s=>
-                                                        s.weightedMark).reduce((sum, mark) => sum + mark, 0) %>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.totalMark.toFixed(2) %>
                                                 </td>
-                                                <!-- Total marks -->
-                                                <td class="p-1 text-center">
-                                                    <% subjects.map(s=>
-                                                        s.coefficient).reduce((sum, coef) => sum + coef, 0) %>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.totalCoef %>
                                                 </td>
-                                                <!-- Total marks*Coef -->
-                                                <td class="p-1 text-center">
-                                                    <% subjects.map(s=>
-                                                        s.weightedMark).reduce((sum, mark) => sum + mark, 0) %>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.totalWeightedMark.toFixed(2) %>
+                                                </td>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.categoryRank %>
+                                                </td>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.categoryGrade %>
+                                                </td>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.categoryMin.toFixed(2) %>
+                                                </td>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.categoryAvg.toFixed(2) %>
+                                                </td>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.categoryMax.toFixed(2) %>
+                                                </td>
+                                                <td class="border p-1 text-center">
+                                                    <%= categorySummary.categorySuccessRate.toFixed(2) %>%
                                                 </td>
                                             </tr>
-                                            <% } %>
-                            </tbody>
-                        </table>
-                        <% }) %>
+
+                                            <!-- Total Row - only shown on the last category -->
+                                            <% if(categories.length-1===index) { %>
+                                                <tr>
+                                                    <td class="p-1 font-bold text-center">
+                                                        <div class="font-bold text-lg">TOTAL</div>
+                                                    </td>
+                                                    <!-- Total marks -->
+                                                    <td class="p-1 text-center">
+                                                        <%= totals.totalMark.toFixed(2) %>
+                                                    </td>
+                                                    <!-- Total coefficients -->
+                                                    <td class="p-1 text-center">
+                                                        <%= totals.totalCoef %>
+                                                    </td>
+                                                    <!-- Total weighted marks -->
+                                                    <td class="p-1 text-center">
+                                                        <%= totals.totalWeightedMark.toFixed(2) %>
+                                                    </td>
+                                                    <td class="p-1 text-center">
+                                                        <%= statistics.rank %>
+                                                    </td>
+                                                    <td class="p-1 text-center">
+                                                        <%= totals.overallGrade %>
+                                                    </td>
+                                                    <td colspan="4" class="p-1 text-center text-sm">
+                                                        Overall Average: <%= totals.overallAverage.toFixed(2) %>
+                                                    </td>
+                                                </tr>
+                                                <% } %>
+                                </tbody>
+                            </table>
+                            <% }) %>
             </div>
 
             <!-- Statistics Section -->
@@ -323,14 +345,14 @@
                                     <!-- weakest average of the subclass -->
                                     <span class="text-sm">Last Student's average</span>
                                     <span>
-                                        <%= statistics.classStats.lastStudentAverage %>
+                                        <%= statistics.classStats.lowestAverage %>
                                     </span>
                                 </div>
                                 <div class="flex justify-between">
                                     <!-- heightest average of the subclass -->
                                     <span class="text-sm">Best Student's average</span>
                                     <span>
-                                        <%= statistics.classStats.bestStudentAverage %>
+                                        <%= statistics.classStats.highestAverage %>
                                     </span>
                                 </div>
                                 <div class="flex justify-between">

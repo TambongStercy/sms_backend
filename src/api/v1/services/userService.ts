@@ -2,10 +2,41 @@
 
 import prisma, { Gender, User, Role } from '../../../config/db';
 import bcrypt from 'bcrypt';
+import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 
 
-export async function getAllUsers(): Promise<User[]> {
-    return prisma.user.findMany();
+export async function getAllUsers(
+    paginationOptions?: PaginationOptions,
+    filterOptions?: FilterOptions
+): Promise<PaginatedResult<User>> {
+    // Process complex filters for users
+    const processedFilters: any = { ...filterOptions };
+
+    // Role filtering
+    if (filterOptions?.role) {
+        processedFilters.user_roles = {
+            some: {
+                role: filterOptions.role
+            }
+        };
+        delete processedFilters.role;
+    }
+
+    // Build include option for related data
+    const include: any = {};
+
+    // Include roles if requested
+    if (filterOptions?.includeRoles === 'true') {
+        include.user_roles = true;
+        delete processedFilters.includeRoles;
+    }
+
+    return paginate<User>(
+        prisma.user,
+        paginationOptions,
+        processedFilters,
+        Object.keys(include).length > 0 ? include : undefined
+    );
 }
 
 export async function createUser(data: {

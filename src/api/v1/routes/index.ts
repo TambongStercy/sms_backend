@@ -7,7 +7,7 @@ import studentRoutes from './studentRoutes';
 import feeRoutes from './feeRoutes';
 import subjectRoutes from './subjectRoutes';
 import disciplineRoutes from './disciplineRoutes';
-import examRoutes, { marksRouter } from './examRoutes';
+import examRoutes, { marksRouter, reportCardsRouter } from './examRoutes';
 import communicationRoutes from './communicationRoutes';
 import mobileRoutes from './mobileRoutes';
 
@@ -30,6 +30,9 @@ router.use('/exams', examRoutes);
 
 // Marks endpoints are mounted at /marks
 router.use('/marks', marksRouter);
+
+// Report cards endpoints are mounted at /report-cards
+router.use('/report-cards', reportCardsRouter);
 
 // Communication endpoints (announcements & notifications)
 router.use('/', communicationRoutes);

@@ -1,0 +1,3651 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "School Management System API",
+    "version": "1.0.0",
+    "description": "API for School Management System including authentication, academic year, subjects, exams, and mobile integrations",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "contact": {
+      "name": "API Support",
+      "url": "https://www.schoolmanagementsystem.com/support",
+      "email": "support@schoolmanagementsystem.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Development server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "Term": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Term ID",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Term name",
+            "example": "First Term"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Term start date",
+            "example": "2023-09-01T00:00:00.000Z"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Term end date",
+            "example": "2023-12-20T00:00:00.000Z"
+          },
+          "academicYearId": {
+            "type": "integer",
+            "description": "ID of the academic year this term belongs to",
+            "example": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the term was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the term was last updated",
+            "example": "2023-01-01T12:00:00.000Z"
+          }
+        }
+      },
+      "AcademicYear": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Academic year ID",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Academic year name",
+            "example": "2023-2024"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Academic year start date",
+            "example": "2023-09-01T00:00:00.000Z"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Academic year end date",
+            "example": "2024-06-30T00:00:00.000Z"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this is the default academic year",
+            "example": true
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Term"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the academic year was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the academic year was last updated",
+            "example": "2023-01-01T12:00:00.000Z"
+          }
+        }
+      },
+      "CreateAcademicYearRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "startDate",
+          "endDate"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Academic year name",
+            "example": "2024-2025"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Academic year start date",
+            "example": "2024-09-01"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Academic year end date",
+            "example": "2025-06-30"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this should be the default academic year",
+            "example": false
+          }
+        }
+      },
+      "UpdateAcademicYearRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Academic year name",
+            "example": "2024-2025 Updated"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Academic year start date",
+            "example": "2024-08-15"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Academic year end date",
+            "example": "2025-06-15"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this should be the default academic year",
+            "example": false
+          }
+        }
+      },
+      "TermRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "startDate",
+          "endDate"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Term name",
+            "example": "Second Term"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Term start date",
+            "example": "2024-01-10"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Term end date",
+            "example": "2024-04-15"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john.doe@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "description": "User's password",
+            "example": "securePassword123"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT authentication token",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "password",
+          "gender",
+          "date_of_birth",
+          "phone",
+          "address"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "User's full name",
+            "example": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john.doe@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "description": "User's password",
+            "example": "securePassword123"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE",
+              "OTHER"
+            ],
+            "description": "User's gender",
+            "example": "MALE"
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date",
+            "description": "User's date of birth",
+            "example": "1990-01-01"
+          },
+          "phone": {
+            "type": "string",
+            "description": "User's phone number",
+            "example": 1234567890
+          },
+          "address": {
+            "type": "string",
+            "description": "User's physical address",
+            "example": "123 Main St, City, Country"
+          },
+          "id_card_num": {
+            "type": "string",
+            "description": "User's ID card number (optional)",
+            "example": "ID12345678"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "User's unique identifier",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "User's full name",
+            "example": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john.doe@example.com"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE",
+              "OTHER"
+            ],
+            "description": "User's gender",
+            "example": "MALE"
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date",
+            "description": "User's date of birth",
+            "example": "1990-01-01"
+          },
+          "phone": {
+            "type": "string",
+            "description": "User's phone number",
+            "example": 1234567890
+          },
+          "address": {
+            "type": "string",
+            "description": "User's physical address",
+            "example": "123 Main St, City, Country"
+          },
+          "id_card_num": {
+            "type": "string",
+            "description": "User's ID card number",
+            "example": "ID12345678"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the user was created",
+            "example": "2023-01-01T00:00:00Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the user was last updated",
+            "example": "2023-01-01T00:00:00Z"
+          }
+        }
+      },
+      "Exam": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Exam ID",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "Exam title",
+            "example": "Mid-Term Assessment"
+          },
+          "description": {
+            "type": "string",
+            "description": "Exam description",
+            "example": "Mathematics mid-term assessment covering chapters 1-5"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time of the exam",
+            "example": "2023-10-15T09:00:00.000Z"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration of the exam in minutes",
+            "example": 120
+          },
+          "maxScore": {
+            "type": "integer",
+            "description": "Maximum possible score for the exam",
+            "example": 100
+          },
+          "passScore": {
+            "type": "integer",
+            "description": "Minimum score required to pass the exam",
+            "example": 60
+          },
+          "subjectId": {
+            "type": "integer",
+            "description": "ID of the subject for this exam",
+            "example": 1
+          },
+          "termId": {
+            "type": "integer",
+            "description": "ID of the term for this exam",
+            "example": 2
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the exam was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the exam was last updated",
+            "example": "2023-01-01T12:00:00.000Z"
+          }
+        }
+      },
+      "ExamDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Exam ID",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "Exam title",
+            "example": "Mid-Term Assessment"
+          },
+          "description": {
+            "type": "string",
+            "description": "Exam description",
+            "example": "Mathematics mid-term assessment covering chapters 1-5"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time of the exam",
+            "example": "2023-10-15T09:00:00.000Z"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration of the exam in minutes",
+            "example": 120
+          },
+          "maxScore": {
+            "type": "integer",
+            "description": "Maximum possible score for the exam",
+            "example": 100
+          },
+          "passScore": {
+            "type": "integer",
+            "description": "Minimum score required to pass the exam",
+            "example": 60
+          },
+          "subject": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Subject ID",
+                "example": 1
+              },
+              "name": {
+                "type": "string",
+                "description": "Subject name",
+                "example": "Mathematics"
+              }
+            }
+          },
+          "term": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Term ID",
+                "example": 2
+              },
+              "name": {
+                "type": "string",
+                "description": "Term name",
+                "example": "Second Term"
+              }
+            }
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mark"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the exam was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the exam was last updated",
+            "example": "2023-01-01T12:00:00.000Z"
+          }
+        }
+      },
+      "Mark": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Mark ID",
+            "example": 1
+          },
+          "score": {
+            "type": "number",
+            "description": "Student's score for the exam",
+            "example": 85
+          },
+          "comment": {
+            "type": "string",
+            "description": "Teacher's comment on the mark",
+            "example": "Excellent work on problem-solving questions"
+          },
+          "examId": {
+            "type": "integer",
+            "description": "ID of the exam this mark is for",
+            "example": 1
+          },
+          "studentId": {
+            "type": "integer",
+            "description": "ID of the student this mark belongs to",
+            "example": 10
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the mark was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the mark was last updated",
+            "example": "2023-01-01T12:00:00.000Z"
+          }
+        }
+      },
+      "CreateExamRequest": {
+        "type": "object",
+        "required": [
+          "title",
+          "date",
+          "maxScore",
+          "passScore",
+          "subjectId",
+          "termId"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Exam title",
+            "example": "Final Examination"
+          },
+          "description": {
+            "type": "string",
+            "description": "Exam description",
+            "example": "Comprehensive assessment covering all course material"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of the exam",
+            "example": "2023-12-10"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration of the exam in minutes",
+            "example": 180
+          },
+          "maxScore": {
+            "type": "integer",
+            "description": "Maximum possible score for the exam",
+            "example": 100
+          },
+          "passScore": {
+            "type": "integer",
+            "description": "Minimum score required to pass the exam",
+            "example": 50
+          },
+          "subjectId": {
+            "type": "integer",
+            "description": "ID of the subject for this exam",
+            "example": 2
+          },
+          "termId": {
+            "type": "integer",
+            "description": "ID of the term for this exam",
+            "example": 3
+          }
+        }
+      },
+      "UpdateExamRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Exam title",
+            "example": "Updated Final Examination"
+          },
+          "description": {
+            "type": "string",
+            "description": "Exam description",
+            "example": "Comprehensive assessment with revised content"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of the exam",
+            "example": "2023-12-15"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration of the exam in minutes",
+            "example": 150
+          },
+          "maxScore": {
+            "type": "integer",
+            "description": "Maximum possible score for the exam",
+            "example": 120
+          },
+          "passScore": {
+            "type": "integer",
+            "description": "Minimum score required to pass the exam",
+            "example": 65
+          }
+        }
+      },
+      "CreateMarkRequest": {
+        "type": "object",
+        "required": [
+          "score",
+          "studentId"
+        ],
+        "properties": {
+          "score": {
+            "type": "number",
+            "description": "Student's score for the exam",
+            "example": 92
+          },
+          "comment": {
+            "type": "string",
+            "description": "Teacher's comment on the mark",
+            "example": "Outstanding performance in all sections"
+          },
+          "studentId": {
+            "type": "integer",
+            "description": "ID of the student this mark belongs to",
+            "example": 12
+          }
+        }
+      },
+      "UpdateMarkRequest": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "number",
+            "description": "Student's score for the exam",
+            "example": 95
+          },
+          "comment": {
+            "type": "string",
+            "description": "Teacher's comment on the mark",
+            "example": "Revised score after review - excellent work"
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Notification ID",
+            "example": 1
+          },
+          "user_id": {
+            "type": "integer",
+            "description": "ID of the user the notification belongs to",
+            "example": 10
+          },
+          "message": {
+            "type": "string",
+            "description": "Notification message content",
+            "example": "New announcement posted"
+          },
+          "date_sent": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time the notification was sent",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SENT",
+              "DELIVERED",
+              "READ"
+            ],
+            "description": "Current status of the notification",
+            "example": "DELIVERED"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the notification was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the notification was last updated",
+            "example": "2023-01-01T12:00:00.000Z"
+          }
+        }
+      },
+      "DeviceRegistrationRequest": {
+        "type": "object",
+        "required": [
+          "deviceToken",
+          "deviceType"
+        ],
+        "properties": {
+          "deviceToken": {
+            "type": "string",
+            "description": "Device token for push notifications",
+            "example": "fcm-token-example-123456789"
+          },
+          "deviceType": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ],
+            "description": "Type of the device",
+            "example": "android"
+          }
+        }
+      },
+      "DeviceRegistrationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation was successful",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Success or error message",
+            "example": "Device registered successfully"
+          },
+          "deviceInfo": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "integer",
+                "description": "User ID",
+                "example": 1
+              },
+              "deviceToken": {
+                "type": "string",
+                "description": "Device token",
+                "example": "fcm-token-example-123456789"
+              },
+              "deviceType": {
+                "type": "string",
+                "description": "Device type",
+                "example": "android"
+              }
+            }
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "properties": {
+          "announcements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "title": {
+                  "type": "string",
+                  "example": "School Closed Tomorrow"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Due to weather conditions, school will be closed tomorrow"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2023-01-01T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "upcomingEvents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "title": {
+                  "type": "string",
+                  "example": "Parent-Teacher Conference"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2023-01-15T14:00:00.000Z"
+                },
+                "location": {
+                  "type": "string",
+                  "example": "School Auditorium"
+                }
+              }
+            }
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {
+              "attendance": {
+                "type": "integer",
+                "description": "Attendance percentage",
+                "example": 95
+              },
+              "assignments": {
+                "type": "integer",
+                "description": "Number of pending assignments",
+                "example": 3
+              },
+              "fees": {
+                "type": "object",
+                "properties": {
+                  "paid": {
+                    "type": "number",
+                    "description": "Amount of fees paid",
+                    "example": 5000
+                  },
+                  "pending": {
+                    "type": "number",
+                    "description": "Amount of fees pending",
+                    "example": 2000
+                  }
+                }
+              }
+            }
+          },
+          "quickLinks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "example": "View Timetable"
+                },
+                "url": {
+                  "type": "string",
+                  "example": "/timetable"
+                },
+                "icon": {
+                  "type": "string",
+                  "example": "calendar"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SyncRequest": {
+        "type": "object",
+        "required": [
+          "lastSyncTimestamp"
+        ],
+        "properties": {
+          "lastSyncTimestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the last sync",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "attendanceRecords": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "markEntries": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "formSubmissions": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SyncResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "syncTimestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-01-02T12:00:00.000Z"
+          },
+          "updates": {
+            "type": "object",
+            "properties": {
+              "students": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "classes": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "subjects": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "announcements": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Subject": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Subject ID",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Subject name",
+            "example": "Mathematics"
+          },
+          "shortName": {
+            "type": "string",
+            "description": "Short form of the subject name",
+            "example": "Math"
+          },
+          "code": {
+            "type": "string",
+            "description": "Subject code",
+            "example": "MATH101"
+          },
+          "description": {
+            "type": "string",
+            "description": "Subject description",
+            "example": "Basic mathematical principles and concepts"
+          },
+          "classLevel": {
+            "type": "string",
+            "description": "Grade or class level",
+            "example": "Grade 10"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the subject was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the subject was last updated",
+            "example": "2023-01-01T12:00:00.000Z"
+          }
+        }
+      },
+      "SubjectDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Subject ID",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Subject name",
+            "example": "Mathematics"
+          },
+          "shortName": {
+            "type": "string",
+            "description": "Short form of the subject name",
+            "example": "Math"
+          },
+          "code": {
+            "type": "string",
+            "description": "Subject code",
+            "example": "MATH101"
+          },
+          "description": {
+            "type": "string",
+            "description": "Subject description",
+            "example": "Basic mathematical principles and concepts"
+          },
+          "classLevel": {
+            "type": "string",
+            "description": "Grade or class level",
+            "example": "Grade 10"
+          },
+          "teachers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Teacher ID"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Teacher name"
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Teacher email"
+                }
+              }
+            }
+          },
+          "subclasses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Subclass ID"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Subclass name"
+                }
+              }
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the subject was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the subject was last updated",
+            "example": "2023-01-01T12:00:00.000Z"
+          }
+        }
+      },
+      "CreateSubjectRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "shortName",
+          "code",
+          "classLevel"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Subject name",
+            "example": "Physics"
+          },
+          "shortName": {
+            "type": "string",
+            "description": "Short form of the subject name",
+            "example": "Phys"
+          },
+          "code": {
+            "type": "string",
+            "description": "Subject code",
+            "example": "PHYS101"
+          },
+          "description": {
+            "type": "string",
+            "description": "Subject description",
+            "example": "Introduction to basic principles of physics"
+          },
+          "classLevel": {
+            "type": "string",
+            "description": "Grade or class level",
+            "example": "Grade 11"
+          }
+        }
+      },
+      "UpdateSubjectRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Subject name",
+            "example": "Advanced Physics"
+          },
+          "shortName": {
+            "type": "string",
+            "description": "Short form of the subject name",
+            "example": "AP"
+          },
+          "code": {
+            "type": "string",
+            "description": "Subject code",
+            "example": "PHYS201"
+          },
+          "description": {
+            "type": "string",
+            "description": "Subject description",
+            "example": "Advanced physics concepts including mechanics and thermodynamics"
+          },
+          "classLevel": {
+            "type": "string",
+            "description": "Grade or class level",
+            "example": "Grade 12"
+          }
+        }
+      },
+      "AssignTeacherRequest": {
+        "type": "object",
+        "required": [
+          "teacherId"
+        ],
+        "properties": {
+          "teacherId": {
+            "type": "integer",
+            "description": "ID of the teacher to assign to the subject",
+            "example": 5
+          }
+        }
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Access token is missing or invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string",
+                  "example": "Unauthorized"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "summary": "User login",
+        "tags": [
+          "Authentication"
+        ],
+        "description": "Authenticates a user with email and password credentials.\nOn successful login, returns a JWT token valid for 24 hours along with user information.\nThis token must be included in the Authorization header of subsequent requests.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "examples": {
+                "valid": {
+                  "summary": "Valid login credentials",
+                  "value": {
+                    "email": "user@example.com",
+                    "password": "password123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Successful login response",
+                    "value": {
+                      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjE1MjQ1NTY1LCJleHAiOjE2MTUzMzE5NjV9.8tUTQM6q7J_5oxlAb-mGjNPNBg9T5WvEYW8RSBvKAiQ",
+                      "user": {
+                        "id": 1,
+                        "name": "John Doe",
+                        "email": "user@example.com",
+                        "gender": "Male"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "invalidCredentials": {
+                    "summary": "Invalid credentials provided",
+                    "value": {
+                      "error": "Invalid credentials"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "tags": [
+          "Authentication"
+        ],
+        "description": "Creates a new user account with the provided information.\nPasswords are securely hashed before storage.\nAfter registration, users must login to access protected endpoints.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              },
+              "examples": {
+                "valid": {
+                  "summary": "Valid registration information",
+                  "value": {
+                    "name": "John Doe",
+                    "email": "john.doe@example.com",
+                    "password": "SecurePass123",
+                    "gender": "Male",
+                    "date_of_birth": "1990-01-01",
+                    "phone": "+237 680123456",
+                    "address": "123 Main Street, Yaoundé",
+                    "id_card_num": "ID12345678"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "invalidGender": {
+                    "summary": "Invalid gender value",
+                    "value": {
+                      "error": "Invalid gender. Choose a valid gender."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "duplicateEmail": {
+                    "summary": "Email already in use",
+                    "value": {
+                      "error": "Email already in use"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "User logout",
+        "tags": [
+          "Authentication"
+        ],
+        "description": "Invalidates the user's JWT token by adding it to a blacklist.\nOnce logged out, the token can no longer be used for authentication,\neven if it hasn't yet expired. This endpoint requires authentication.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logout successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Logged out successfully"
+                    }
+                  }
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Successful logout",
+                    "value": {
+                      "message": "Logged out successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No token provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "No token provided"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Get current user's profile",
+        "tags": [
+          "Authentication"
+        ],
+        "description": "Retrieves the profile information of the currently authenticated user.\nThis endpoint requires a valid JWT token from a previous login.\nThe user's ID is extracted from the token, and their profile is fetched from the database.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Complete user profile",
+                    "value": {
+                      "id": 1,
+                      "name": "John Doe",
+                      "email": "john.doe@example.com",
+                      "gender": "Male",
+                      "date_of_birth": "1990-01-01",
+                      "phone": "+237 680123456",
+                      "address": "123 Main Street, Yaoundé",
+                      "id_card_num": "ID12345678",
+                      "photo": "https://example.com/profiles/john.jpg",
+                      "created_at": "2023-01-01T12:00:00Z",
+                      "updated_at": "2023-01-01T12:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "notFound": {
+                    "summary": "User not found",
+                    "value": {
+                      "error": "User not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/academic-years": {
+      "get": {
+        "summary": "Get all academic years",
+        "description": "Retrieves a list of all academic years",
+        "tags": [
+          "Academic Years"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for pagination"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of academic years retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "academicYears": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AcademicYear"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new academic year",
+        "description": "Creates a new academic year with the provided details",
+        "tags": [
+          "Academic Years"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAcademicYearRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Academic year created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYear"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/academic-years/{id}": {
+      "get": {
+        "summary": "Get academic year details",
+        "description": "Retrieves details of a specific academic year by ID",
+        "tags": [
+          "Academic Years"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Academic year ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Academic year details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYear"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Academic year not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update an academic year",
+        "description": "Updates an existing academic year with the provided details",
+        "tags": [
+          "Academic Years"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Academic year ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAcademicYearRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Academic year updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYear"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Academic year not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an academic year",
+        "description": "Deletes a specific academic year by ID",
+        "tags": [
+          "Academic Years"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Academic year ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Academic year deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Academic year not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/academic-years/{id}/default": {
+      "post": {
+        "summary": "Set an academic year as default",
+        "description": "Sets a specific academic year as the default",
+        "tags": [
+          "Academic Years"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Academic year ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Academic year set as default successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "academicYear": {
+                      "$ref": "#/components/schemas/AcademicYear"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Academic year not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/academic-years/{id}/terms": {
+      "post": {
+        "summary": "Add a term to an academic year",
+        "description": "Adds a new term to a specific academic year",
+        "tags": [
+          "Academic Years"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Academic year ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TermRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Term added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Term"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Academic year not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subjects": {
+      "get": {
+        "summary": "Get all subjects",
+        "description": "Retrieves a list of all subjects",
+        "tags": [
+          "Subjects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for pagination"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "in": "query",
+            "name": "classLevel",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter subjects by class level"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of subjects retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subjects": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Subject"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new subject",
+        "description": "Creates a new subject with the provided details",
+        "tags": [
+          "Subjects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subject created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subjects/{id}": {
+      "get": {
+        "summary": "Get subject details",
+        "description": "Retrieves details of a specific subject by ID",
+        "tags": [
+          "Subjects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Subject ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subject details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subject not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update subject details",
+        "description": "Updates an existing subject with the provided details",
+        "tags": [
+          "Subjects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Subject ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subject updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subject not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a subject",
+        "description": "Deletes a specific subject by ID",
+        "tags": [
+          "Subjects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Subject ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subject deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subject not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subjects/{id}/teachers": {
+      "post": {
+        "summary": "Assign a teacher to a subject",
+        "description": "Assigns a teacher to a specific subject",
+        "tags": [
+          "Subjects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Subject ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTeacherRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Teacher assigned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "$ref": "#/components/schemas/SubjectDetail"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subject or teacher not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exams": {
+      "get": {
+        "summary": "Get all exams",
+        "description": "Retrieves a list of all exams",
+        "tags": [
+          "Exams"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for pagination"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "in": "query",
+            "name": "subjectId",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter exams by subject ID"
+          },
+          {
+            "in": "query",
+            "name": "termId",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter exams by term ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of exams retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exams": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Exam"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new exam",
+        "description": "Creates a new exam with the provided details",
+        "tags": [
+          "Exams"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExamRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Exam created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Exam"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exams/{id}": {
+      "get": {
+        "summary": "Get exam details",
+        "description": "Retrieves details of a specific exam by ID",
+        "tags": [
+          "Exams"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Exam ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exam details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Exam not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an exam",
+        "description": "Deletes a specific exam by ID",
+        "tags": [
+          "Exams"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Exam ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exam deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Exam not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/marks": {
+      "get": {
+        "summary": "Get all marks",
+        "description": "Retrieves a list of all marks with optional filtering",
+        "tags": [
+          "Marks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for pagination"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "in": "query",
+            "name": "examId",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter marks by exam ID"
+          },
+          {
+            "in": "query",
+            "name": "studentId",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter marks by student ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of marks retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "marks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Mark"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new mark entry",
+        "description": "Creates a new mark for a student's exam",
+        "tags": [
+          "Marks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMarkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mark created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mark"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Exam or student not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/marks/{id}": {
+      "put": {
+        "summary": "Update a mark",
+        "description": "Updates an existing mark with the provided details",
+        "tags": [
+          "Marks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Mark ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMarkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mark updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mark"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mark not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a mark",
+        "description": "Deletes a specific mark by ID",
+        "tags": [
+          "Marks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Mark ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mark deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - User does not have required permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mark not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mobile/dashboard": {
+      "get": {
+        "summary": "Get mobile dashboard data",
+        "description": "Retrieves personalized dashboard data for the authenticated user's mobile app",
+        "tags": [
+          "Mobile"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard data retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mobile/register-device": {
+      "post": {
+        "summary": "Register a mobile device for push notifications",
+        "description": "Registers a mobile device to receive push notifications",
+        "tags": [
+          "Mobile"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRegistrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mobile/notifications": {
+      "get": {
+        "summary": "Get user-specific notifications",
+        "description": "Retrieves all notifications for the authenticated user",
+        "tags": [
+          "Mobile"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for pagination"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Number of notifications per page"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "read",
+                "unread",
+                "all"
+              ],
+              "default": "all"
+            },
+            "description": "Filter notifications by status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "notifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Notification"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mobile/data/sync": {
+      "post": {
+        "summary": "Sync offline data",
+        "description": "Synchronizes data between the mobile app and server",
+        "tags": [
+          "Mobile"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data synchronized successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User is not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "User authentication, registration, and session management endpoints"
+    }
+  ]
+}

@@ -1,10 +1,23 @@
 // src/api/v1/controllers/classController.ts
 import { Request, Response } from 'express';
 import * as classService from '../services/classService';
+import { extractPaginationAndFilters } from '../../../utils/pagination';
 
-export const getAllClasses = async (req: Request, res: Response) => {
+export const getAllClasses = async (req: Request, res: Response): Promise<any> => {
     try {
-        const classes = await classService.getAllClasses();
+        // Check if the legacy mode is requested (for backward compatibility)
+        if (req.query.legacy === 'true') {
+            const classes = await classService.getAllClassesWithSubclasses();
+            return res.json(classes);
+        }
+
+        // Define allowed filters for classes
+        const allowedFilters = ['name', 'id'];
+
+        // Extract pagination and filter parameters from the request
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+
+        const classes = await classService.getAllClasses(paginationOptions, filterOptions);
         res.json(classes);
     } catch (error: any) {
         console.error('Error fetching classes:', error);

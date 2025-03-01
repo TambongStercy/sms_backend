@@ -1,10 +1,17 @@
 // src/api/v1/controllers/userController.ts
 import { Request, Response } from 'express';
 import * as userService from '../services/userService';
+import { extractPaginationAndFilters } from '../../../utils/pagination';
 
 export const getAllUsers = async (req: Request, res: Response) => {
     try {
-        const users = await userService.getAllUsers();
+        // Define allowed filters for users
+        const allowedFilters = ['name', 'email', 'gender', 'role', 'includeRoles', 'phone'];
+
+        // Extract pagination and filter parameters from the request
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+
+        const users = await userService.getAllUsers(paginationOptions, filterOptions);
         res.json(users);
     } catch (error: any) {
         console.error('Error fetching users:', error);

@@ -9,24 +9,27 @@ datasource db {
 
 model AcademicYear {
     id         Int      @id @unique @default(autoincrement())
+    name       String?
     start_date DateTime
     end_date   DateTime
+    is_default Boolean  @default(false)
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    user_roles                   UserRole[]
-    student_sub_class_years      Student_SubClass_Year[]
-    vice_principal_assignment    VicePrincipalAssignment[]
-    discipline_master_assignment DisciplineMasterAssignment[]
-    principal_assignment         PrincipalAssignment?
-    bursar_assignment            BursarAssignment?
-    exam_sequences               ExamSequence[]
-    sub_teach_periods            SubTeach_Period_Year[]
-    school_fees                  SchoolFees[]
-    payment_transactions         PaymentTransaction[]
-    exam_papers                  ExamPaper[]
-    announcement                 Announcement[]
+    user_roles                    UserRole[]
+    enrollments                   Enrollment[]
+    vice_principal_assignments    VicePrincipalAssignment[]
+    discipline_master_assignments DisciplineMasterAssignment[]
+    principal_assignment          PrincipalAssignment?
+    bursar_assignment             BursarAssignment?
+    exam_sequences                ExamSequence[]
+    teacher_periods               TeacherPeriod[]
+    school_fees                   SchoolFees[]
+    payment_transactions          PaymentTransaction[]
+    exam_papers                   ExamPaper[]
+    announcements                 Announcement[]
+    terms                         Term[]
 }
 
 model User {
@@ -45,11 +48,11 @@ model User {
     updated_at DateTime @updatedAt
 
     user_roles                    UserRole[]
-    parent_students               Parent_Student[]
+    parent_students               ParentStudent[]
     marks                         Mark[]                       @relation("RecordedByUser")
-    subject_teachers              Subject_Teacher[]
-    subclass_subject              SubClass_Subject[]
-    teacher_absence               TeacherAbsence[]
+    subject_teachers              SubjectTeacher[]
+    subclass_subjects             SubclassSubject[]
+    teacher_absences              TeacherAbsence[]
     assigned_teacher_absences     TeacherAbsence[]             @relation("AssignedByUser")
     student_absences              StudentAbsence[]
     discipline_issues_assigned    DisciplineIssue[]            @relation("AssignedDisciplineIssue")
@@ -58,9 +61,9 @@ model User {
     discipline_master_assignments DisciplineMasterAssignment[]
     principal_assignments         PrincipalAssignment[]
     bursar_assignments            BursarAssignment[]
-    assigned_sub_teach_periods    SubTeach_Period_Year[]       @relation("SubTeachPeriods-AssignedBy")
-    Announcement                  Announcement[]
-    MobileNotification            MobileNotification[]
+    assigned_teacher_periods      TeacherPeriod[]              @relation("TeacherPeriods-AssignedBy")
+    announcements                 Announcement[]
+    mobile_notifications          MobileNotification[]
 }
 
 model UserRole {
@@ -72,13 +75,13 @@ model UserRole {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    user         User          @relation(fields: [user_id], references: [id])
-    academicYear AcademicYear? @relation(fields: [academic_year_id], references: [id])
+    user          User          @relation(fields: [user_id], references: [id])
+    academic_year AcademicYear? @relation(fields: [academic_year_id], references: [id])
 
     @@unique([user_id, role, academic_year_id])
 }
 
-model Parent_Student {
+model ParentStudent {
     id         Int     @id @default(autoincrement())
     parent_id  Int
     student_id Int
@@ -89,31 +92,34 @@ model Parent_Student {
     updated_at DateTime @updatedAt
 
     @@unique([parent_id, student_id])
+    @@map("Parent_Student")
 }
 
 model Class {
     id         Int        @id @unique @default(autoincrement())
     name       String
-    subclasses SubClass[]
+    subclasses Subclass[]
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 }
 
-model SubClass {
+model Subclass {
     id   Int    @id @unique @default(autoincrement())
     name String
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    class_id                     Int
-    vice_principal_assignment    VicePrincipalAssignment[]
-    discipline_master_assignment DisciplineMasterAssignment[]
-    class                        Class                        @relation(fields: [class_id], references: [id])
-    student_sub_class_years      Student_SubClass_Year[]
-    sub_class_subjects           SubClass_Subject[]
-    sub_teach_periods            SubTeach_Period_Year[]
+    class_id                      Int
+    vice_principal_assignments    VicePrincipalAssignment[]
+    discipline_master_assignments DisciplineMasterAssignment[]
+    class                         Class                        @relation(fields: [class_id], references: [id])
+    enrollments                   Enrollment[]
+    subclass_subjects             SubclassSubject[]
+    teacher_periods               TeacherPeriod[]
+
+    @@map("SubClass")
 }
 
 model Student {
@@ -129,11 +135,11 @@ model Student {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    student_subclass   Student_SubClass_Year[]
-    parents            Parent_Student[]        @relation("StudentParents")
+    enrollments Enrollment[]
+    parents     ParentStudent[] @relation("StudentParents")
 }
 
-model Student_SubClass_Year {
+model Enrollment {
     id               Int     @id @default(autoincrement())
     student_id       Int
     subclass_id      Int
@@ -144,33 +150,35 @@ model Student_SubClass_Year {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    paymentTransaction PaymentTransaction[]
-    marks        Mark[]
-    schoolFee   SchoolFees[]
-    absences     StudentAbsence[]
-    discipline  DisciplineIssue[]
-    student      Student          @relation(fields: [student_id], references: [id])
-    subclass     SubClass         @relation(fields: [subclass_id], references: [id])
-    academicYear AcademicYear     @relation(fields: [academic_year_id], references: [id])
+    payment_transactions PaymentTransaction[]
+    marks                Mark[]
+    school_fees          SchoolFees[]
+    absences             StudentAbsence[]
+    discipline_issues    DisciplineIssue[]
+    student              Student              @relation(fields: [student_id], references: [id])
+    subclass             Subclass             @relation(fields: [subclass_id], references: [id])
+    academic_year        AcademicYear         @relation(fields: [academic_year_id], references: [id])
 
     @@unique([student_id, subclass_id, academic_year_id])
+    @@map("Student_SubClass_Year")
 }
 
 model SchoolFees {
-    id                  Int      @id @default(autoincrement())
-    amount_expected     Float
-    amount_paid         Float
-    academic_year_id    Int
-    due_date            DateTime
-    student_subclass_id Int
+    id               Int      @id @default(autoincrement())
+    amount_expected  Float
+    amount_paid      Float
+    academic_year_id Int
+    due_date         DateTime
+    enrollment_id    Int
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    academicYear     AcademicYear          @relation(fields: [academic_year_id], references: [id])
-    student_subclass Student_SubClass_Year @relation(fields: [student_subclass_id], references: [id])
+    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
+    enrollment    Enrollment   @relation(fields: [enrollment_id], references: [id])
 
-    @@unique([student_subclass_id, academic_year_id])
+    @@unique([enrollment_id, academic_year_id])
+    @@map("SchoolFees")
 }
 
 model Subject {
@@ -181,13 +189,13 @@ model Subject {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    sub_class_subjects SubClass_Subject[]
-    subject_teachers   Subject_Teacher[]
-    questions          Question[]
-    examPapers         ExamPaper[]
+    subclass_subjects SubclassSubject[]
+    subject_teachers  SubjectTeacher[]
+    questions         Question[]
+    exam_papers       ExamPaper[]
 }
 
-model SubClass_Subject {
+model SubclassSubject {
     id              Int   @id @default(autoincrement())
     coefficient     Float
     subclass_id     Int
@@ -197,15 +205,16 @@ model SubClass_Subject {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    marks       Mark[]
-    subclass    SubClass @relation(fields: [subclass_id], references: [id])
-    mainTeacher User     @relation(fields: [main_teacher_id], references: [id])
-    subject     Subject  @relation(fields: [subject_id], references: [id])
+    marks        Mark[]
+    subclass     Subclass @relation(fields: [subclass_id], references: [id])
+    main_teacher User     @relation(fields: [main_teacher_id], references: [id])
+    subject      Subject  @relation(fields: [subject_id], references: [id])
 
     @@unique([subclass_id, subject_id])
+    @@map("SubClass_Subject")
 }
 
-model Subject_Teacher {
+model SubjectTeacher {
     id         Int @id @default(autoincrement())
     subject_id Int
     teacher_id Int
@@ -213,16 +222,17 @@ model Subject_Teacher {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    sub_teach_periods  SubTeach_Period_Year[]
-    subject Subject @relation(fields: [subject_id], references: [id])
-    teacher User    @relation(fields: [teacher_id], references: [id])
+    teacher_periods TeacherPeriod[]
+    subject         Subject         @relation(fields: [subject_id], references: [id])
+    teacher         User            @relation(fields: [teacher_id], references: [id])
 
     @@unique([subject_id, teacher_id])
+    @@map("Subject_Teacher")
 }
 
 model DisciplineIssue {
     id             Int     @id @unique @default(autoincrement())
-    student_subclass_id     Int
+    enrollment_id  Int
     description    String
     notes          String?
     assigned_by_id Int
@@ -231,68 +241,72 @@ model DisciplineIssue {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    student_subclass    Student_SubClass_Year @relation(fields: [student_subclass_id], references: [id])
-    assignedBy User    @relation("AssignedDisciplineIssue", fields: [assigned_by_id], references: [id])
-    reviewedBy User    @relation("ReviewedDisciplineIssue", fields: [reviewed_by_id], references: [id])
+    enrollment  Enrollment @relation(fields: [enrollment_id], references: [id])
+    assigned_by User       @relation("AssignedDisciplineIssue", fields: [assigned_by_id], references: [id])
+    reviewed_by User       @relation("ReviewedDisciplineIssue", fields: [reviewed_by_id], references: [id])
 }
 
 model StudentAbsence {
-    id                       Int  @id @default(autoincrement())
-    assigned_by_id           Int
-    sub_teach_period_year_id Int?
-    student_subclass_id      Int
+    id                Int  @id @default(autoincrement())
+    assigned_by_id    Int
+    teacher_period_id Int?
+    enrollment_id     Int
 
-    subTeachPeriodYear SubTeach_Period_Year? @relation(fields: [sub_teach_period_year_id], references: [id])
-    student_subclass   Student_SubClass_Year @relation(fields: [student_subclass_id], references: [id])
-    assignedBy         User                  @relation(fields: [assigned_by_id], references: [id])
+    teacher_period TeacherPeriod? @relation(fields: [teacher_period_id], references: [id])
+    enrollment     Enrollment     @relation(fields: [enrollment_id], references: [id])
+    assigned_by    User           @relation(fields: [assigned_by_id], references: [id])
 
-    @@unique([student_subclass_id, sub_teach_period_year_id])
+    @@unique([enrollment_id, teacher_period_id])
 }
 
 model TeacherAbsence {
-    absence_id               Int    @id @default(autoincrement())
-    reason                   String
-    teacher_id               Int
-    assigned_by_id           Int
-    sub_teach_period_year_id Int?
+    id                Int    @id @default(autoincrement())
+    reason            String
+    teacher_id        Int
+    assigned_by_id    Int
+    teacher_period_id Int?
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    teacher            User                  @relation(fields: [teacher_id], references: [id])
-    subTeachPeriodYear SubTeach_Period_Year? @relation(fields: [sub_teach_period_year_id], references: [id])
-    assignedBy         User                  @relation("AssignedByUser", fields: [assigned_by_id], references: [id])
+    teacher        User           @relation(fields: [teacher_id], references: [id])
+    teacher_period TeacherPeriod? @relation(fields: [teacher_period_id], references: [id])
+    assigned_by    User           @relation("AssignedByUser", fields: [assigned_by_id], references: [id])
 
-    @@unique([teacher_id, sub_teach_period_year_id])
+    @@unique([teacher_id, teacher_period_id])
 }
 
 model ExamSequence {
     id               Int @id @default(autoincrement())
-    sequence_number  Int //usually 6 of them
+    sequence_number  Int
     academic_year_id Int
     term_id          Int
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    academicYear AcademicYear @relation(fields: [academic_year_id], references: [id])
-    term         Term         @relation(fields: [term_id], references: [id])
-    marks        Mark[]
+    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
+    term          Term         @relation(fields: [term_id], references: [id])
+    marks         Mark[]
 
     @@unique([sequence_number, term_id, academic_year_id])
 }
 
 model Term {
-    id     Int    @id @default(autoincrement())
-    name   String
-    number Int    @unique //usually 3 of them
+    id               Int      @id @default(autoincrement())
+    name             String
+    number           Int      @unique
+    start_date       DateTime
+    end_date         DateTime
+    academic_year_id Int?
 
+    academic_year  AcademicYear?  @relation(fields: [academic_year_id], references: [id])
     exam_sequences ExamSequence[]
 }
 
 model Mark {
     id                  Int   @id @default(autoincrement())
-    student_subclass_id Int
+    enrollment_id       Int
     subclass_subject_id Int
     teacher_id          Int
     exam_sequence_id    Int
@@ -301,12 +315,12 @@ model Mark {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    student_subclass Student_SubClass_Year @relation(fields: [student_subclass_id], references: [id])
-    teacher          User                  @relation("RecordedByUser", fields: [teacher_id], references: [id])
-    subclass_subject SubClass_Subject      @relation(fields: [subclass_subject_id], references: [id])
-    examSequence     ExamSequence          @relation(fields: [exam_sequence_id], references: [id])
+    enrollment       Enrollment      @relation(fields: [enrollment_id], references: [id])
+    teacher          User            @relation("RecordedByUser", fields: [teacher_id], references: [id])
+    subclass_subject SubclassSubject @relation(fields: [subclass_subject_id], references: [id])
+    exam_sequence    ExamSequence    @relation(fields: [exam_sequence_id], references: [id])
 
-    @@unique([exam_sequence_id, student_subclass_id, subclass_subject_id])
+    @@unique([exam_sequence_id, enrollment_id, subclass_subject_id])
 }
 
 model VicePrincipalAssignment {
@@ -318,9 +332,9 @@ model VicePrincipalAssignment {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    user         User         @relation(fields: [user_id], references: [id])
-    subclass     SubClass     @relation(fields: [subclass_id], references: [id])
-    academicYear AcademicYear @relation(fields: [academic_year_id], references: [id])
+    user          User         @relation(fields: [user_id], references: [id])
+    subclass      Subclass     @relation(fields: [subclass_id], references: [id])
+    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
 
     @@unique([user_id, subclass_id, academic_year_id])
 }
@@ -334,9 +348,9 @@ model DisciplineMasterAssignment {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    user         User         @relation(fields: [user_id], references: [id])
-    subclass     SubClass     @relation(fields: [subclass_id], references: [id])
-    academicYear AcademicYear @relation(fields: [academic_year_id], references: [id])
+    user          User         @relation(fields: [user_id], references: [id])
+    subclass      Subclass     @relation(fields: [subclass_id], references: [id])
+    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
 
     @@unique([user_id, subclass_id, academic_year_id])
 }
@@ -349,8 +363,8 @@ model PrincipalAssignment {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    user         User         @relation(fields: [user_id], references: [id])
-    academicYear AcademicYear @relation(fields: [academic_year_id], references: [id])
+    user          User         @relation(fields: [user_id], references: [id])
+    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
 }
 
 model BursarAssignment {
@@ -361,46 +375,47 @@ model BursarAssignment {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    user         User         @relation(fields: [user_id], references: [id])
-    academicYear AcademicYear @relation(fields: [academic_year_id], references: [id])
+    user          User         @relation(fields: [user_id], references: [id])
+    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
 }
 
 model Period {
     id          Int       @id @default(autoincrement())
     day_of_week DayOfWeek
-    start_time  String //"HH:MM"
-    end_time    String //"HH:MM"
+    start_time  String
+    end_time    String
 
-    sub_teach_periods SubTeach_Period_Year[]
+    teacher_periods TeacherPeriod[]
 
     @@unique([id, day_of_week, start_time, end_time])
 }
 
-model SubTeach_Period_Year {
-    id               Int @id @default(autoincrement())
-    subject_teachear_id Int
-    sub_class_id     Int
-    period_id        Int
-    academic_year_id Int
-    assigned_by_id   Int
+model TeacherPeriod {
+    id                 Int @id @default(autoincrement())
+    subject_teacher_id Int
+    subclass_id        Int
+    period_id          Int
+    academic_year_id   Int
+    assigned_by_id     Int
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    studentAbsence StudentAbsence[]
-    teacherAbsence TeacherAbsence[]
-    subject_teachear        Subject_Teacher         @relation(fields: [subject_teachear_id], references: [id])
-    subclass       SubClass         @relation(fields: [sub_class_id], references: [id])
-    period         Period           @relation(fields: [period_id], references: [id])
-    academicYear   AcademicYear     @relation(fields: [academic_year_id], references: [id])
-    assignedBy     User             @relation("SubTeachPeriods-AssignedBy", fields: [assigned_by_id], references: [id])
+    student_absences StudentAbsence[]
+    teacher_absences TeacherAbsence[]
+    subject_teacher  SubjectTeacher   @relation(fields: [subject_teacher_id], references: [id])
+    subclass         Subclass         @relation(fields: [subclass_id], references: [id])
+    period           Period           @relation(fields: [period_id], references: [id])
+    academic_year    AcademicYear     @relation(fields: [academic_year_id], references: [id])
+    assigned_by      User             @relation("TeacherPeriods-AssignedBy", fields: [assigned_by_id], references: [id])
 
-    @@unique([subject_teachear_id, period_id, assigned_by_id, academic_year_id])
+    @@unique([subject_teacher_id, period_id, assigned_by_id, academic_year_id])
+    @@map("SubTeach_Period_Year")
 }
 
 model PaymentTransaction {
     id               Int           @id @default(autoincrement())
-    student_subclass_id Int
+    enrollment_id    Int
     academic_year_id Int
     amount           Float
     payment_date     DateTime
@@ -409,8 +424,8 @@ model PaymentTransaction {
     created_at       DateTime      @default(now())
     updated_at       DateTime      @updatedAt
 
-    student_subclass      Student_SubClass_Year      @relation(fields: [student_subclass_id], references: [id])
-    academicYear AcademicYear @relation(fields: [academic_year_id], references: [id])
+    enrollment    Enrollment   @relation(fields: [enrollment_id], references: [id])
+    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
 }
 
 enum PaymentMethod {
@@ -430,8 +445,8 @@ model Announcement {
     created_at       DateTime @default(now())
     updated_at       DateTime @updatedAt
 
-    created_by   User?         @relation(fields: [created_by_id], references: [id])
-    academicYear AcademicYear? @relation(fields: [academic_year_id], references: [id])
+    created_by    User?         @relation(fields: [created_by_id], references: [id])
+    academic_year AcademicYear? @relation(fields: [academic_year_id], references: [id])
 }
 
 enum Audience {
@@ -463,14 +478,14 @@ model Question {
     subject_id     Int
     question_text  String
     question_type  QuestionType
-    options        Json? // For MCQs: e.g., ["A", "B", "C", "D"]
+    options        Json?
     correct_answer String?
     topic          String?
     created_at     DateTime     @default(now())
     updated_at     DateTime     @updatedAt
 
-    subject           Subject             @relation(fields: [subject_id], references: [id])
-    examPaperQuestion ExamPaperQuestion[]
+    subject              Subject             @relation(fields: [subject_id], references: [id])
+    exam_paper_questions ExamPaperQuestion[]
 }
 
 enum QuestionType {
@@ -484,22 +499,22 @@ model ExamPaper {
     subject_id       Int
     academic_year_id Int
     exam_date        DateTime
-    duration         BigInt //In Seconds
+    duration         BigInt
     created_at       DateTime @default(now())
     updated_at       DateTime @updatedAt
 
-    subject      Subject             @relation(fields: [subject_id], references: [id])
-    academicYear AcademicYear        @relation(fields: [academic_year_id], references: [id])
-    questions    ExamPaperQuestion[]
+    subject       Subject             @relation(fields: [subject_id], references: [id])
+    academic_year AcademicYear        @relation(fields: [academic_year_id], references: [id])
+    questions     ExamPaperQuestion[]
 }
 
 model ExamPaperQuestion {
     exam_paper_id Int
     question_id   Int
-    order         Int? // Optional ordering field
+    order         Int?
 
-    examPaper ExamPaper @relation(fields: [exam_paper_id], references: [id])
-    question  Question  @relation(fields: [question_id], references: [id])
+    exam_paper ExamPaper @relation(fields: [exam_paper_id], references: [id])
+    question   Question  @relation(fields: [question_id], references: [id])
 
     @@id([exam_paper_id, question_id])
 }

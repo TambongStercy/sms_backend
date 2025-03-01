@@ -1,6 +1,11 @@
 // seed.ts
 import { PrismaClient } from '@prisma/client';
 import { faker } from '@faker-js/faker';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config({ path: './.env' });
 
 const prisma = new PrismaClient();
 
@@ -18,6 +23,8 @@ async function main() {
         data: {
             name: 'First Term',
             number: 1,
+            start_date: new Date('2024-09-01'),
+            end_date: new Date('2024-12-31'),
         },
     });
 
@@ -30,7 +37,7 @@ async function main() {
         },
     });
 
-    // 4. Create Class and SubClass
+    // 4. Create Class and Subclass
     const schoolClass = await prisma.class.create({
         data: {
             name: 'Form 1',
@@ -81,7 +88,7 @@ async function main() {
                 },
             });
 
-            await prisma.subject_Teacher.create({
+            await prisma.subjectTeacher.create({
                 data: {
                     subject_id: subject.id,
                     teacher_id: user.id,
@@ -95,7 +102,7 @@ async function main() {
     // 7. Link subjects to subclass with main teachers
     await Promise.all(
         subjects.map((subject, i) =>
-            prisma.subClass_Subject.create({
+            prisma.subclassSubject.create({
                 data: {
                     coefficient: faker.number.int({ min: 1, max: 4 }),
                     subclass_id: subClass.id,
@@ -122,7 +129,7 @@ async function main() {
             });
 
             // Enroll student in subclass
-            const enrollment = await prisma.student_SubClass_Year.create({
+            const enrollment = await prisma.enrollment.create({
                 data: {
                     student_id: student.id,
                     subclass_id: subClass.id,
@@ -138,16 +145,16 @@ async function main() {
 
     // 9. Create marks for all students in all subjects
     for (const { enrollment } of students) {
-        const subclassSubjects = await prisma.subClass_Subject.findMany({
+        const subclassSubjects = await prisma.subclassSubject.findMany({
             where: { subclass_id: subClass.id },
         });
 
-        for (const subClassSubject of subclassSubjects) {
+        for (const subclassSubject of subclassSubjects) {
             await prisma.mark.create({
                 data: {
-                    student_subclass_id: enrollment.id,
-                    subclass_subject_id: subClassSubject.id,
-                    teacher_id: subClassSubject.main_teacher_id,
+                    enrollment_id: enrollment.id,
+                    subclass_subject_id: subclassSubject.id,
+                    teacher_id: subclassSubject.main_teacher_id,
                     exam_sequence_id: examSequence.id,
                     score: faker.number.float({ min: 5, max: 20 }),
                 },

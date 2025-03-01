@@ -57,3 +57,63 @@ export const deleteAcademicYear = async (req: Request, res: Response) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const setDefaultAcademicYear = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const yearId = parseInt(req.params.id);
+
+        // Check if the academic year exists
+        const year = await academicYearService.getAcademicYearById(yearId);
+        if (!year) {
+            return res.status(404).json({ error: 'Academic year not found' });
+        }
+
+        // Set as default (implement this method in your service)
+        await academicYearService.setAsDefault(yearId);
+
+        res.json({
+            success: true,
+            message: `Academic year ${year.start_date} set as default`,
+            academicYear: year
+        });
+    } catch (error: any) {
+        console.error('Error setting default academic year:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const addTerm = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const yearId = parseInt(req.params.id);
+        const { name, startDate, endDate } = req.body;
+
+        // Validate required fields
+        if (!name || !startDate || !endDate) {
+            return res.status(400).json({
+                error: 'Term name, start date, and end date are required'
+            });
+        }
+
+        // Check if the academic year exists
+        const year = await academicYearService.getAcademicYearById(yearId);
+        if (!year) {
+            return res.status(404).json({ error: 'Academic year not found' });
+        }
+
+        // Add term to academic year (implement this method in your service)
+        const term = await academicYearService.addTermToYear(yearId, {
+            name,
+            start_date: new Date(startDate),
+            end_date: new Date(endDate)
+        });
+
+        res.status(201).json({
+            success: true,
+            message: `Term "${name}" added to academic year ${year.start_date}`,
+            term
+        });
+    } catch (error: any) {
+        console.error('Error adding term to academic year:', error);
+        res.status(500).json({ error: error.message });
+    }
+};

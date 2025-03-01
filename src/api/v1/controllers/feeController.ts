@@ -24,7 +24,7 @@ export const createFee = async (req: Request, res: Response) => {
 
 export const recordPayment = async (req: Request, res: Response) => {
     try {
-        const payment = await feeService.recordPayment(parseInt(req.params.id), req.body);
+        const payment = await feeService.recordPayment(req.body);
         res.status(201).json(payment);
     } catch (error: any) {
         console.error('Error recording payment:', error);

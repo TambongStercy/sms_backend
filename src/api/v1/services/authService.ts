@@ -14,7 +14,7 @@ export async function login(email: string, password: string): Promise<{ token: s
     if (!isValid) {
         throw new Error('Invalid credentials');
     }
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
     return { token, user };
 }
 
@@ -26,6 +26,7 @@ export async function register(data: {
     date_of_birth: string;
     phone: string;
     address: string;
+    id_card_num?: string;
 }): Promise<User> {
 
     if (!Object.values(Gender).includes(data.gender as Gender)) {
@@ -43,6 +44,7 @@ export async function register(data: {
             date_of_birth: new Date(data.date_of_birth),
             phone: data.phone,
             address: data.address,
+            id_card_num: data.id_card_num,
         },
     });
 }

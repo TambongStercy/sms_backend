@@ -1,7 +1,21 @@
 // src/api/v1/services/classService.ts
-import prisma, { Class, SubClass } from '../../../config/db';
+import prisma, { Class, Subclass } from '../../../config/db';
+import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 
-export async function getAllClasses(): Promise<Class[]> {
+export async function getAllClasses(
+    paginationOptions?: PaginationOptions,
+    filterOptions?: FilterOptions
+): Promise<PaginatedResult<Class>> {
+    return paginate<Class>(
+        prisma.class,
+        paginationOptions,
+        filterOptions,
+        { subclasses: true }
+    );
+}
+
+// Original function for backwards compatibility
+export async function getAllClassesWithSubclasses(): Promise<Class[]> {
     return prisma.class.findMany({
         include: {
             subclasses: true,
@@ -22,8 +36,8 @@ export async function getClassById(id: number): Promise<Class | null> {
     });
 }
 
-export async function addSubClass(class_id: number, data: { name: string }): Promise<SubClass> {
-    return prisma.subClass.create({
+export async function addSubClass(class_id: number, data: { name: string }): Promise<Subclass> {
+    return prisma.subclass.create({
         data: {
             name: data.name,
             class_id,
@@ -31,8 +45,8 @@ export async function addSubClass(class_id: number, data: { name: string }): Pro
     });
 }
 
-export async function deleteSubClass(subClassId: number): Promise<SubClass> {
-    return prisma.subClass.delete({
+export async function deleteSubClass(subClassId: number): Promise<Subclass> {
+    return prisma.subclass.delete({
         where: { id: subClassId },
     });
 }

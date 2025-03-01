@@ -1,11 +1,42 @@
 // src/api/v1/controllers/studentController.ts
 import { Request, Response } from 'express';
 import * as studentService from '../services/studentService';
+import { extractPaginationAndFilters } from '../../../utils/pagination';
 
 export const getAllStudents = async (req: Request, res: Response) => {
     try {
-        const students = await studentService.getAllStudents();
-        res.json(students);
+        // Define allowed filters for students
+        const allowedFilters = ['name', 'gender', 'matricule', 'id'];
+
+        // Extract pagination and filter parameters from the request
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+
+        // Determine if we want students with enrollment info
+        const withEnrollment = req.query.withEnrollment === 'true';
+
+        let result;
+        if (withEnrollment) {
+            // Get academic year from query if provided
+            const academicYearId = req.query.academic_year_id ?
+                parseInt(req.query.academic_year_id as string) : undefined;
+
+            // Add class and subclass filters for enrollment query
+            const enrollmentFilters = {
+                ...filterOptions,
+                ...(req.query.class_id ? { class_id: req.query.class_id } : {}),
+                ...(req.query.subclass_id ? { subclass_id: req.query.subclass_id } : {})
+            };
+
+            result = await studentService.getAllStudentsWithCurrentEnrollment(
+                academicYearId,
+                paginationOptions,
+                enrollmentFilters
+            );
+        } else {
+            result = await studentService.getAllStudents(paginationOptions, filterOptions);
+        }
+
+        res.json(result);
     } catch (error: any) {
         console.error('Error fetching students:', error);
         res.status(500).json({ error: error.message });

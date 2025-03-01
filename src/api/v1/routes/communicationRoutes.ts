@@ -1,15 +1,19 @@
 import { Router } from 'express';
 import * as communicationController from '../controllers/communicationController';
+import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
 
 // GET /announcements - List announcements (optionally filter by audience)
-router.get('/announcements', communicationController.getAnnouncements);
+// All authenticated users can view announcements
+router.get('/announcements', authenticate, communicationController.getAnnouncements);
 
 // POST /announcements - Create an announcement
-router.post('/announcements', communicationController.createAnnouncement);
+// Only ADMIN, PRINCIPAL, VICE_PRINCIPAL can create announcements
+router.post('/announcements', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.createAnnouncement);
 
 // POST /notifications - Send push notifications
-router.post('/notifications', communicationController.sendNotification);
+// Only ADMIN, PRINCIPAL, VICE_PRINCIPAL can send notifications
+router.post('/notifications', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.sendNotification);
 
 export default router;
