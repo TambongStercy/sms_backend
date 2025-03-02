@@ -6,7 +6,7 @@
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
     "build": "rimraf dist && tsc && prisma generate --no-engine",
-    "postbuild": "if not exist dist\\view mkdir dist\\view && if not exist dist\\reports mkdir dist\\reports && xcopy /E /I src\\view dist\\view && xcopy /E /I src\\reports dist\\reports",
+    "postbuild": "mkdir -p dist/view dist/reports && cp -r src/view/. dist/view/ && cp -r src/reports/. dist/reports/",
     "swagger-test": "ts-node scripts/swagger-test.ts",
     "swagger-docs": "ts-node scripts/swagger-test.ts && echo 'Swagger documentation generated successfully!'"
   },
