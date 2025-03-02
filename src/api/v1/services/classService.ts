@@ -45,6 +45,15 @@ export async function addSubClass(class_id: number, data: { name: string }): Pro
     });
 }
 
+export async function checkSubClassExists(subclassId: number, classId: number): Promise<Subclass | null> {
+    return prisma.subclass.findFirst({
+        where: {
+            id: subclassId,
+            class_id: classId
+        }
+    });
+}
+
 export async function deleteSubClass(subClassId: number): Promise<Subclass> {
     return prisma.subclass.delete({
         where: { id: subClassId },

@@ -66,6 +66,7 @@ export async function recordPayment(data: {
     enrollment_id?: number;
     student_id?: number;
     academic_year_id?: number;
+    fee_id: number;
 }): Promise<PaymentTransaction> {
     // Handle the case where student_id is provided instead of enrollment_id
     if (data.student_id && !data.enrollment_id) {
@@ -91,6 +92,7 @@ export async function recordPayment(data: {
 
     return prisma.paymentTransaction.create({
         data: {
+            fee_id: data.fee_id,
             amount: data.amount,
             receipt_number: data.receipt_number,
             payment_method: data.payment_method,
@@ -102,11 +104,29 @@ export async function recordPayment(data: {
 }
 
 export async function exportFeeReports(academicYearId?: number): Promise<any> {
-    // Get current academic year if not provided
-    const yearId = await getAcademicYearId(academicYearId);
+    // Implementation for exporting fee reports
+    // This is a placeholder - actual implementation would generate the report
+    return { message: "Fee report exported successfully" };
+}
 
-    // You can use yearId in your report generation logic
+/**
+ * Retrieves all payment transactions for a specific fee record
+ * @param feeId The ID of the fee record
+ * @returns Array of payment transactions or null if the fee doesn't exist
+ */
+export async function getFeePayments(feeId: number): Promise<PaymentTransaction[] | null> {
+    // First check if the fee exists
+    const feeExists = await prisma.schoolFees.findUnique({
+        where: { id: feeId }
+    });
 
-    // Implement your report export logic (Excel, PDF, etc.)
-    return { message: 'Fee report generated', academicYearId: yearId };
+    if (!feeExists) {
+        return null;
+    }
+
+    // Get all payment transactions for this fee
+    return prisma.paymentTransaction.findMany({
+        where: { fee_id: feeId },
+        orderBy: { payment_date: 'desc' }
+    });
 }

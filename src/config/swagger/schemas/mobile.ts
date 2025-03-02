@@ -212,6 +212,112 @@
  *               type: array
  *               items:
  *                 type: object
+ * 
+ *     # Standardized Response Schemas
+ *     MobileDashboardResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           $ref: '#/components/schemas/Dashboard'
+ *       description: Response for a successful request to retrieve mobile dashboard data
+ *
+ *     DeviceRegisteredResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           example: Device registered successfully
+ *         data:
+ *           type: object
+ *           properties:
+ *             userId:
+ *               type: integer
+ *               example: 1
+ *             deviceToken:
+ *               type: string
+ *               example: fcm-token-example-123456789
+ *             deviceType:
+ *               type: string
+ *               example: android
+ *       description: Response for a successful device registration request
+ *
+ *     NotificationListResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Notification'
+ *         meta:
+ *           type: object
+ *           properties:
+ *             total:
+ *               type: integer
+ *               example: 25
+ *             page:
+ *               type: integer
+ *               example: 1
+ *             limit:
+ *               type: integer
+ *               example: 20
+ *             totalPages:
+ *               type: integer
+ *               example: 2
+ *       description: Response for a successful request to retrieve user notifications
+ *
+ *     DataSyncResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           type: object
+ *           properties:
+ *             syncTimestamp:
+ *               type: string
+ *               format: date-time
+ *               example: 2023-01-02T12:00:00.000Z
+ *             updates:
+ *               type: object
+ *               properties:
+ *                 students:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 classes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 subjects:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 announcements:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       description: Response for a successful data synchronization request
+ *
+ *     ErrorResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: false
+ *         error:
+ *           type: string
+ *           example: An error occurred
+ *       description: Response for an unsuccessful request
  */
 
 export { }; 

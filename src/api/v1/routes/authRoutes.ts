@@ -49,24 +49,52 @@ const router = Router();
  *                     id: 1
  *                     name: John Doe
  *                     email: user@example.com
- *                     gender: Male
+ *                     gender: MALE
+ *                     date_of_birth: "1990-01-01"
+ *                     phone: "+237 680123456"
+ *                     address: "123 Main Street, Yaoundé"
+ *                     photo: "https://example.com/profiles/john.jpg"
+ *                     user_roles: [
+ *                       {
+ *                         id: 1,
+ *                         name: "ADMIN",
+ *                         description: "Administrator with full access"
+ *                       }
+ *                     ]
+ *                     created_at: "2023-01-01T12:00:00Z"
+ *                     updated_at: "2023-01-01T12:00:00Z"
  *       401:
  *         description: Invalid credentials
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Invalid credentials
  *             examples:
  *               invalidCredentials:
  *                 summary: Invalid credentials provided
  *                 value:
+ *                   success: false
  *                   error: Invalid credentials
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal server error
  */
 router.post('/login', authController.login);
 
@@ -93,7 +121,7 @@ router.post('/login', authController.login);
  *                 name: John Doe
  *                 email: john.doe@example.com
  *                 password: SecurePass123
- *                 gender: Male
+ *                 gender: MALE
  *                 date_of_birth: "1990-01-01"
  *                 phone: "+237 680123456"
  *                 address: "123 Main Street, Yaoundé"
@@ -104,35 +132,73 @@ router.post('/login', authController.login);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/User'
+ *               $ref: '#/components/schemas/RegisterResponse'
+ *             examples:
+ *               success:
+ *                 summary: User registered successfully
+ *                 value:
+ *                   success: true
+ *                   message: User registered successfully
+ *                   user:
+ *                     id: 1
+ *                     name: John Doe
+ *                     email: john.doe@example.com
+ *                     gender: MALE
+ *                     date_of_birth: "1990-01-01"
+ *                     phone: "+237 680123456"
+ *                     address: "123 Main Street, Yaoundé"
+ *                     id_card_num: "ID12345678"
+ *                     created_at: "2023-01-01T12:00:00Z"
+ *                     updated_at: "2023-01-01T12:00:00Z"
  *       400:
  *         description: Invalid input data
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
  *             examples:
  *               invalidGender:
  *                 summary: Invalid gender value
  *                 value:
+ *                   success: false
  *                   error: Invalid gender. Choose a valid gender.
  *       409:
  *         description: Email already exists
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
  *             examples:
  *               duplicateEmail:
  *                 summary: Email already in use
  *                 value:
+ *                   success: false
  *                   error: Email already in use
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal server error
  */
 router.post('/register', authController.register);
 
@@ -154,15 +220,12 @@ router.post('/register', authController.register);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Logged out successfully
+ *               $ref: '#/components/schemas/LogoutResponse'
  *             examples:
  *               success:
  *                 summary: Successful logout
  *                 value:
+ *                   success: true
  *                   message: Logged out successfully
  *       400:
  *         description: No token provided
@@ -171,7 +234,10 @@ router.post('/register', authController.register);
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
  *                   type: string
  *                   example: No token provided
  *       401:
@@ -181,7 +247,14 @@ router.post('/register', authController.register);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal server error
  */
 router.post('/logout', authenticate, authController.logout);
 
@@ -203,22 +276,37 @@ router.post('/logout', authenticate, authController.logout);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/User'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
  *             examples:
  *               success:
  *                 summary: Complete user profile
  *                 value:
- *                   id: 1
- *                   name: John Doe
- *                   email: john.doe@example.com
- *                   gender: Male
- *                   date_of_birth: "1990-01-01"
- *                   phone: "+237 680123456"
- *                   address: "123 Main Street, Yaoundé"
- *                   id_card_num: "ID12345678"
- *                   photo: "https://example.com/profiles/john.jpg"
- *                   created_at: "2023-01-01T12:00:00Z"
- *                   updated_at: "2023-01-01T12:00:00Z"
+ *                   success: true
+ *                   data:
+ *                     id: 1
+ *                     name: John Doe
+ *                     email: john.doe@example.com
+ *                     gender: MALE
+ *                     date_of_birth: "1990-01-01"
+ *                     phone: "+237 680123456"
+ *                     address: "123 Main Street, Yaoundé"
+ *                     id_card_num: "ID12345678"
+ *                     photo: "https://example.com/profiles/john.jpg"
+ *                     user_roles: [
+ *                       {
+ *                         id: 1,
+ *                         name: "ADMIN",
+ *                         description: "Administrator with full access"
+ *                       }
+ *                     ]
+ *                     created_at: "2023-01-01T12:00:00Z"
+ *                     updated_at: "2023-01-01T12:00:00Z"
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
@@ -226,18 +314,33 @@ router.post('/logout', authenticate, authController.logout);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: User not found
  *             examples:
  *               notFound:
  *                 summary: User not found
  *                 value:
+ *                   success: false
  *                   error: User not found
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal server error
  */
 router.get('/me', authenticate, authController.getProfile);
 

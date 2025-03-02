@@ -1,10 +1,7 @@
 // src/api/v1/controllers/mobileController.ts
 import { Request, Response } from 'express';
 import * as mobileService from '../services/mobileService';
-
-interface AuthenticatedRequest extends Request {
-    user?: { id: any }; // Adjust this based on your actual user object
-}
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 export const getDashboard = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -21,10 +18,16 @@ export const getDashboard = async (req: AuthenticatedRequest, res: Response) => 
             quickLinks: []
         };
 
-        res.json(dashboard);
+        res.json({
+            success: true,
+            data: dashboard
+        });
     } catch (error: any) {
         console.error('Error fetching mobile dashboard:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -33,7 +36,10 @@ export const registerDevice = async (req: AuthenticatedRequest, res: Response): 
         const { deviceToken, deviceType } = req.body;
 
         if (!deviceToken || !deviceType) {
-            return res.status(400).json({ error: 'Device token and type are required' });
+            return res.status(400).json({
+                success: false,
+                error: 'Device token and type are required'
+            });
         }
 
         // For now, simply acknowledge the registration
@@ -41,7 +47,7 @@ export const registerDevice = async (req: AuthenticatedRequest, res: Response): 
         res.json({
             success: true,
             message: 'Device registered successfully',
-            deviceInfo: {
+            data: {
                 userId: req.user?.id,
                 deviceToken,
                 deviceType
@@ -49,26 +55,64 @@ export const registerDevice = async (req: AuthenticatedRequest, res: Response): 
         });
     } catch (error: any) {
         console.error('Error registering device:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const getNotifications = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const notifications = await mobileService.getNotifications(req.user?.id);
-        res.json(notifications);
+        // Check if the user is authenticated
+        if (!req.user || !req.user.id) {
+            res.status(401).json({
+                success: false,
+                error: 'Unauthorized - User not authenticated properly'
+            });
+            return;
+        }
+
+        // Use empty array as fallback if user has no notifications
+        let notifications: any[] = [];
+
+        try {
+            notifications = await mobileService.getNotifications(Number(req.user.id));
+        } catch (notifError) {
+            console.warn('Error fetching notifications, using empty array:', notifError);
+        }
+
+        res.json({
+            success: true,
+            data: notifications,
+            meta: {
+                total: notifications.length,
+                page: 1,
+                limit: notifications.length,
+                totalPages: 1
+            }
+        });
     } catch (error: any) {
         console.error('Error fetching mobile notifications:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const syncData = async (req: Request, res: Response) => {
     try {
-        const result = await mobileService.syncData(req.body);
-        res.json(result);
+        const syncResult = await mobileService.syncData(req.body);
+        res.json({
+            success: true,
+            data: syncResult
+        });
     } catch (error: any) {
         console.error('Error syncing data:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };

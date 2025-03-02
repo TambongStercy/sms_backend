@@ -671,15 +671,15 @@ function calculateStandardDeviation(numbers: number[]): number {
 
 // Example usage:
 // For a single student
-generateReportCard({
-    academicYearId: 1,
-    examSequenceId: 1,
-    studentId: 1
-}).then(console.log).catch(console.error);
+// generateReportCard({
+//     academicYearId: 1,
+//     examSequenceId: 1,
+//     studentId: 1
+// }).then(console.log).catch(console.error);
 
 // For all students in a subclass
-// generateReportCard({ 
-//    academicYearId: 1, 
-//    examSequenceId: 1, 
-//    subclassId: 1 
-// }).then(console.log).catch(console.error);
+generateReportCard({ 
+   academicYearId: 1, 
+   examSequenceId: 1, 
+   subclassId: 1 
+}).then(console.log).catch(console.error);

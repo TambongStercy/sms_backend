@@ -19,19 +19,19 @@ const router = Router();
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Dashboard'
+ *               $ref: '#/components/schemas/MobileDashboardResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // GET /mobile/dashboard - Get mobile dashboard data
 // All authenticated users can access their dashboard
@@ -58,25 +58,25 @@ router.get('/dashboard', authenticate, mobileController.getDashboard);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/DeviceRegistrationResponse'
+ *               $ref: '#/components/schemas/DeviceRegisteredResponse'
  *       400:
  *         description: Invalid request data
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // POST /mobile/register-device - Register a mobile device for push notifications
 // All authenticated users can register their devices
@@ -117,35 +117,19 @@ router.post('/register-device', authenticate, mobileController.registerDevice);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 notifications:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Notification'
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     total:
- *                       type: integer
- *                     pages:
- *                       type: integer
- *                     page:
- *                       type: integer
- *                     limit:
- *                       type: integer
+ *               $ref: '#/components/schemas/NotificationListResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // GET /mobile/notifications - Get user-specific notifications
 // All authenticated users can access their notifications
@@ -172,25 +156,25 @@ router.get('/notifications', authenticate, mobileController.getNotifications);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/SyncResponse'
+ *               $ref: '#/components/schemas/DataSyncResponse'
  *       400:
  *         description: Invalid request data
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // POST /mobile/data/sync - Sync offline data (if implemented)
 // All authenticated users can sync their data

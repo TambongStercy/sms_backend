@@ -12,7 +12,7 @@ export const getAllStudents = async (req: Request, res: Response) => {
         const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
 
         // Determine if we want students with enrollment info
-        const withEnrollment = req.query.withEnrollment === 'true';
+        const withEnrollment = req.query.with_enrollment === 'true';
 
         let result;
         if (withEnrollment) {

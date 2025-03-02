@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
     provider = "postgresql"
-    url      = env("DATABASE_URL")
+    url      = env("DATABASE_URI")
 }
 
 model AcademicYear {
@@ -92,7 +92,6 @@ model ParentStudent {
     updated_at DateTime @updatedAt
 
     @@unique([parent_id, student_id])
-    @@map("Parent_Student")
 }
 
 model Class {
@@ -119,7 +118,6 @@ model Subclass {
     subclass_subjects             SubclassSubject[]
     teacher_periods               TeacherPeriod[]
 
-    @@map("SubClass")
 }
 
 model Student {
@@ -160,7 +158,6 @@ model Enrollment {
     academic_year        AcademicYear         @relation(fields: [academic_year_id], references: [id])
 
     @@unique([student_id, subclass_id, academic_year_id])
-    @@map("Student_SubClass_Year")
 }
 
 model SchoolFees {
@@ -176,9 +173,8 @@ model SchoolFees {
 
     academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
     enrollment    Enrollment   @relation(fields: [enrollment_id], references: [id])
-
+    payment_transactions PaymentTransaction[]
     @@unique([enrollment_id, academic_year_id])
-    @@map("SchoolFees")
 }
 
 model Subject {
@@ -211,7 +207,6 @@ model SubclassSubject {
     subject      Subject  @relation(fields: [subject_id], references: [id])
 
     @@unique([subclass_id, subject_id])
-    @@map("SubClass_Subject")
 }
 
 model SubjectTeacher {
@@ -227,7 +222,6 @@ model SubjectTeacher {
     teacher         User            @relation(fields: [teacher_id], references: [id])
 
     @@unique([subject_id, teacher_id])
-    @@map("Subject_Teacher")
 }
 
 model DisciplineIssue {
@@ -410,7 +404,6 @@ model TeacherPeriod {
     assigned_by      User             @relation("TeacherPeriods-AssignedBy", fields: [assigned_by_id], references: [id])
 
     @@unique([subject_teacher_id, period_id, assigned_by_id, academic_year_id])
-    @@map("SubTeach_Period_Year")
 }
 
 model PaymentTransaction {
@@ -419,6 +412,7 @@ model PaymentTransaction {
     academic_year_id Int
     amount           Float
     payment_date     DateTime
+    fee_id           Int
     receipt_number   String?
     payment_method   PaymentMethod
     created_at       DateTime      @default(now())
@@ -426,6 +420,7 @@ model PaymentTransaction {
 
     enrollment    Enrollment   @relation(fields: [enrollment_id], references: [id])
     academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
+    school_fees   SchoolFees   @relation(fields: [fee_id], references: [id])
 }
 
 enum PaymentMethod {

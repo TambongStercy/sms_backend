@@ -13,28 +13,17 @@
  *           type: string
  *           description: Subject name
  *           example: Mathematics
- *         shortName:
+ *         category:
  *           type: string
- *           description: Short form of the subject name
- *           example: Math
- *         code:
- *           type: string
- *           description: Subject code
- *           example: MATH101
- *         description:
- *           type: string
- *           description: Subject description
- *           example: Basic mathematical principles and concepts
- *         classLevel:
- *           type: string
- *           description: Grade or class level
- *           example: Grade 10
- *         createdAt:
+ *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
+ *           description: Subject category
+ *           example: SCIENCE_AND_TECHNOLOGY
+ *         created_at:
  *           type: string
  *           format: date-time
  *           description: Date and time when the subject was created
  *           example: 2023-01-01T12:00:00.000Z
- *         updatedAt:
+ *         updated_at:
  *           type: string
  *           format: date-time
  *           description: Date and time when the subject was last updated
@@ -51,53 +40,75 @@
  *           type: string
  *           description: Subject name
  *           example: Mathematics
- *         shortName:
+ *         category:
  *           type: string
- *           description: Short form of the subject name
- *           example: Math
- *         code:
- *           type: string
- *           description: Subject code
- *           example: MATH101
- *         description:
- *           type: string
- *           description: Subject description
- *           example: Basic mathematical principles and concepts
- *         classLevel:
- *           type: string
- *           description: Grade or class level
- *           example: Grade 10
- *         teachers:
+ *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
+ *           description: Subject category
+ *           example: SCIENCE_AND_TECHNOLOGY
+ *         subject_teachers:
  *           type: array
  *           items:
  *             type: object
  *             properties:
  *               id:
  *                 type: integer
- *                 description: Teacher ID
- *               name:
- *                 type: string
- *                 description: Teacher name
- *               email:
- *                 type: string
- *                 description: Teacher email
- *         subclasses:
+ *                 description: SubjectTeacher ID
+ *               teacher:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                     description: Teacher ID
+ *                   name:
+ *                     type: string
+ *                     description: Teacher name
+ *                   email:
+ *                     type: string
+ *                     description: Teacher email
+ *         subclass_subjects:
  *           type: array
  *           items:
  *             type: object
  *             properties:
  *               id:
  *                 type: integer
- *                 description: Subclass ID
- *               name:
- *                 type: string
- *                 description: Subclass name
- *         createdAt:
+ *                 description: SubclassSubject ID
+ *               coefficient:
+ *                 type: number
+ *                 description: Subject coefficient in this subclass
+ *               subclass:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                     description: Subclass ID
+ *                   name:
+ *                     type: string
+ *                     description: Subclass name
+ *                   class:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         description: Class ID
+ *                       name:
+ *                         type: string
+ *                         description: Class name
+ *               main_teacher:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                     description: Teacher ID
+ *                   name:
+ *                     type: string
+ *                     description: Teacher name
+ *         created_at:
  *           type: string
  *           format: date-time
  *           description: Date and time when the subject was created
  *           example: 2023-01-01T12:00:00.000Z
- *         updatedAt:
+ *         updated_at:
  *           type: string
  *           format: date-time
  *           description: Date and time when the subject was last updated
@@ -107,30 +118,17 @@
  *       type: object
  *       required:
  *         - name
- *         - shortName
- *         - code
- *         - classLevel
+ *         - category
  *       properties:
  *         name:
  *           type: string
  *           description: Subject name
  *           example: Physics
- *         shortName:
+ *         category:
  *           type: string
- *           description: Short form of the subject name
- *           example: Phys
- *         code:
- *           type: string
- *           description: Subject code
- *           example: PHYS101
- *         description:
- *           type: string
- *           description: Subject description
- *           example: Introduction to basic principles of physics
- *         classLevel:
- *           type: string
- *           description: Grade or class level
- *           example: Grade 11
+ *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
+ *           description: Subject category
+ *           example: SCIENCE_AND_TECHNOLOGY
  *
  *     UpdateSubjectRequest:
  *       type: object
@@ -139,29 +137,18 @@
  *           type: string
  *           description: Subject name
  *           example: Advanced Physics
- *         shortName:
+ *         category:
  *           type: string
- *           description: Short form of the subject name
- *           example: AP
- *         code:
- *           type: string
- *           description: Subject code
- *           example: PHYS201
- *         description:
- *           type: string
- *           description: Subject description
- *           example: Advanced physics concepts including mechanics and thermodynamics
- *         classLevel:
- *           type: string
- *           description: Grade or class level
- *           example: Grade 12
+ *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
+ *           description: Subject category
+ *           example: SCIENCE_AND_TECHNOLOGY
  *
  *     AssignTeacherRequest:
  *       type: object
  *       required:
- *         - teacherId
+ *         - teacher_id
  *       properties:
- *         teacherId:
+ *         teacher_id:
  *           type: integer
  *           description: ID of the teacher to assign to the subject
  *           example: 5

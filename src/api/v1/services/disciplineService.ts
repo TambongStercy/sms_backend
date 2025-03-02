@@ -141,13 +141,13 @@ export async function getAllDisciplineIssues(
     }
 
     // Filter by date range
-    if (filterOptions?.startDate && filterOptions?.endDate) {
+    if (filterOptions?.start_date && filterOptions?.end_date) {
         processedFilters.created_at = {
-            gte: new Date(filterOptions.startDate as string),
-            lte: new Date(filterOptions.endDate as string)
+            gte: new Date(filterOptions.start_date as string),
+            lte: new Date(filterOptions.end_date as string)
         };
-        delete processedFilters.startDate;
-        delete processedFilters.endDate;
+        delete processedFilters.start_date;
+        delete processedFilters.end_date;
     }
 
     // Include relations

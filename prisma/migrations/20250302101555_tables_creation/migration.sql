@@ -66,14 +66,14 @@ CREATE TABLE "UserRole" (
 );
 
 -- CreateTable
-CREATE TABLE "Parent_Student" (
+CREATE TABLE "ParentStudent" (
     "id" SERIAL NOT NULL,
     "parent_id" INTEGER NOT NULL,
     "student_id" INTEGER NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Parent_Student_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "ParentStudent_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -87,14 +87,14 @@ CREATE TABLE "Class" (
 );
 
 -- CreateTable
-CREATE TABLE "SubClass" (
+CREATE TABLE "Subclass" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
     "class_id" INTEGER NOT NULL,
 
-    CONSTRAINT "SubClass_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Subclass_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -114,7 +114,7 @@ CREATE TABLE "Student" (
 );
 
 -- CreateTable
-CREATE TABLE "Student_SubClass_Year" (
+CREATE TABLE "Enrollment" (
     "id" SERIAL NOT NULL,
     "student_id" INTEGER NOT NULL,
     "subclass_id" INTEGER NOT NULL,
@@ -124,7 +124,7 @@ CREATE TABLE "Student_SubClass_Year" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Student_SubClass_Year_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Enrollment_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -153,7 +153,7 @@ CREATE TABLE "Subject" (
 );
 
 -- CreateTable
-CREATE TABLE "SubClass_Subject" (
+CREATE TABLE "SubclassSubject" (
     "id" SERIAL NOT NULL,
     "coefficient" DOUBLE PRECISION NOT NULL,
     "subclass_id" INTEGER NOT NULL,
@@ -162,18 +162,18 @@ CREATE TABLE "SubClass_Subject" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "SubClass_Subject_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "SubclassSubject_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "Subject_Teacher" (
+CREATE TABLE "SubjectTeacher" (
     "id" SERIAL NOT NULL,
     "subject_id" INTEGER NOT NULL,
     "teacher_id" INTEGER NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Subject_Teacher_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "SubjectTeacher_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -308,7 +308,7 @@ CREATE TABLE "Period" (
 );
 
 -- CreateTable
-CREATE TABLE "SubTeach_Period_Year" (
+CREATE TABLE "TeacherPeriod" (
     "id" SERIAL NOT NULL,
     "subject_teacher_id" INTEGER NOT NULL,
     "subclass_id" INTEGER NOT NULL,
@@ -318,7 +318,7 @@ CREATE TABLE "SubTeach_Period_Year" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "SubTeach_Period_Year_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "TeacherPeriod_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -415,19 +415,19 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 CREATE UNIQUE INDEX "UserRole_user_id_role_academic_year_id_key" ON "UserRole"("user_id", "role", "academic_year_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Parent_Student_parent_id_student_id_key" ON "Parent_Student"("parent_id", "student_id");
+CREATE UNIQUE INDEX "ParentStudent_parent_id_student_id_key" ON "ParentStudent"("parent_id", "student_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Class_id_key" ON "Class"("id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SubClass_id_key" ON "SubClass"("id");
+CREATE UNIQUE INDEX "Subclass_id_key" ON "Subclass"("id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Student_id_key" ON "Student"("id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Student_SubClass_Year_student_id_subclass_id_academic_year__key" ON "Student_SubClass_Year"("student_id", "subclass_id", "academic_year_id");
+CREATE UNIQUE INDEX "Enrollment_student_id_subclass_id_academic_year_id_key" ON "Enrollment"("student_id", "subclass_id", "academic_year_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SchoolFees_enrollment_id_academic_year_id_key" ON "SchoolFees"("enrollment_id", "academic_year_id");
@@ -436,10 +436,10 @@ CREATE UNIQUE INDEX "SchoolFees_enrollment_id_academic_year_id_key" ON "SchoolFe
 CREATE UNIQUE INDEX "Subject_id_key" ON "Subject"("id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SubClass_Subject_subclass_id_subject_id_key" ON "SubClass_Subject"("subclass_id", "subject_id");
+CREATE UNIQUE INDEX "SubclassSubject_subclass_id_subject_id_key" ON "SubclassSubject"("subclass_id", "subject_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Subject_Teacher_subject_id_teacher_id_key" ON "Subject_Teacher"("subject_id", "teacher_id");
+CREATE UNIQUE INDEX "SubjectTeacher_subject_id_teacher_id_key" ON "SubjectTeacher"("subject_id", "teacher_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "DisciplineIssue_id_key" ON "DisciplineIssue"("id");
@@ -475,7 +475,7 @@ CREATE UNIQUE INDEX "BursarAssignment_academic_year_id_key" ON "BursarAssignment
 CREATE UNIQUE INDEX "Period_id_day_of_week_start_time_end_time_key" ON "Period"("id", "day_of_week", "start_time", "end_time");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SubTeach_Period_Year_subject_teacher_id_period_id_assigned__key" ON "SubTeach_Period_Year"("subject_teacher_id", "period_id", "assigned_by_id", "academic_year_id");
+CREATE UNIQUE INDEX "TeacherPeriod_subject_teacher_id_period_id_assigned_by_id_a_key" ON "TeacherPeriod"("subject_teacher_id", "period_id", "assigned_by_id", "academic_year_id");
 
 -- AddForeignKey
 ALTER TABLE "UserRole" ADD CONSTRAINT "UserRole_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -484,46 +484,46 @@ ALTER TABLE "UserRole" ADD CONSTRAINT "UserRole_user_id_fkey" FOREIGN KEY ("user
 ALTER TABLE "UserRole" ADD CONSTRAINT "UserRole_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Parent_Student" ADD CONSTRAINT "Parent_Student_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ParentStudent" ADD CONSTRAINT "ParentStudent_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Parent_Student" ADD CONSTRAINT "Parent_Student_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "Student"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ParentStudent" ADD CONSTRAINT "ParentStudent_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "Student"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubClass" ADD CONSTRAINT "SubClass_class_id_fkey" FOREIGN KEY ("class_id") REFERENCES "Class"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Subclass" ADD CONSTRAINT "Subclass_class_id_fkey" FOREIGN KEY ("class_id") REFERENCES "Class"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Student_SubClass_Year" ADD CONSTRAINT "Student_SubClass_Year_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "Student"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Enrollment" ADD CONSTRAINT "Enrollment_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "Student"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Student_SubClass_Year" ADD CONSTRAINT "Student_SubClass_Year_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "SubClass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Enrollment" ADD CONSTRAINT "Enrollment_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "Subclass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Student_SubClass_Year" ADD CONSTRAINT "Student_SubClass_Year_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Enrollment" ADD CONSTRAINT "Enrollment_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SchoolFees" ADD CONSTRAINT "SchoolFees_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SchoolFees" ADD CONSTRAINT "SchoolFees_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Student_SubClass_Year"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "SchoolFees" ADD CONSTRAINT "SchoolFees_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Enrollment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubClass_Subject" ADD CONSTRAINT "SubClass_Subject_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "SubClass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "SubclassSubject" ADD CONSTRAINT "SubclassSubject_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "Subclass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubClass_Subject" ADD CONSTRAINT "SubClass_Subject_main_teacher_id_fkey" FOREIGN KEY ("main_teacher_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "SubclassSubject" ADD CONSTRAINT "SubclassSubject_main_teacher_id_fkey" FOREIGN KEY ("main_teacher_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubClass_Subject" ADD CONSTRAINT "SubClass_Subject_subject_id_fkey" FOREIGN KEY ("subject_id") REFERENCES "Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "SubclassSubject" ADD CONSTRAINT "SubclassSubject_subject_id_fkey" FOREIGN KEY ("subject_id") REFERENCES "Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Subject_Teacher" ADD CONSTRAINT "Subject_Teacher_subject_id_fkey" FOREIGN KEY ("subject_id") REFERENCES "Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "SubjectTeacher" ADD CONSTRAINT "SubjectTeacher_subject_id_fkey" FOREIGN KEY ("subject_id") REFERENCES "Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Subject_Teacher" ADD CONSTRAINT "Subject_Teacher_teacher_id_fkey" FOREIGN KEY ("teacher_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "SubjectTeacher" ADD CONSTRAINT "SubjectTeacher_teacher_id_fkey" FOREIGN KEY ("teacher_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "DisciplineIssue" ADD CONSTRAINT "DisciplineIssue_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Student_SubClass_Year"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "DisciplineIssue" ADD CONSTRAINT "DisciplineIssue_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Enrollment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "DisciplineIssue" ADD CONSTRAINT "DisciplineIssue_assigned_by_id_fkey" FOREIGN KEY ("assigned_by_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -532,10 +532,10 @@ ALTER TABLE "DisciplineIssue" ADD CONSTRAINT "DisciplineIssue_assigned_by_id_fke
 ALTER TABLE "DisciplineIssue" ADD CONSTRAINT "DisciplineIssue_reviewed_by_id_fkey" FOREIGN KEY ("reviewed_by_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "StudentAbsence" ADD CONSTRAINT "StudentAbsence_teacher_period_id_fkey" FOREIGN KEY ("teacher_period_id") REFERENCES "SubTeach_Period_Year"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "StudentAbsence" ADD CONSTRAINT "StudentAbsence_teacher_period_id_fkey" FOREIGN KEY ("teacher_period_id") REFERENCES "TeacherPeriod"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "StudentAbsence" ADD CONSTRAINT "StudentAbsence_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Student_SubClass_Year"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "StudentAbsence" ADD CONSTRAINT "StudentAbsence_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Enrollment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StudentAbsence" ADD CONSTRAINT "StudentAbsence_assigned_by_id_fkey" FOREIGN KEY ("assigned_by_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -544,7 +544,7 @@ ALTER TABLE "StudentAbsence" ADD CONSTRAINT "StudentAbsence_assigned_by_id_fkey"
 ALTER TABLE "TeacherAbsence" ADD CONSTRAINT "TeacherAbsence_teacher_id_fkey" FOREIGN KEY ("teacher_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TeacherAbsence" ADD CONSTRAINT "TeacherAbsence_teacher_period_id_fkey" FOREIGN KEY ("teacher_period_id") REFERENCES "SubTeach_Period_Year"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "TeacherAbsence" ADD CONSTRAINT "TeacherAbsence_teacher_period_id_fkey" FOREIGN KEY ("teacher_period_id") REFERENCES "TeacherPeriod"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TeacherAbsence" ADD CONSTRAINT "TeacherAbsence_assigned_by_id_fkey" FOREIGN KEY ("assigned_by_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -559,13 +559,13 @@ ALTER TABLE "ExamSequence" ADD CONSTRAINT "ExamSequence_term_id_fkey" FOREIGN KE
 ALTER TABLE "Term" ADD CONSTRAINT "Term_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Mark" ADD CONSTRAINT "Mark_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Student_SubClass_Year"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Mark" ADD CONSTRAINT "Mark_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Enrollment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Mark" ADD CONSTRAINT "Mark_teacher_id_fkey" FOREIGN KEY ("teacher_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Mark" ADD CONSTRAINT "Mark_subclass_subject_id_fkey" FOREIGN KEY ("subclass_subject_id") REFERENCES "SubClass_Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Mark" ADD CONSTRAINT "Mark_subclass_subject_id_fkey" FOREIGN KEY ("subclass_subject_id") REFERENCES "SubclassSubject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Mark" ADD CONSTRAINT "Mark_exam_sequence_id_fkey" FOREIGN KEY ("exam_sequence_id") REFERENCES "ExamSequence"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -574,7 +574,7 @@ ALTER TABLE "Mark" ADD CONSTRAINT "Mark_exam_sequence_id_fkey" FOREIGN KEY ("exa
 ALTER TABLE "VicePrincipalAssignment" ADD CONSTRAINT "VicePrincipalAssignment_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "VicePrincipalAssignment" ADD CONSTRAINT "VicePrincipalAssignment_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "SubClass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "VicePrincipalAssignment" ADD CONSTRAINT "VicePrincipalAssignment_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "Subclass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "VicePrincipalAssignment" ADD CONSTRAINT "VicePrincipalAssignment_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -583,7 +583,7 @@ ALTER TABLE "VicePrincipalAssignment" ADD CONSTRAINT "VicePrincipalAssignment_ac
 ALTER TABLE "DisciplineMasterAssignment" ADD CONSTRAINT "DisciplineMasterAssignment_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "DisciplineMasterAssignment" ADD CONSTRAINT "DisciplineMasterAssignment_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "SubClass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "DisciplineMasterAssignment" ADD CONSTRAINT "DisciplineMasterAssignment_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "Subclass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "DisciplineMasterAssignment" ADD CONSTRAINT "DisciplineMasterAssignment_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -601,22 +601,22 @@ ALTER TABLE "BursarAssignment" ADD CONSTRAINT "BursarAssignment_user_id_fkey" FO
 ALTER TABLE "BursarAssignment" ADD CONSTRAINT "BursarAssignment_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubTeach_Period_Year" ADD CONSTRAINT "SubTeach_Period_Year_subject_teacher_id_fkey" FOREIGN KEY ("subject_teacher_id") REFERENCES "Subject_Teacher"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TeacherPeriod" ADD CONSTRAINT "TeacherPeriod_subject_teacher_id_fkey" FOREIGN KEY ("subject_teacher_id") REFERENCES "SubjectTeacher"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubTeach_Period_Year" ADD CONSTRAINT "SubTeach_Period_Year_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "SubClass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TeacherPeriod" ADD CONSTRAINT "TeacherPeriod_subclass_id_fkey" FOREIGN KEY ("subclass_id") REFERENCES "Subclass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubTeach_Period_Year" ADD CONSTRAINT "SubTeach_Period_Year_period_id_fkey" FOREIGN KEY ("period_id") REFERENCES "Period"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TeacherPeriod" ADD CONSTRAINT "TeacherPeriod_period_id_fkey" FOREIGN KEY ("period_id") REFERENCES "Period"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubTeach_Period_Year" ADD CONSTRAINT "SubTeach_Period_Year_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TeacherPeriod" ADD CONSTRAINT "TeacherPeriod_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SubTeach_Period_Year" ADD CONSTRAINT "SubTeach_Period_Year_assigned_by_id_fkey" FOREIGN KEY ("assigned_by_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TeacherPeriod" ADD CONSTRAINT "TeacherPeriod_assigned_by_id_fkey" FOREIGN KEY ("assigned_by_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "PaymentTransaction" ADD CONSTRAINT "PaymentTransaction_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Student_SubClass_Year"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PaymentTransaction" ADD CONSTRAINT "PaymentTransaction_enrollment_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "Enrollment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PaymentTransaction" ADD CONSTRAINT "PaymentTransaction_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

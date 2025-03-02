@@ -5,20 +5,32 @@ import * as academicYearService from '../services/academicYearService';
 export const getAllAcademicYears = async (req: Request, res: Response) => {
     try {
         const years = await academicYearService.getAllAcademicYears();
-        res.json(years);
+        res.json({
+            success: true,
+            data: years
+        });
     } catch (error: any) {
         console.error('Error fetching academic years:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const createAcademicYear = async (req: Request, res: Response) => {
     try {
         const newYear = await academicYearService.createAcademicYear(req.body);
-        res.status(201).json(newYear);
+        res.status(201).json({
+            success: true,
+            data: newYear
+        });
     } catch (error: any) {
         console.error('Error creating academic year:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -27,12 +39,21 @@ export const getAcademicYearById = async (req: Request, res: Response): Promise<
         const id = parseInt(req.params.id);
         const year = await academicYearService.getAcademicYearById(id);
         if (!year) {
-            return res.status(404).json({ error: 'Academic year not found' });
+            return res.status(404).json({
+                success: false,
+                error: 'Academic year not found'
+            });
         }
-        res.status(200).json(year);
+        res.status(200).json({
+            success: true,
+            data: year
+        });
     } catch (error: any) {
         console.error('Error fetching academic year:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -40,10 +61,16 @@ export const updateAcademicYear = async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const updatedYear = await academicYearService.updateAcademicYear(id, req.body);
-        res.json(updatedYear);
+        res.json({
+            success: true,
+            data: updatedYear
+        });
     } catch (error: any) {
         console.error('Error updating academic year:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -51,10 +78,16 @@ export const deleteAcademicYear = async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         await academicYearService.deleteAcademicYear(id);
-        res.json({ message: 'Academic year deleted successfully' });
+        res.json({
+            success: true,
+            message: 'Academic year deleted successfully'
+        });
     } catch (error: any) {
         console.error('Error deleting academic year:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -65,7 +98,10 @@ export const setDefaultAcademicYear = async (req: Request, res: Response): Promi
         // Check if the academic year exists
         const year = await academicYearService.getAcademicYearById(yearId);
         if (!year) {
-            return res.status(404).json({ error: 'Academic year not found' });
+            return res.status(404).json({
+                success: false,
+                error: 'Academic year not found'
+            });
         }
 
         // Set as default (implement this method in your service)
@@ -74,11 +110,14 @@ export const setDefaultAcademicYear = async (req: Request, res: Response): Promi
         res.json({
             success: true,
             message: `Academic year ${year.start_date} set as default`,
-            academicYear: year
+            data: year
         });
     } catch (error: any) {
         console.error('Error setting default academic year:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -90,6 +129,7 @@ export const addTerm = async (req: Request, res: Response): Promise<any> => {
         // Validate required fields
         if (!name || !startDate || !endDate) {
             return res.status(400).json({
+                success: false,
                 error: 'Term name, start date, and end date are required'
             });
         }
@@ -97,7 +137,10 @@ export const addTerm = async (req: Request, res: Response): Promise<any> => {
         // Check if the academic year exists
         const year = await academicYearService.getAcademicYearById(yearId);
         if (!year) {
-            return res.status(404).json({ error: 'Academic year not found' });
+            return res.status(404).json({
+                success: false,
+                error: 'Academic year not found'
+            });
         }
 
         // Add term to academic year (implement this method in your service)
@@ -110,10 +153,13 @@ export const addTerm = async (req: Request, res: Response): Promise<any> => {
         res.status(201).json({
             success: true,
             message: `Term "${name}" added to academic year ${year.start_date}`,
-            term
+            data: term
         });
     } catch (error: any) {
         console.error('Error adding term to academic year:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };

@@ -76,7 +76,38 @@
  *           type: string
  *           description: User's ID card number (optional)
  *           example: ID12345678
+ *         photo:
+ *           type: string
+ *           format: uri
+ *           description: URL to user's profile photo (optional)
+ *           example: https://example.com/photos/user1.jpg
  * 
+ *     RegisterResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           description: Indicates if registration was successful
+ *           example: true
+ *         message:
+ *           type: string
+ *           description: Success message
+ *           example: User registered successfully
+ *         user:
+ *           $ref: '#/components/schemas/User'
+ * 
+ *     LogoutResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           description: Indicates if logout was successful
+ *           example: true
+ *         message:
+ *           type: string
+ *           description: Success message
+ *           example: Logged out successfully
+ *
  *     User:
  *       type: object
  *       properties:
@@ -115,15 +146,52 @@
  *           type: string
  *           description: User's ID card number
  *           example: ID12345678
- *         createdAt:
+ *         photo:
+ *           type: string
+ *           format: uri
+ *           description: URL to user's profile photo
+ *           example: https://example.com/photos/user1.jpg
+ *         roles:
+ *           type: array
+ *           description: User's assigned roles
+ *           items:
+ *             $ref: '#/components/schemas/Role'
+ *           example: [{id: 1, name: "ADMIN"}, {id: 2, name: "TEACHER"}]
+ *         created_at:
  *           type: string
  *           format: date-time
  *           description: Timestamp when the user was created
  *           example: 2023-01-01T00:00:00Z
- *         updatedAt:
+ *         updated_at:
  *           type: string
  *           format: date-time
  *           description: Timestamp when the user was last updated
+ *           example: 2023-01-01T00:00:00Z
+ *
+ *     Role:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Role's unique identifier
+ *           example: 1
+ *         name:
+ *           type: string
+ *           description: Role name
+ *           example: ADMIN
+ *         description:
+ *           type: string
+ *           description: Role description
+ *           example: Administrator with full access
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the role was created
+ *           example: 2023-01-01T00:00:00Z
+ *         updated_at:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the role was last updated
  *           example: 2023-01-01T00:00:00Z
  */
 

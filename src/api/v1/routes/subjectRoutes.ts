@@ -9,7 +9,7 @@ const router = Router();
  * /subjects:
  *   get:
  *     summary: Get all subjects
- *     description: Retrieves a list of all subjects
+ *     description: Retrieves a list of all subjects with optional filtering and pagination
  *     tags: [Subjects]
  *     security:
  *       - bearerAuth: []
@@ -27,10 +27,33 @@ const router = Router();
  *           default: 10
  *         description: Number of items per page
  *       - in: query
- *         name: classLevel
+ *         name: name
  *         schema:
  *           type: string
- *         description: Filter subjects by class level
+ *         description: Filter subjects by name
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
+ *         description: Filter subjects by category
+ *       - in: query
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         description: Filter subjects by ID
+ *       - in: query
+ *         name: include_teachers
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Include teacher information with subject data
+ *       - in: query
+ *         name: include_subclasses
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Include subclass information with subject data
  *     responses:
  *       200:
  *         description: List of subjects retrieved successfully
@@ -39,7 +62,7 @@ const router = Router();
  *             schema:
  *               type: object
  *               properties:
- *                 subjects:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Subject'
@@ -124,7 +147,7 @@ router.post('/', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectControl
 
 /**
  * @swagger
- * /subjects/{id}:
+ * /subjects/{subjectId}:
  *   get:
  *     summary: Get subject details
  *     description: Retrieves details of a specific subject by ID
@@ -133,7 +156,7 @@ router.post('/', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectControl
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: subjectId
  *         required: true
  *         schema:
  *           type: integer
@@ -170,7 +193,7 @@ router.get('/:id', authenticate, subjectController.getSubjectById);
 
 /**
  * @swagger
- * /subjects/{id}:
+ * /subjects/{subjectId}:
  *   put:
  *     summary: Update subject details
  *     description: Updates an existing subject with the provided details
@@ -179,7 +202,7 @@ router.get('/:id', authenticate, subjectController.getSubjectById);
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: subjectId
  *         required: true
  *         schema:
  *           type: integer
@@ -234,7 +257,7 @@ router.put('/:id', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectContr
 
 /**
  * @swagger
- * /subjects/{id}:
+ * /subjects/{subjectId}:
  *   delete:
  *     summary: Delete a subject
  *     description: Deletes a specific subject by ID
@@ -243,7 +266,7 @@ router.put('/:id', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectContr
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: subjectId
  *         required: true
  *         schema:
  *           type: integer
@@ -291,7 +314,7 @@ router.delete('/:id', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectCo
 
 /**
  * @swagger
- * /subjects/{id}/teachers:
+ * /subjects/{subjectId}/teachers:
  *   post:
  *     summary: Assign a teacher to a subject
  *     description: Assigns a teacher to a specific subject
@@ -300,7 +323,7 @@ router.delete('/:id', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectCo
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: subjectId
  *         required: true
  *         schema:
  *           type: integer
@@ -360,6 +383,91 @@ router.delete('/:id', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectCo
 // Only ADMIN, PRINCIPAL can assign teachers
 router.post('/:id/teachers', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectController.assignTeacher);
 
+/**
+ * @swagger
+ * /subjects/{subjectId}/sub-classes:
+ *   post:
+ *     summary: Link subject to a sub-class
+ *     description: Links a subject to a sub-class with a specified coefficient and main teacher
+ *     tags: [Subjects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Subject ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subclass_id
+ *               - coefficient
+ *               - main_teacher_id
+ *             properties:
+ *               subclass_id:
+ *                 type: integer
+ *                 description: ID of the subclass to link the subject to
+ *               coefficient:
+ *                 type: number
+ *                 description: Coefficient for the subject in this subclass
+ *               main_teacher_id:
+ *                 type: integer
+ *                 description: ID of the main teacher for this subject-subclass combination
+ *     responses:
+ *       201:
+ *         description: Subject linked to subclass successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 subject_id:
+ *                   type: integer
+ *                 subclass_id:
+ *                   type: integer
+ *                 coefficient:
+ *                   type: number
+ *                 main_teacher_id:
+ *                   type: integer
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized - User is not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Forbidden - User does not have required permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Subject, subclass, or teacher not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 // POST /subjects/:id/sub-classes - Link subject to a sub-class (with coefficient)
 // Only ADMIN, PRINCIPAL can link subjects to sub-classes
 router.post('/:id/sub-classes', authenticate, authorize(['ADMIN', 'PRINCIPAL']), subjectController.linkSubjectToSubClass);

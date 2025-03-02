@@ -32,6 +32,22 @@ export const recordPayment = async (req: Request, res: Response) => {
     }
 };
 
+export const getFeePayments = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const feeId = parseInt(req.params.feeId);
+        const payments = await feeService.getFeePayments(feeId);
+
+        if (!payments) {
+            return res.status(404).json({ error: 'Fee not found' });
+        }
+
+        res.json(payments);
+    } catch (error: any) {
+        console.error('Error fetching fee payments:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const exportFeeReports = async (req: Request, res: Response) => {
     try {
         const report = await feeService.exportFeeReports();

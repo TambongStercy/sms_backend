@@ -31,6 +31,7 @@ The School Management System API is organized into the following modules:
 13. [Announcement API](./announcementRoutes.md) - School-wide announcements
 14. [Event API](./eventRoutes.md) - School events and calendar management
 15. [Mobile API](./mobileRoutes.md) - Mobile application specific endpoints
+16. [File Upload API](./fileRoutes.md) - File upload and management for images and documents
 
 ## Common Response Formats
 
@@ -76,6 +77,7 @@ All API endpoints follow a consistent response format:
 - `403 Forbidden`: The authenticated user does not have permission to access the requested resource
 - `404 Not Found`: The requested resource does not exist
 - `409 Conflict`: The request could not be completed due to a conflict with the current state of the resource
+- `413 Payload Too Large`: The request entity is larger than limits defined by server
 - `500 Internal Server Error`: An error occurred on the server
 
 ## Pagination

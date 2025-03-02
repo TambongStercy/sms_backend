@@ -32,35 +32,19 @@ const router = Router();
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 academicYears:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/AcademicYear'
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     total:
- *                       type: integer
- *                     pages:
- *                       type: integer
- *                     page:
- *                       type: integer
- *                     limit:
- *                       type: integer
+ *               $ref: '#/components/schemas/AcademicYearListResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // GET /academic-years - List all academic years
 // All authenticated users can view academic years
@@ -87,31 +71,31 @@ router.get('/', authenticate, academicYearController.getAllAcademicYears);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/AcademicYear'
+ *               $ref: '#/components/schemas/AcademicYearCreatedResponse'
  *       400:
  *         description: Invalid request data
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: Forbidden - User does not have required permissions
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // POST /academic-years - Create a new academic year
 // Only ADMIN, PRINCIPAL can create academic years
@@ -139,25 +123,25 @@ router.post('/', authenticate, authorize(['ADMIN', 'PRINCIPAL']), academicYearCo
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/AcademicYear'
+ *               $ref: '#/components/schemas/AcademicYearDetailResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Academic year not found
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // GET /academic-years/:id - Get academic year details
 // All authenticated users can view academic year details
@@ -185,38 +169,31 @@ router.get('/:id', authenticate, academicYearController.getAcademicYearById);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 academicYear:
- *                   $ref: '#/components/schemas/AcademicYear'
+ *               $ref: '#/components/schemas/AcademicYearDefaultResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: Forbidden - User does not have required permissions
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Academic year not found
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // POST /academic-years/:id/default - Set an academic year as default
 // Only ADMIN, PRINCIPAL can set default academic year
@@ -250,37 +227,37 @@ router.post('/:id/default', authenticate, authorize(['ADMIN', 'PRINCIPAL']), aca
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Term'
+ *               $ref: '#/components/schemas/TermCreatedResponse'
  *       400:
  *         description: Invalid request data
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: Forbidden - User does not have required permissions
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Academic year not found
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // POST /academic-years/:id/terms - Add a term to an academic year
 router.post('/:id/terms', authenticate, authorize(['ADMIN', 'PRINCIPAL']), academicYearController.addTerm);
@@ -313,34 +290,34 @@ router.post('/:id/terms', authenticate, authorize(['ADMIN', 'PRINCIPAL']), acade
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/AcademicYear'
+ *               $ref: '#/components/schemas/AcademicYearUpdatedResponse'
  *       400:
  *         description: Invalid request data
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Academic year not found
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // PUT /academic-years/:id - Update an academic year
-router.put('/:id', academicYearController.updateAcademicYear);
+router.put('/:id', authenticate, authorize(['ADMIN', 'PRINCIPAL']), academicYearController.updateAcademicYear);
 
 /**
  * @swagger
@@ -364,32 +341,27 @@ router.put('/:id', academicYearController.updateAcademicYear);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
+ *               $ref: '#/components/schemas/AcademicYearDeletedResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Academic year not found
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 // DELETE /academic-years/:id - Delete an academic year
-router.delete('/:id', academicYearController.deleteAcademicYear);
+router.delete('/:id', authenticate, authorize(['ADMIN', 'PRINCIPAL']), academicYearController.deleteAcademicYear);
 
 export default router;

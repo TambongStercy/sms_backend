@@ -64,6 +64,7 @@ const options = {
         './src/api/v1/routes/feeRoutes.ts',
         './src/api/v1/routes/disciplineRoutes.ts',
         './src/api/v1/routes/communicationRoutes.ts',
+        './src/api/v1/routes/fileRoutes.ts',
         './src/config/swagger/schemas/*.ts',
         './src/api/v1/routes/docs/swagger/*.yaml'
     ],

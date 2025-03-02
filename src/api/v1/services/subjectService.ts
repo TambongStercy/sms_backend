@@ -6,44 +6,17 @@ import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../
 
 export async function getAllSubjects(
     paginationOptions?: PaginationOptions,
-    filterOptions?: FilterOptions
+    filterOptions?: FilterOptions,
+    includeOptions?: any
 ): Promise<PaginatedResult<Subject>> {
     // Process category filter if needed
     const processedFilters: any = { ...filterOptions };
-
-    // Include related data if requested
-    const include: any = {};
-
-    // Include teachers if requested
-    if (filterOptions?.includeTeachers === 'true') {
-        include.subject_teachers = {
-            include: {
-                teacher: true
-            }
-        };
-        delete processedFilters.includeTeachers;
-    }
-
-    // Include subclasses if requested
-    if (filterOptions?.includeSubclasses === 'true') {
-        include.subclass_subjects = {
-            include: {
-                subclass: {
-                    include: {
-                        class: true
-                    }
-                },
-                main_teacher: true
-            }
-        };
-        delete processedFilters.includeSubclasses;
-    }
 
     return paginate<Subject>(
         prisma.subject,
         paginationOptions,
         processedFilters,
-        Object.keys(include).length > 0 ? include : undefined
+        includeOptions
     );
 }
 
@@ -166,7 +139,7 @@ export async function getSubjectById(id: number): Promise<Subject | null> {
 }
 
 export async function updateSubject(
-    id: number, 
+    id: number,
     data: { name?: string; category?: SubjectCategory }
 ): Promise<Subject> {
     return prisma.subject.update({
@@ -183,11 +156,11 @@ export async function deleteSubject(id: number): Promise<Subject> {
     await prisma.subjectTeacher.deleteMany({
         where: { subject_id: id }
     });
-    
+
     await prisma.subclassSubject.deleteMany({
         where: { subject_id: id }
     });
-    
+
     // Then delete the subject
     return prisma.subject.delete({
         where: { id }

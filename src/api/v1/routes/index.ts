@@ -10,6 +10,9 @@ import disciplineRoutes from './disciplineRoutes';
 import examRoutes, { marksRouter, reportCardsRouter } from './examRoutes';
 import communicationRoutes from './communicationRoutes';
 import mobileRoutes from './mobileRoutes';
+import fileRoutes from './fileRoutes';
+import express from 'express';
+import path from 'path';
 
 const router = Router();
 
@@ -39,5 +42,11 @@ router.use('/', communicationRoutes);
 
 // Mobile endpoints (prefixed with /mobile)
 router.use('/mobile', mobileRoutes);
+
+// File upload endpoints
+router.use('/uploads', fileRoutes);
+
+// Serve uploaded files statically
+router.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 export default router;

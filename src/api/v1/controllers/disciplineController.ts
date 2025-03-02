@@ -10,12 +10,12 @@ export const getAllDisciplineIssues = async (req: Request, res: Response) => {
             'student_id',
             'class_id',
             'subclass_id',
-            'startDate',
-            'endDate',
+            'start_date',
+            'end_date',
             'description',
-            'includeAssignedBy',
-            'includeReviewedBy',
-            'includeStudent'
+            'include_assigned_by',
+            'include_reviewed_by',
+            'include_student'
         ];
 
         // Extract pagination and filter parameters from the request
@@ -31,49 +31,125 @@ export const getAllDisciplineIssues = async (req: Request, res: Response) => {
             academicYearId
         );
 
-        res.json(result);
+        res.json({
+            success: true,
+            data: result
+        });
     } catch (error: any) {
         console.error('Error fetching discipline issues:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const recordStudentAttendance = async (req: Request, res: Response) => {
     try {
         const attendance = await disciplineService.recordStudentAttendance(req.body);
-        res.status(201).json(attendance);
+        res.status(201).json({
+            success: true,
+            message: 'Student attendance recorded successfully',
+            data: attendance
+        });
     } catch (error: any) {
         console.error('Error recording student attendance:', error);
-        res.status(500).json({ error: error.message });
+
+        // Determine appropriate status code based on error message
+        let statusCode = 500;
+        if (error.message.includes('not enrolled')) {
+            statusCode = 404;
+        } else if (error.message.includes('already exists')) {
+            statusCode = 409;
+        } else if (error.message.includes('Invalid')) {
+            statusCode = 400;
+        }
+
+        res.status(statusCode).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const recordTeacherAttendance = async (req: Request, res: Response) => {
     try {
         const attendance = await disciplineService.recordTeacherAttendance(req.body);
-        res.status(201).json(attendance);
+        res.status(201).json({
+            success: true,
+            message: 'Teacher attendance recorded successfully',
+            data: attendance
+        });
     } catch (error: any) {
         console.error('Error recording teacher attendance:', error);
-        res.status(500).json({ error: error.message });
+
+        // Determine appropriate status code based on error message
+        let statusCode = 500;
+        if (error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('already exists')) {
+            statusCode = 409;
+        } else if (error.message.includes('Invalid')) {
+            statusCode = 400;
+        }
+
+        res.status(statusCode).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const recordDisciplineIssue = async (req: Request, res: Response) => {
     try {
         const issue = await disciplineService.recordDisciplineIssue(req.body);
-        res.status(201).json(issue);
+        res.status(201).json({
+            success: true,
+            message: 'Discipline issue recorded successfully',
+            data: issue
+        });
     } catch (error: any) {
         console.error('Error recording discipline issue:', error);
-        res.status(500).json({ error: error.message });
+
+        // Determine appropriate status code based on error message
+        let statusCode = 500;
+        if (error.message.includes('not enrolled') || error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('already exists')) {
+            statusCode = 409;
+        } else if (error.message.includes('Invalid')) {
+            statusCode = 400;
+        }
+
+        res.status(statusCode).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
-export const getDisciplineHistory = async (req: Request, res: Response) => {
+export const getDisciplineHistory = async (req: Request, res: Response): Promise<void> => {
     try {
-        const history = await disciplineService.getDisciplineHistory(parseInt(req.params.studentId));
-        res.json(history);
+        const studentId = parseInt(req.params.studentId);
+        if (isNaN(studentId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid student ID'
+            });
+            return;
+        }
+
+        const history = await disciplineService.getDisciplineHistory(studentId);
+
+        res.json({
+            success: true,
+            data: history
+        });
     } catch (error: any) {
         console.error('Error fetching discipline history:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };

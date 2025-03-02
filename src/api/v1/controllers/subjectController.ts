@@ -6,12 +6,43 @@ import { extractPaginationAndFilters } from '../../../utils/pagination';
 export const getAllSubjects = async (req: Request, res: Response) => {
     try {
         // Define allowed filters for subjects
-        const allowedFilters = ['name', 'category', 'id', 'includeTeachers', 'includeSubclasses'];
+        const allowedFilters = ['name', 'category', 'id', 'include_teachers', 'include_subclasses'];
 
         // Extract pagination and filter parameters from the request
         const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
 
-        const subjects = await subjectService.getAllSubjects(paginationOptions, filterOptions);
+        // Process specific filters if needed
+        const processedFilters: any = { ...filterOptions };
+
+        // Include related data if requested
+        const include: any = {};
+
+        // Include teachers if requested
+        if (filterOptions?.include_teachers === 'true') {
+            include.subject_teachers = {
+                include: {
+                    teacher: true
+                }
+            };
+            delete processedFilters.include_teachers;
+        }
+
+        // Include subclasses if requested
+        if (filterOptions?.include_subclasses === 'true') {
+            include.subclass_subjects = {
+                include: {
+                    subclass: {
+                        include: {
+                            class: true
+                        }
+                    },
+                    main_teacher: true
+                }
+            };
+            delete processedFilters.include_subclasses;
+        }
+
+        const subjects = await subjectService.getAllSubjects(paginationOptions, processedFilters, include);
         res.json(subjects);
     } catch (error: any) {
         console.error('Error fetching subjects:', error);
@@ -32,8 +63,20 @@ export const createSubject = async (req: Request, res: Response) => {
 export const assignTeacher = async (req: Request, res: Response) => {
     try {
         const subject_id = parseInt(req.params.id);
-        const teacher = await subjectService.assignTeacher(subject_id, req.body);
-        res.status(201).json(teacher);
+        const teacher_id = req.body.teacher_id;
+
+        if (!teacher_id) {
+            res.status(400).json({ error: 'Teacher ID is required' });
+            return;
+        }
+
+        const teacher = await subjectService.assignTeacher(subject_id, { teacher_id });
+
+        res.status(201).json({
+            success: true,
+            message: 'Teacher assigned successfully',
+            teacher
+        });
     } catch (error: any) {
         console.error('Error assigning teacher:', error);
         res.status(500).json({ error: error.message });
@@ -43,7 +86,19 @@ export const assignTeacher = async (req: Request, res: Response) => {
 export const linkSubjectToSubClass = async (req: Request, res: Response) => {
     try {
         const subject_id = parseInt(req.params.id);
-        const link = await subjectService.linkSubjectToSubClass(subject_id, req.body);
+        const { subclass_id, coefficient, main_teacher_id } = req.body;
+
+        if (!subclass_id || !coefficient || !main_teacher_id) {
+            res.status(400).json({ error: 'Subclass ID, coefficient, and main teacher ID are required' });
+            return;
+        }
+
+        const link = await subjectService.linkSubjectToSubClass(subject_id, {
+            subclass_id,
+            coefficient,
+            main_teacher_id
+        });
+
         res.status(201).json(link);
     } catch (error: any) {
         console.error('Error linking subject to sub-class:', error);
@@ -105,6 +160,7 @@ export const deleteSubject = async (req: Request, res: Response): Promise<any> =
         await subjectService.deleteSubject(subjectId);
 
         res.json({
+            success: true,
             message: 'Subject deleted successfully'
         });
     } catch (error: any) {

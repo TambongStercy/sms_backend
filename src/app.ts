@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger/swagger';
+import path from 'path';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -24,8 +25,14 @@ app.use(cors());
 // Parse incoming JSON requests
 app.use(express.json());
 
+// Parse URL-encoded bodies
+app.use(express.urlencoded({ extended: true }));
+
 // HTTP request logging
 app.use(morgan('dev'));
+
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Setup Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
