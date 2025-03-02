@@ -210,6 +210,17 @@ yarn start
 
 The API documentation is available via Swagger UI at `/api-docs` when the server is running. It provides detailed information about all available endpoints, request/response formats, and authentication requirements.
 
+The complete OpenAPI specification is also available in JSON format at `/api-docs.json`. This can be useful for:
+- Importing the API collection into tools like Postman or Insomnia
+- Generating client libraries for various programming languages
+- Offline documentation reference
+- Integration with third-party API management tools
+
+To download the specification file, you can use:
+```bash
+curl http://localhost:3000/api-docs.json -o api-docs.json
+```
+
 ### API Endpoints
 
 The API is organized into logical modules with the following base paths:
@@ -281,6 +292,17 @@ Key features include:
 - Subjects can be assigned to specific subclasses
 - Teachers can be assigned to teach specific subjects
 - The system tracks periods and teaching schedules
+
+### Mobile App Integration
+
+The system includes API endpoints specifically designed for mobile app integration, available under the `/api/v1/mobile` path. These endpoints provide:
+
+- **Mobile Dashboard**: Personalized dashboard data for different user roles
+- **Push Notifications**: Registration and delivery of notifications to mobile devices
+- **Optimized Responses**: Data formatted specifically for mobile consumption
+- **Authentication**: Specialized authentication flows for mobile clients
+
+Mobile app developers can reference the API documentation at `/api-docs` for detailed information about the mobile endpoints.
 
 ## Database Schema
 
@@ -362,4 +384,43 @@ yarn test path/to/test
 - Implement role-based access control for all endpoints
 - Keep controller methods focused on request/response handling
 - Put business logic in service files
-- Use transactions for operations that modify multiple database records 
+- Use transactions for operations that modify multiple database records
+
+### Using Swagger for Development
+
+Swagger UI provides a powerful interactive tool for testing and exploring the API during development:
+
+1. **Testing Endpoints**: Use the Swagger UI to send requests directly from your browser
+2. **Exploring Parameters**: View all required and optional parameters for each endpoint
+3. **Authentication**: Test endpoints with authentication by clicking the "Authorize" button
+4. **Schema Inspection**: View the data models and response schemas
+
+To properly document new endpoints, add Swagger JSDoc comments to your route files:
+
+```typescript
+/**
+ * @swagger
+ * /api/v1/your-path:
+ *   get:
+ *     summary: Brief description of your endpoint
+ *     description: Detailed description of what this endpoint does
+ *     tags: [YourTagName]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: paramName
+ *         in: query
+ *         description: Description of the parameter
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success response description
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/YourResponseType'
+ */
+```
+
+This approach ensures that all API changes are automatically reflected in the documentation. 
