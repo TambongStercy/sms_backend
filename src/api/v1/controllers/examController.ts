@@ -156,7 +156,6 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
             return;
         }
 
-        // Generate the report card
         const reportCardPath = await examService.generateReportCard({
             academicYearId,
             examSequenceId,
@@ -168,6 +167,20 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
         res.setHeader('Content-Disposition', `attachment; filename="student-${studentId}-report.pdf"`);
 
         const fileStream = fs.createReadStream(reportCardPath);
+
+        // Delete the file after it's been sent to the client
+        fileStream.on('end', () => {
+            setTimeout(() => {
+                fs.unlink(reportCardPath, (err) => {
+                    if (err) {
+                        console.error(`Error deleting file ${reportCardPath}:`, err);
+                    } else {
+                        console.log(`Successfully deleted temporary PDF file: ${reportCardPath}`);
+                    }
+                });
+            }, 1000); // Small delay to ensure the file is fully sent
+        });
+
         fileStream.pipe(res);
     } catch (error: any) {
         console.error('Error generating student report card:', error);
@@ -205,6 +218,20 @@ export const generateSubclassReportCards = async (req: Request, res: Response): 
         res.setHeader('Content-Disposition', `attachment; filename="subclass-${subclassId}-reports.pdf"`);
 
         const fileStream = fs.createReadStream(reportCardPath);
+
+        // Delete the file after it's been sent to the client
+        fileStream.on('end', () => {
+            setTimeout(() => {
+                fs.unlink(reportCardPath, (err) => {
+                    if (err) {
+                        console.error(`Error deleting file ${reportCardPath}:`, err);
+                    } else {
+                        console.log(`Successfully deleted temporary PDF file: ${reportCardPath}`);
+                    }
+                });
+            }, 1000); // Small delay to ensure the file is fully sent
+        });
+
         fileStream.pipe(res);
     } catch (error: any) {
         console.error('Error generating subclass report cards:', error);

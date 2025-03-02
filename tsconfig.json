@@ -2,7 +2,7 @@
     "compilerOptions": {
         "sourceMap": true,
         "outDir": "./dist",
-        "rootDir": "./",
+        "rootDir": "./src",
         "strict": true,
         "lib": [
             "ESNext"
@@ -10,16 +10,18 @@
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "resolveJsonModule": true,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "target": "ES2018",
+        "module": "CommonJS"
     },
     "ts-node": {
         "swc": true
     },
     "include": [
-        "src/**/*",
-        "scripts/**/*"
+        "src/**/*"
     ],
     "exclude": [
-        "node_modules"
+        "node_modules",
+        "dist"
     ]
 }
