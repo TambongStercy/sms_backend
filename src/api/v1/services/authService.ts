@@ -1,8 +1,8 @@
 // src/api/v1/services/authService.ts
-import prisma, { User, Gender } from '../../../config/db';
+import prisma, { Gender, Role } from '../../../config/db';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-
+import { JwtPayload } from '../middleware/auth.middleware';
 // Define user registration data interface
 interface UserRegistrationData {
     name: string;
@@ -46,7 +46,7 @@ export async function login(email: string, password: string) {
 
     // Generate JWT token
     const token = jwt.sign(
-        { id: user.id, email: user.email },
+        { id: user.id, email: user.email, role: user.user_roles.map(role => role.role) as Role[] } as JwtPayload,
         JWT_SECRET,
         { expiresIn: '24h' }
     );

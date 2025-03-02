@@ -60,17 +60,31 @@ import { isTokenBlacklisted } from '../services/tokenBlacklistService';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 /**
- * Extended Request interface with user property
- * This adds the user object to the request object after successful authentication
+ * JWT token payload interface
+ * This defines what is stored in the JWT token
  */
-export interface AuthenticatedRequest extends Request {
-    user?: {
-        id: number;
-        email: string;
-        role?: string;
-        [key: string]: any;
-    };
+export interface JwtPayload {
+    id: number;
+    email: string;
+    role?: [string];
+    [key: string]: any;
 }
+
+// Add the user property to the Express Request interface directly
+// This augmentation approach avoids conflicts with other declarations
+declare global {
+    namespace Express {
+        interface Request {
+            user?: JwtPayload;
+        }
+    }
+}
+
+/**
+ * Extended Request interface that includes the user property
+ * This is used for better code readability and type safety
+ */
+export type AuthenticatedRequest = Request;
 
 /**
  * Authentication middleware that verifies JWT tokens
@@ -111,10 +125,10 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
         }
 
         // Verify the token
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
 
         // Add user to request object
-        (req as AuthenticatedRequest).user = decoded as AuthenticatedRequest['user'];
+        (req as AuthenticatedRequest).user = decoded;
 
         // Continue to the next middleware or route handler
         next();
@@ -148,18 +162,16 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
  */
 export const authorize = (roles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
-        const authReq = req as AuthenticatedRequest;
-
-        if (!authReq.user) {
+        if (!req.user) {
             res.status(401).json({ error: 'Unauthorized' });
             return;
         }
 
         // Check if user's role is in the allowed roles
-        if (authReq.user.role && roles.includes(authReq.user.role)) {
+        if (req.user.role && roles.some(role => req.user!.role!.includes(role))) {
             next();
         } else {
-            res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
+            res.status(403).json({ error: `Forbidden: Insufficient permissions(Your Role: ${req.user?.role})` });
         }
     };
 }; 
