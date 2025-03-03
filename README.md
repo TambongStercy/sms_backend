@@ -15,6 +15,8 @@ This is a comprehensive School Management System backend API built with TypeScri
   - [Environment Variables](#environment-variables)
   - [Database Setup](#database-setup)
   - [Running the Application](#running-the-application)
+- [Deployment](#deployment)
+  - [Deploying to Render](#deploying-to-render)
 - [API Documentation](#api-documentation)
   - [API Endpoints](#api-endpoints)
 - [Authentication & Authorization](#authentication--authorization)
@@ -205,6 +207,34 @@ npm start
 yarn build
 yarn start
 ```
+
+## Deployment
+
+### Deploying to Render
+
+This application can be deployed to Render as a Web Service. Follow these steps to deploy:
+
+1. Create a new Web Service in Render and connect your GitHub repository.
+
+2. Configure the following settings:
+   - **Environment**: Node
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+   - **Node Version**: 16 or higher (recommended)
+
+3. Add the necessary environment variables in the Render dashboard:
+   - `DATABASE_URL`: Your PostgreSQL connection string
+   - `JWT_SECRET`: Secret key for JWT authentication
+   - `NODE_ENV`: Set to `production`
+   - Other environment variables as needed
+
+4. For database, you can either:
+   - Use Render's PostgreSQL managed database service
+   - Connect to an external PostgreSQL database
+
+5. Once deployed, Render will automatically build and start your application whenever you push changes to your repository.
+
+**Note**: The repository is configured with a special `postbuild` script that creates necessary directories and copies templates for report generation, ensuring proper functionality in the Render environment.
 
 ## API Documentation
 
