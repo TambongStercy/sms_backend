@@ -8,8 +8,7 @@
     "build": "rimraf dist && tsc && prisma generate --no-engine",
     "postbuild": "mkdir -p dist/view dist/reports && cp -r src/view/. dist/view/ && cp -r src/reports/. dist/reports/",
     "swagger-test": "ts-node scripts/swagger-test.ts",
-    "swagger-docs": "ts-node scripts/swagger-test.ts && echo 'Swagger documentation generated successfully!'",
-    "add-terms": "ts-node src/scripts/add-terms.ts"
+    "swagger-docs": "ts-node scripts/swagger-test.ts && echo 'Swagger documentation generated successfully!'"
   },
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
