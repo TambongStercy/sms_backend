@@ -849,7 +849,20 @@ async function renderReportCardHtml(reportData: ReportData): Promise<string> {
  * Generates a PDF from HTML content
  */
 async function generatePdf(html: string, filePath: string): Promise<void> {
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ],
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+    });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
@@ -983,7 +996,20 @@ async function generateMultiPagePdf(htmlPages: string[], filePath: string): Prom
     }
 
     // Generate a single PDF with all pages
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ],
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+    });
     const page = await browser.newPage();
     await page.setContent(wrapperHtml, { waitUntil: 'networkidle0' });
 

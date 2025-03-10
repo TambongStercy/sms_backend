@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: school-management-system
+    env: node
+    buildCommand: ./render-build.sh
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/google-chrome-stable
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false 
