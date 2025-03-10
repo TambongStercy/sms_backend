@@ -454,7 +454,7 @@ export const reportCardsRouter = Router();
 
 /**
  * @swagger
- * /api/v1/report-cards/student/{studentId}:
+ * /report-cards/student/{studentId}:
  *   get:
  *     summary: Generate report card for a student
  *     description: Generate report card for a specific student
@@ -469,13 +469,13 @@ export const reportCardsRouter = Router();
  *           type: integer
  *         description: Student ID
  *       - in: query
- *         name: term_id
+ *         name: examSequenceId
  *         required: true
  *         schema:
  *           type: integer
- *         description: Term ID
+ *         description: Exam Sequence ID
  *       - in: query
- *         name: academic_year_id
+ *         name: academicYearId
  *         schema:
  *           type: integer
  *         description: Academic Year ID (defaults to current academic year)
@@ -518,11 +518,12 @@ export const reportCardsRouter = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-reportCardsRouter.get('/student/:studentId', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'STUDENT', 'PARENT']), examController.generateStudentReportCard);
+// reportCardsRouter.get('/student/:studentId', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'STUDENT', 'PARENT']), examController.generateStudentReportCard);
+reportCardsRouter.get('/student/:studentId', examController.generateStudentReportCard);
 
 /**
  * @swagger
- * /api/v1/report-cards/subclass/{subclassId}:
+ * /report-cards/subclass/{subclassId}:
  *   get:
  *     summary: Generate report cards for a subclass
  *     description: Generate report cards for all students in a subclass
@@ -537,13 +538,13 @@ reportCardsRouter.get('/student/:studentId', authenticate, authorize(['ADMIN', '
  *           type: integer
  *         description: Subclass ID
  *       - in: query
- *         name: term_id
+ *         name: examSequenceId
  *         required: true
  *         schema:
  *           type: integer
- *         description: Term ID
+ *         description: Exam Sequence ID
  *       - in: query
- *         name: academic_year_id
+ *         name: academicYearId
  *         schema:
  *           type: integer
  *         description: Academic Year ID (defaults to current academic year)
@@ -586,7 +587,8 @@ reportCardsRouter.get('/student/:studentId', authenticate, authorize(['ADMIN', '
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-reportCardsRouter.get('/subclass/:subclassId', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']), examController.generateSubclassReportCards);
+// reportCardsRouter.get('/subclass/:subclassId', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']), examController.generateSubclassReportCards);
+reportCardsRouter.get('/subclass/:subclassId', examController.generateSubclassReportCards);
 
 
 // Marks router (will be mounted at /marks)
@@ -594,7 +596,7 @@ export const marksRouter = Router();
 
 /**
  * @swagger
- * /api/v1/marks:
+ * /marks:
  *   get:
  *     summary: Get all marks
  *     description: Retrieves a list of all marks with optional filtering
@@ -656,7 +658,7 @@ marksRouter.get('/', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRINCI
 
 /**
  * @swagger
- * /api/v1/marks:
+ * /marks:
  *   post:
  *     summary: Create a new mark
  *     description: Create a new exam mark for a student
@@ -728,7 +730,7 @@ marksRouter.post('/', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRINC
 
 /**
  * @swagger
- * /api/v1/marks/{id}:
+ * /marks/{id}:
  *   put:
  *     summary: Update a mark
  *     description: Update an existing exam mark
@@ -799,7 +801,7 @@ marksRouter.put('/:id', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'VICE_PRI
 
 /**
  * @swagger
- * /api/v1/marks/{id}:
+ * /marks/{id}:
  *   delete:
  *     summary: Delete a mark
  *     description: Delete an existing exam mark

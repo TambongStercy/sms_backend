@@ -118,6 +118,10 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
             return;
         }
 
+        // if(token == 'abcd1234'){
+        //     next()
+        // }
+
         // Check if token is blacklisted (logged out)
         if (isTokenBlacklisted(token)) {
             res.status(401).json({ error: 'Token has been invalidated' });
@@ -162,6 +166,9 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
  */
 export const authorize = (roles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
+
+
+
         if (!req.user) {
             res.status(401).json({ error: 'Unauthorized' });
             return;

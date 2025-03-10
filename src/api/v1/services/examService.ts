@@ -475,7 +475,7 @@ async function generateSingleReportCard(
     const filePath = path.join(process.cwd(), `src/reports/${studentId}-${academicYearId}-${examSequenceId}-report.pdf`);
     await generatePdf(html, filePath);
 
-    console.log(`PDF saved at ${filePath}`);
+    // console.log(`PDF saved at ${filePath}`);
     return filePath;
 }
 
@@ -548,7 +548,7 @@ async function generateSubclassReportCards(
 
     await generateMultiPagePdf(htmlPages, filePath);
 
-    console.log(`PDF with ${reportDataArray.length} report cards saved at ${filePath}`);
+    // console.log(`PDF with ${reportDataArray.length} report cards saved at ${filePath}`);
     return filePath;
 }
 
