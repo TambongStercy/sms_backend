@@ -2,7 +2,7 @@ services:
   - type: web
     name: school-management-system
     env: node
-    buildCommand: ./render-build.sh
+    buildCommand: npm run render-build
     startCommand: npm start
     envVars:
       - key: NODE_ENV

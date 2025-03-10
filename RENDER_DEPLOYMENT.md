@@ -15,7 +15,7 @@ This document provides instructions for deploying the School Management System t
 4. Configure the service:
    - Name: school-management-system (or your preferred name)
    - Environment: Node
-   - Build Command: `./render-build.sh`
+   - Build Command: `npm run render-build`
    - Start Command: `npm start`
 
 5. Add the following environment variables:
@@ -31,22 +31,28 @@ This document provides instructions for deploying the School Management System t
 
 If you encounter issues with Puppeteer and Chrome:
 
-1. Make sure the build script is executable:
-   ```
-   git update-index --chmod=+x render-build.sh
-   git commit -m "Make render-build.sh executable"
-   git push
-   ```
+1. Check the build logs to ensure Chrome is being installed correctly
 
-2. Check the build logs to ensure Chrome is being installed correctly
+2. If you encounter build script errors:
+   - Try using the alternative build command: `npm ci && npm run install-chrome && npm run build`
+   - If shell scripts are preferred, try: `bash ./render-build-simple.sh`
 
 3. If you still have issues, you can try manually installing Chrome in the Render dashboard:
    - Go to your web service
    - Click on "Shell"
    - Run: `npx puppeteer browsers install chrome`
 
+## Alternative Approaches
+
+If the npm script approach doesn't work, you can try:
+
+1. Using the shell script directly:
+   - Build Command: `bash ./render-build.sh`
+
+2. Using the simplified shell script:
+   - Build Command: `bash ./render-build-simple.sh`
+
 ## Notes
 
-- The `render-build.sh` script installs Chrome for Puppeteer
-- The `package.json` includes scripts for installing Chrome
+- The `package.json` includes a `render-build` script specifically for Render deployment
 - The `PUPPETEER_EXECUTABLE_PATH` environment variable tells Puppeteer where to find Chrome 

@@ -10,7 +10,8 @@
     "swagger-test": "ts-node scripts/swagger-test.ts",
     "swagger-docs": "ts-node scripts/swagger-test.ts && echo 'Swagger documentation generated successfully!'",
     "install-chrome": "npx puppeteer browsers install chrome",
-    "prebuild": "npm run install-chrome"
+    "prebuild": "npm run install-chrome",
+    "render-build": "npm ci && npm run install-chrome && npm run build"
   },
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
