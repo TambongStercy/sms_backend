@@ -454,3 +454,7 @@ To properly document new endpoints, add Swagger JSDoc comments to your route fil
 ```
 
 This approach ensures that all API changes are automatically reflected in the documentation. 
+
+## License
+
+[MIT](LICENSE) 

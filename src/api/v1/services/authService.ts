@@ -3,6 +3,7 @@ import prisma, { Gender, Role } from '../../../config/db';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { JwtPayload } from '../middleware/auth.middleware';
+
 // Define user registration data interface
 interface UserRegistrationData {
     name: string;
@@ -16,7 +17,12 @@ interface UserRegistrationData {
     photo?: string;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'thisschoolsappisbest';
+const JWT_SECRET = process.env.JWT_SECRET as string;
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+}
+
+const TOKEN_EXPIRY = '24h';
 
 /**
  * Authenticate user and generate JWT token
@@ -29,7 +35,7 @@ export async function login(email: string, password: string) {
     const user = await prisma.user.findUnique({
         where: { email },
         include: {
-            user_roles: true // Include roles if the relationship exists
+            user_roles: true
         }
     });
 
@@ -46,17 +52,21 @@ export async function login(email: string, password: string) {
 
     // Generate JWT token
     const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.user_roles.map(role => role.role) as Role[] } as JwtPayload,
+        {
+            id: user.id,
+            email: user.email,
+            role: user.user_roles.map(role => role.role) as Role[]
+        } as JwtPayload,
         JWT_SECRET,
-        { expiresIn: '24h' }
+        { expiresIn: TOKEN_EXPIRY }
     );
 
     // Return token and user (excluding password)
     const { password: _, ...userWithoutPassword } = user;
 
     return {
-        success: true,
         token,
+        expiresIn: TOKEN_EXPIRY,
         user: userWithoutPassword
     };
 }
@@ -84,7 +94,7 @@ export async function register(userData: UserRegistrationData) {
     // Format date correctly if it's a string
     const formattedData = {
         ...userData,
-        gender: userData.gender as Gender, // Cast the string to Gender enum
+        gender: userData.gender as Gender,
         date_of_birth: new Date(userData.date_of_birth)
     };
 
@@ -103,6 +113,9 @@ export async function register(userData: UserRegistrationData) {
             address: formattedData.address,
             id_card_num: formattedData.id_card_num,
             photo: formattedData.photo
+        },
+        include: {
+            user_roles: true
         }
     });
 
@@ -120,7 +133,7 @@ export async function getProfile(userId: number) {
     const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
-            user_roles: true // Include roles if the relationship exists
+            user_roles: true
         }
     });
 

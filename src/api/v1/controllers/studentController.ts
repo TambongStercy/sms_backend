@@ -5,7 +5,7 @@ import { extractPaginationAndFilters } from '../../../utils/pagination';
 
 export const getAllStudents = async (req: Request, res: Response) => {
     try {
-        // Define allowed filters for students
+        // Define allowed filters for students using snake_case
         const allowedFilters = ['name', 'gender', 'matricule', 'id'];
 
         // Extract pagination and filter parameters from the request
@@ -16,8 +16,8 @@ export const getAllStudents = async (req: Request, res: Response) => {
 
         let result;
         if (withEnrollment) {
-            // Get academic year from query if provided
-            const academicYearId = req.query.academic_year_id ?
+            // Get academic year from query - middleware handles conversion
+            const academic_year_id = req.query.academic_year_id ?
                 parseInt(req.query.academic_year_id as string) : undefined;
 
             // Add class and subclass filters for enrollment query
@@ -28,7 +28,7 @@ export const getAllStudents = async (req: Request, res: Response) => {
             };
 
             result = await studentService.getAllStudentsWithCurrentEnrollment(
-                academicYearId,
+                academic_year_id,
                 paginationOptions,
                 enrollmentFilters
             );
@@ -36,20 +36,35 @@ export const getAllStudents = async (req: Request, res: Response) => {
             result = await studentService.getAllStudents(paginationOptions, filterOptions);
         }
 
-        res.json(result);
+        res.json({
+            success: true,
+            ...result
+        });
     } catch (error: any) {
         console.error('Error fetching students:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const createStudent = async (req: Request, res: Response) => {
     try {
-        const newStudent = await studentService.createStudent(req.body);
-        res.status(201).json(newStudent);
+        // Use the body directly - middleware handles conversion
+        const studentData = req.body;
+        const newStudent = await studentService.createStudent(studentData);
+
+        res.status(201).json({
+            success: true,
+            data: newStudent
+        });
     } catch (error: any) {
         console.error('Error creating student:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -58,33 +73,65 @@ export const getStudentById = async (req: Request, res: Response): Promise<any> 
         const id = parseInt(req.params.id);
         const student = await studentService.getStudentById(id);
         if (!student) {
-            return res.status(404).json({ error: 'Student not found' });
+            return res.status(404).json({
+                success: false,
+                error: 'Student not found'
+            });
         }
-        res.json(student);
+        res.json({
+            success: true,
+            data: student
+        });
     } catch (error: any) {
         console.error('Error fetching student:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const linkParent = async (req: Request, res: Response) => {
     try {
-        const student_id = parseInt(req.params.id);
-        const newLink = await studentService.linkParent(student_id, req.body);
-        res.status(201).json(newLink);
+        const studentId = parseInt(req.params.id);
+
+        // Use the body directly with student_id - middleware handles conversion
+        const linkData = {
+            ...req.body,
+            student_id: studentId
+        };
+
+        const newLink = await studentService.linkParent(studentId, linkData);
+        res.status(201).json({
+            success: true,
+            data: newLink
+        });
     } catch (error: any) {
         console.error('Error linking parent:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
 export const enrollStudent = async (req: Request, res: Response) => {
     try {
-        const student_id = parseInt(req.params.id);
-        const enrollment = await studentService.enrollStudent(student_id, req.body);
-        res.status(201).json(enrollment);
+        const studentId = parseInt(req.params.id);
+
+        // Use the body directly - middleware handles conversion
+        const enrollmentData = req.body;
+
+        const enrollment = await studentService.enrollStudent(studentId, enrollmentData);
+        res.status(201).json({
+            success: true,
+            data: enrollment
+        });
     } catch (error: any) {
         console.error('Error enrolling student:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };

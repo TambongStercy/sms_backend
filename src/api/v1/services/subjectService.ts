@@ -166,3 +166,91 @@ export async function deleteSubject(id: number): Promise<Subject> {
         where: { id }
     });
 }
+
+/**
+ * Assigns a subject to all subclasses of a class
+ * @param class_id The ID of the class
+ * @param subject_id The ID of the subject to assign
+ * @param data Additional data for the assignment (coefficient and main_teacher_id)
+ * @returns Array of created SubclassSubject relationships
+ */
+export async function assignSubjectToClass(
+    class_id: number,
+    subject_id: number,
+    data: {
+        coefficient: number;
+        main_teacher_id: number;
+    }
+): Promise<SubclassSubject[]> {
+    // First get all subclasses for the given class
+    const subclasses = await prisma.subclass.findMany({
+        where: { class_id }
+    });
+
+    if (subclasses.length === 0) {
+        throw new Error(`No subclasses found for class with ID ${class_id}`);
+    }
+
+    // Check if subject exists
+    const subject = await prisma.subject.findUnique({
+        where: { id: subject_id }
+    });
+
+    if (!subject) {
+        throw new Error(`Subject with ID ${subject_id} not found`);
+    }
+
+    // Check if teacher exists
+    const teacher = await prisma.user.findUnique({
+        where: { id: data.main_teacher_id }
+    });
+
+    if (!teacher) {
+        throw new Error(`Teacher with ID ${data.main_teacher_id} not found`);
+    }
+
+    // Create the subject-subclass relationships for each subclass
+    const createdRelationships = await Promise.all(
+        subclasses.map(subclass =>
+            prisma.subclassSubject.create({
+                data: {
+                    subject_id,
+                    subclass_id: subclass.id,
+                    coefficient: data.coefficient,
+                    main_teacher_id: data.main_teacher_id
+                },
+                include: {
+                    subject: true,
+                    subclass: {
+                        include: {
+                            class: true
+                        }
+                    },
+                    main_teacher: true
+                }
+            }).catch(error => {
+                // Handle unique constraint violation - subject may already be assigned to this subclass
+                if (error.code === 'P2002') {
+                    return prisma.subclassSubject.findFirst({
+                        where: {
+                            subject_id,
+                            subclass_id: subclass.id
+                        },
+                        include: {
+                            subject: true,
+                            subclass: {
+                                include: {
+                                    class: true
+                                }
+                            },
+                            main_teacher: true
+                        }
+                    });
+                }
+                throw error;
+            })
+        )
+    );
+
+    return createdRelationships.filter(Boolean) as SubclassSubject[];
+}

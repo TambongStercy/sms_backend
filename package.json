@@ -2,16 +2,19 @@
   "name": "school-management-system",
   "version": "1.0.0",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
-    "build": "rimraf dist && tsc && prisma generate --no-engine",
-    "postbuild": "mkdir -p dist/view dist/reports && cp -r src/view/. dist/view/ && cp -r src/reports/. dist/reports/",
-    "swagger-test": "ts-node scripts/swagger-test.ts",
+    "build": "rimraf dist && tsc && prisma generate",
+    "postbuild": "node scripts/copy-assets.js",
     "swagger-docs": "ts-node scripts/swagger-test.ts && echo 'Swagger documentation generated successfully!'",
-    "install-chrome": "npx puppeteer browsers install chrome",
-    "prebuild": "npm run install-chrome",
-    "render-build": "npm ci && npm run install-chrome && npm run build"
+    "create-super-manager": "ts-node create-super-manager.ts",
+    "import-students": "ts-node import-students.ts",
+    "prisma:deploy": "prisma migrate deploy",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
@@ -26,11 +29,13 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.7.1",
-    "prisma": "^2.30.0",
+    "prisma": "^6.3.1",
     "puppeteer": "^24.2.0",
     "rimraf": "^5.0.5",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
   },
   "devDependencies": {
     "@swc/core": "^1.11.5",
@@ -42,11 +47,12 @@
     "@types/morgan": "^1.9.9",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.13.1",
+    "@types/puppeteer": "^5.4.7",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
-    "nodemon": "^3.1.9",
-    "prisma": "^6.3.1",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.3"
+    "nodemon": "^3.1.9"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
   }
 }

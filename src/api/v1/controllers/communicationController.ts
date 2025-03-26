@@ -18,9 +18,23 @@ export const getAnnouncements = async (req: Request, res: Response) => {
     }
 };
 
-export const createAnnouncement = async (req: Request, res: Response) => {
+export const createAnnouncement = async (req: Request, res: Response): Promise<any> => {
     try {
-        const newAnnouncement = await communicationService.createAnnouncement(req.body);
+        // Check if user is authenticated
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated or missing ID'
+            });
+        }
+
+        // Add the authenticated user's ID as the creator
+        const announcementData = {
+            ...req.body,
+            created_by_id: req.user.id
+        };
+
+        const newAnnouncement = await communicationService.createAnnouncement(announcementData);
         res.status(201).json({
             success: true,
             data: newAnnouncement

@@ -13,58 +13,25 @@
  *           type: string
  *           description: Name of the exam
  *           example: "First Term Examination"
- *         term_id:
+ *         termId:
  *           type: integer
  *           description: ID of the term
  *           example: 1
- *         academic_year_id:
+ *         academicYearId:
  *           type: integer
  *           description: ID of the academic year
  *           example: 2
- *         created_at:
+ *         createdAt:
  *           type: string
  *           format: date-time
  *           description: Date and time when the exam was created
  *           example: "2023-09-01T12:00:00Z"
- *         updated_at:
+ *         updatedAt:
  *           type: string
  *           format: date-time
  *           description: Date and time when the exam was last updated
  *           example: "2023-09-01T12:00:00Z"
  *       description: Exam information
- *     
- *     ExamDetail:
- *       allOf:
- *         - $ref: '#/components/schemas/Exam'
- *         - type: object
- *           properties:
- *             term:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                   example: 1
- *                 name:
- *                   type: string
- *                   example: "First Term"
- *             academic_year:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                   example: 2
- *                 name:
- *                   type: string
- *                   example: "2023-2024"
- *                 start_date:
- *                   type: string
- *                   format: date
- *                   example: "2023-09-01"
- *                 end_date:
- *                   type: string
- *                   format: date
- *                   example: "2024-06-30"
- *       description: Detailed exam information including term and academic year
  *     
  *     Mark:
  *       type: object
@@ -73,19 +40,19 @@
  *           type: integer
  *           description: Unique identifier for the mark
  *           example: 1
- *         enrollment_id:
+ *         enrollmentId:
  *           type: integer
  *           description: ID of the student enrollment
  *           example: 5
- *         subclass_subject_id:
+ *         subclassSubjectId:
  *           type: integer
  *           description: ID of the subclass subject
  *           example: 3
- *         teacher_id:
+ *         teacherId:
  *           type: integer
  *           description: ID of the teacher who recorded the mark
  *           example: 8
- *         exam_sequence_id:
+ *         examSequenceId:
  *           type: integer
  *           description: ID of the exam sequence
  *           example: 2
@@ -94,51 +61,15 @@
  *           format: float
  *           description: Score achieved by the student
  *           example: 85.5
- *         created_at:
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the mark was created
  *           example: "2023-10-20T14:30:00Z"
- *         updated_at:
+ *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the mark was last updated
  *           example: "2023-10-20T14:30:00Z"
  *       description: Mark information
- *     
- *     CreateExamRequest:
- *       type: object
- *       required:
- *         - name
- *         - term_id
- *         - academic_year_id
- *       properties:
- *         name:
- *           type: string
- *           description: Name of the exam
- *           example: "First Term Examination"
- *         term_id:
- *           type: integer
- *           description: ID of the term
- *           example: 1
- *         academic_year_id:
- *           type: integer
- *           description: ID of the academic year
- *           example: 2
- *       description: Information required to create a new exam
- *     
- *     UpdateExamRequest:
- *       type: object
- *       properties:
- *         name:
- *           type: string
- *           description: Updated name of the exam
- *           example: "First Term Midterm Examination"
- *         term_id:
- *           type: integer
- *           description: Updated ID of the term
- *           example: 2
- *       description: Information required to update an exam
  *
  *     # Standardized Response Schemas
  *     ExamListResponse:
@@ -257,16 +188,16 @@
  *         data:
  *           type: object
  *           properties:
- *             file_url:
+ *             fileUrl:
  *               type: string
  *               example: "/reports/report_cards/student_123_term_1_2023.pdf"
- *             student_name:
+ *             studentName:
  *               type: string
  *               example: "John Doe"
  *             term:
  *               type: string
  *               example: "First Term"
- *             academic_year:
+ *             academicYear:
  *               type: string
  *               example: "2023-2024"
  *         message:
@@ -294,7 +225,7 @@
  *         error:
  *           type: string
  *           example: "Validation failed"
- *         validation_errors:
+ *         validationErrors:
  *           type: array
  *           items:
  *             type: object

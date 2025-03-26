@@ -200,9 +200,13 @@ export async function getStudentById(id: number, academicYearId?: number): Promi
 export async function linkParent(student_id: number, data: { parent_id: number }): Promise<ParentStudent> {
     return prisma.parentStudent.create({
         data: {
-            student_id,
-            parent_id: data.parent_id,
-        },
+            student: {
+                connect: { id: student_id }
+            },
+            parent: {
+                connect: { id: data.parent_id }
+            }
+        }
     });
 }
 
@@ -223,14 +227,48 @@ export async function enrollStudent(
         }
     }
 
-    return prisma.enrollment.create({
-        data: {
-            student_id,
-            subclass_id: data.subclass_id,
-            academic_year_id: data.academic_year_id,
-            photo: data.photo,
-            repeater: data.repeater || false,
-        },
+    // First, get the class information to access its fee_amount
+    const subclass = await prisma.subclass.findUnique({
+        where: { id: data.subclass_id },
+        include: { class: true }
+    });
+
+    if (!subclass) {
+        throw new Error("Subclass not found");
+    }
+
+    // Get the fee amount from the parent class
+    const feeAmount = subclass.class.fee_amount;
+
+    // Use a transaction to create both enrollment and school fee records
+    return prisma.$transaction(async (tx) => {
+        // Create the enrollment first
+        const enrollment = await tx.enrollment.create({
+            data: {
+                student_id,
+                subclass_id: data.subclass_id,
+                academic_year_id: data.academic_year_id!,
+                photo: data.photo,
+                repeater: data.repeater || false,
+            },
+        });
+
+        // Then create the school fee record with the class fee amount
+        // Set the due date to 3 months from now by default
+        const dueDate = new Date();
+        dueDate.setMonth(dueDate.getMonth() + 3);
+
+        await tx.schoolFees.create({
+            data: {
+                amount_expected: feeAmount,
+                amount_paid: 0, // Initially no payment made
+                academic_year_id: data.academic_year_id!,
+                due_date: dueDate,
+                enrollment_id: enrollment.id,
+            }
+        });
+
+        return enrollment;
     });
 }
 

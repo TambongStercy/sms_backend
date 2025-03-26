@@ -4,39 +4,55 @@
  *   schemas:
  *     FileUploadResponse:
  *       type: object
+ *       required:
+ *         - success
+ *         - message
+ *         - file
  *       properties:
+ *         success:
+ *           type: boolean
+ *           description: Whether the operation was successful
+ *           example: true
  *         message:
  *           type: string
  *           description: Status message
  *           example: File uploaded successfully
  *         file:
  *           type: object
+ *           required:
+ *             - filename
+ *             - originalName
+ *             - mimeType
+ *             - size
+ *             - url
  *           properties:
  *             filename:
  *               type: string
- *               description: Generated filename on the server
- *               example: 1620000000000-123456789.jpg
- *             originalname:
+ *               example: "1620000000000-123456789.jpg"
+ *             originalName:
  *               type: string
- *               description: Original filename from the client
- *               example: student-photo.jpg
- *             mimetype:
+ *               example: "student-photo.jpg"
+ *             mimeType:
  *               type: string
- *               description: MIME type of the file
- *               example: image/jpeg
+ *               example: "image/jpeg"
  *             size:
  *               type: number
- *               description: Size of the file in bytes
  *               example: 102400
  *             url:
  *               type: string
- *               description: URL to access the uploaded file
- *               example: http://localhost:3000/uploads/1620000000000-123456789.jpg
+ *               example: "http://localhost:3000/uploads/1620000000000-123456789.jpg"
  *       description: Response after successful file upload
  *     
  *     FileDeleteResponse:
  *       type: object
+ *       required:
+ *         - success
+ *         - message
  *       properties:
+ *         success:
+ *           type: boolean
+ *           description: Whether the operation was successful
+ *           example: true
  *         message:
  *           type: string
  *           description: Status message
@@ -45,15 +61,22 @@
  *     
  *     FileError:
  *       type: object
+ *       required:
+ *         - success
+ *         - error
  *       properties:
+ *         success:
+ *           type: boolean
+ *           description: Indicates an error occurred
+ *           example: false
  *         error:
  *           type: string
  *           description: Error message
  *           example: No file uploaded
  *         details:
  *           type: string
- *           description: Detailed error information
- *           example: File size exceeds the limit
+ *           description: Detailed error information (if available)
+ *           example: File size exceeds the 5MB limit
  *       description: Error response for file operations
  */
 

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
 }
 
 model AcademicYear {
@@ -12,7 +13,6 @@ model AcademicYear {
     name       String?
     start_date DateTime
     end_date   DateTime
-    is_default Boolean  @default(false)
 
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
@@ -78,7 +78,7 @@ model UserRole {
     user          User          @relation(fields: [user_id], references: [id])
     academic_year AcademicYear? @relation(fields: [academic_year_id], references: [id])
 
-    @@unique([user_id, role, academic_year_id])
+    @@unique([user_id, role, academic_year_id], name: "user_id_role_academic_year_id")
 }
 
 model ParentStudent {
@@ -97,6 +97,8 @@ model ParentStudent {
 model Class {
     id         Int        @id @unique @default(autoincrement())
     name       String
+    level      Int        @default(1)
+    fee_amount Float      @default(0)
     subclasses Subclass[]
 
     created_at DateTime @default(now())
@@ -117,7 +119,6 @@ model Subclass {
     enrollments                   Enrollment[]
     subclass_subjects             SubclassSubject[]
     teacher_periods               TeacherPeriod[]
-
 }
 
 model Student {
@@ -148,14 +149,15 @@ model Enrollment {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    payment_transactions PaymentTransaction[]
-    marks                Mark[]
-    school_fees          SchoolFees[]
-    absences             StudentAbsence[]
-    discipline_issues    DisciplineIssue[]
-    student              Student              @relation(fields: [student_id], references: [id])
-    subclass             Subclass             @relation(fields: [subclass_id], references: [id])
-    academic_year        AcademicYear         @relation(fields: [academic_year_id], references: [id])
+    payment_transactions      PaymentTransaction[]
+    marks                     Mark[]
+    school_fees               SchoolFees[]
+    absences                  StudentAbsence[]
+    discipline_issues         DisciplineIssue[]
+    student_sequence_averages StudentSequenceAverage[]
+    student                   Student                  @relation(fields: [student_id], references: [id])
+    subclass                  Subclass                 @relation(fields: [subclass_id], references: [id])
+    academic_year             AcademicYear             @relation(fields: [academic_year_id], references: [id])
 
     @@unique([student_id, subclass_id, academic_year_id])
 }
@@ -171,9 +173,10 @@ model SchoolFees {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
-    enrollment    Enrollment   @relation(fields: [enrollment_id], references: [id])
+    academic_year        AcademicYear         @relation(fields: [academic_year_id], references: [id])
+    enrollment           Enrollment           @relation(fields: [enrollment_id], references: [id])
     payment_transactions PaymentTransaction[]
+
     @@unique([enrollment_id, academic_year_id])
 }
 
@@ -279,9 +282,10 @@ model ExamSequence {
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
 
-    academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
-    term          Term         @relation(fields: [term_id], references: [id])
-    marks         Mark[]
+    academic_year             AcademicYear             @relation(fields: [academic_year_id], references: [id])
+    term                      Term                     @relation(fields: [term_id], references: [id])
+    marks                     Mark[]
+    student_sequence_averages StudentSequenceAverage[]
 
     @@unique([sequence_number, term_id, academic_year_id])
 }
@@ -289,13 +293,14 @@ model ExamSequence {
 model Term {
     id               Int      @id @default(autoincrement())
     name             String
-    number           Int      @unique
     start_date       DateTime
     end_date         DateTime
     academic_year_id Int?
 
     academic_year  AcademicYear?  @relation(fields: [academic_year_id], references: [id])
     exam_sequences ExamSequence[]
+
+    @@unique([start_date, end_date, academic_year_id])
 }
 
 model Mark {
@@ -546,4 +551,29 @@ enum SubjectCategory {
     LANGUAGES_AND_LITERATURE
     HUMAN_AND_SOCIAL_SCIENCE
     OTHERS
+}
+
+model StudentSequenceAverage {
+    id               Int           @id @default(autoincrement())
+    enrollment_id    Int
+    exam_sequence_id Int
+    average          Float
+    rank             Int?
+    total_students   Int?
+    decision         String?
+    status           AverageStatus @default(PENDING)
+
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    enrollment    Enrollment   @relation(fields: [enrollment_id], references: [id])
+    exam_sequence ExamSequence @relation(fields: [exam_sequence_id], references: [id])
+
+    @@unique([enrollment_id, exam_sequence_id])
+}
+
+enum AverageStatus {
+    PENDING
+    CALCULATED
+    VERIFIED
 }

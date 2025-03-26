@@ -8,7 +8,10 @@ import { saveFileMetadata, deleteFile } from '../services/fileService';
 export const uploadFile = async (req: Request, res: Response): Promise<void> => {
     try {
         if (!req.file) {
-            res.status(400).json({ error: 'No file uploaded' });
+            res.status(400).json({
+                success: false,
+                error: 'No file uploaded'
+            });
             return;
         }
 
@@ -16,12 +19,14 @@ export const uploadFile = async (req: Request, res: Response): Promise<void> => 
         const fileData = await saveFileMetadata(req, req.file, userId);
 
         res.status(201).json({
+            success: true,
             message: 'File uploaded successfully',
             file: fileData
         });
     } catch (error) {
         console.error('Error uploading file:', error);
         res.status(500).json({
+            success: false,
             error: 'Failed to upload file',
             details: error instanceof Error ? error.message : 'Unknown error'
         });
@@ -38,13 +43,20 @@ export const removeFile = async (req: Request, res: Response): Promise<void> => 
         const deleted = await deleteFile(filename);
 
         if (deleted) {
-            res.status(200).json({ message: 'File deleted successfully' });
+            res.status(200).json({
+                success: true,
+                message: 'File deleted successfully'
+            });
         } else {
-            res.status(404).json({ error: 'File not found' });
+            res.status(404).json({
+                success: false,
+                error: 'File not found'
+            });
         }
     } catch (error) {
         console.error('Error deleting file:', error);
         res.status(500).json({
+            success: false,
             error: 'Failed to delete file',
             details: error instanceof Error ? error.message : 'Unknown error'
         });

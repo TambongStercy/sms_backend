@@ -14,10 +14,16 @@ export const login = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
         const result = await authService.login(email, password);
-        res.json(result);
+        res.json({
+            success: true,
+            data: result
+        });
     } catch (error: any) {
         console.error('Login error:', error);
-        res.status(401).json({ error: error.message });
+        res.status(401).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -30,10 +36,17 @@ export const login = async (req: Request, res: Response) => {
 export const register = async (req: Request, res: Response) => {
     try {
         const newUser = await authService.register(req.body);
-        res.status(201).json(newUser);
+        res.status(201).json({
+            success: true,
+            message: 'User registered successfully',
+            data: newUser
+        });
     } catch (error: any) {
         console.error('Register error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -45,20 +58,36 @@ export const register = async (req: Request, res: Response) => {
  */
 export const getProfile = async (req: Request, res: Response) => {
     try {
-        // The user object is set by the authentication middleware
         const authReq = req as AuthenticatedRequest;
         const userId = authReq.user?.id;
 
         if (!userId) {
-            res.status(401).json({ error: 'Unauthorized' });
+            res.status(401).json({
+                success: false,
+                error: 'Unauthorized'
+            });
             return;
         }
 
         const user = await authService.getProfile(userId);
-        res.json(user);
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                error: 'User not found'
+            });
+            return;
+        }
+
+        res.json({
+            success: true,
+            data: user
+        });
     } catch (error: any) {
         console.error('Get profile error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 
@@ -72,21 +101,26 @@ export const logout = (req: Request, res: Response) => {
     try {
         const authHeader = req.headers.authorization;
 
-        // Check if auth header exists
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            res.status(400).json({ message: 'No token provided' });
+            res.status(400).json({
+                success: false,
+                error: 'No token provided'
+            });
             return;
         }
 
-        // Extract token from header
         const token = authHeader.split(' ')[1];
-
-        // Add token to blacklist
         blacklistToken(token);
 
-        res.status(200).json({ message: 'Logged out successfully' });
+        res.json({
+            success: true,
+            message: 'Logged out successfully'
+        });
     } catch (error: any) {
         console.error('Logout error:', error);
-        res.status(500).json({ error: error.message || 'Error during logout' });
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Error during logout'
+        });
     }
 };

@@ -7,8 +7,10 @@ import puppeteer from 'puppeteer';
 import ejs from 'ejs';
 import fs from 'fs';
 import path from 'path';
+import * as StudentAverageService from './studentAverageService';
+import getPuppeteerConfig from '../../../utils/puppeteer.config';
 
-export async function createExam(data: {
+export async function createExamPaper(data: {
     name: string;
     subject_id: number;
     academic_year_id?: number;
@@ -30,6 +32,36 @@ export async function createExam(data: {
             academic_year_id: data.academic_year_id,
             exam_date: new Date(data.exam_date),
             duration: BigInt(data.duration), // Convert to BigInt as expected in schema
+        },
+    });
+}
+
+/**
+ * Creates an exam sequence (evaluation period)
+ * This was previously named createExam but mistakenly created an exam paper
+ */
+export async function createExam(data: {
+    sequence_number: number;
+    term_id: number;
+    academic_year_id?: number;
+    start_date?: string;
+    end_date?: string;
+}): Promise<ExamSequence> {
+    // Get current academic year if not provided
+    if (!data.academic_year_id) {
+        data.academic_year_id = await getAcademicYearId() || undefined;
+        if (!data.academic_year_id) {
+            throw new Error("No academic year found and none provided");
+        }
+    }
+
+    return prisma.examSequence.create({
+        data: {
+            sequence_number: data.sequence_number,
+            term_id: data.term_id,
+            academic_year_id: data.academic_year_id,
+            // start_date: data.start_date ? new Date(data.start_date) : undefined,
+            // end_date: data.end_date ? new Date(data.end_date) : undefined,
         },
     });
 }
@@ -834,6 +866,14 @@ async function generateStudentReportData(
         }
     };
 
+    // Get the subclass_id from the enrollment for the StudentAverageService call
+    const subclassId = enrollment.subclass_id;
+
+    await StudentAverageService.calculateAndSaveStudentAverages(
+        examSequenceId,
+        subclassId
+    );
+
     return reportData;
 }
 
@@ -849,20 +889,7 @@ async function renderReportCardHtml(reportData: ReportData): Promise<string> {
  * Generates a PDF from HTML content
  */
 async function generatePdf(html: string, filePath: string): Promise<void> {
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ],
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-    });
+    const browser = await puppeteer.launch(getPuppeteerConfig());
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
@@ -996,20 +1023,7 @@ async function generateMultiPagePdf(htmlPages: string[], filePath: string): Prom
     }
 
     // Generate a single PDF with all pages
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ],
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-    });
+    const browser = await puppeteer.launch(getPuppeteerConfig());
     const page = await browser.newPage();
     await page.setContent(wrapperHtml, { waitUntil: 'networkidle0' });
 
@@ -1118,6 +1132,7 @@ export async function createMark(data: {
     student_id: number;
     subject_id: number;
     mark: number;
+    teacher_id?: number;
     comment?: string;
 }): Promise<Mark> {
     // Find the enrollment for this student
@@ -1143,13 +1158,15 @@ export async function createMark(data: {
         throw new Error('Subject is not assigned to student\'s subclass');
     }
 
+    const teacher = data.teacher_id ?? subclassSubject.main_teacher_id;
+
     // Create the mark
     return prisma.mark.create({
         data: {
             exam_sequence_id: data.exam_id,
             enrollment_id: enrollment.id,
             subclass_subject_id: subclassSubject.id,
-            teacher_id: subclassSubject.main_teacher_id, // Using main teacher as the default
+            teacher_id: teacher, // Using main teacher as the default
             score: data.mark,
             // Add comment if provided and the schema supports it
             ...(data.comment && { comment: data.comment })
@@ -1175,12 +1192,13 @@ export async function createMark(data: {
  */
 export async function updateMark(
     id: number,
-    data: { mark?: number; comment?: string }
+    data: { mark?: number; comment?: string; teacher_id?: number; }
 ): Promise<Mark> {
     return prisma.mark.update({
         where: { id },
         data: {
             score: data.mark,
+            teacher_id: data.teacher_id,
             // Add comment if the schema supports it (as an optional field)
             ...(data.comment !== undefined && { comment: data.comment })
         },
@@ -1208,3 +1226,4 @@ export async function deleteMark(id: number): Promise<Mark> {
         where: { id }
     });
 }
+

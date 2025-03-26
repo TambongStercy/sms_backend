@@ -5,6 +5,7 @@ import ejs from 'ejs';
 import fs from 'fs';
 import path from 'path';
 import * as dotenv from 'dotenv';
+import getPuppeteerConfig from './utils/puppeteer.config';
 
 // Load environment variables from .env file
 dotenv.config({ path: './.env' });
@@ -504,20 +505,7 @@ async function renderReportCardHtml(reportData: ReportData): Promise<string> {
 }
 
 async function generatePdf(html: string, filePath: string): Promise<void> {
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ],
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-    });
+    const browser = await puppeteer.launch(getPuppeteerConfig());
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
@@ -648,20 +636,7 @@ async function generateMultiPagePdf(htmlPages: string[], filePath: string): Prom
     }
 
     // Generate a single PDF with all pages
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ],
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-    });
+    const browser = await puppeteer.launch(getPuppeteerConfig());
     const page = await browser.newPage();
     await page.setContent(wrapperHtml, { waitUntil: 'networkidle0' });
 
@@ -697,15 +672,15 @@ function calculateStandardDeviation(numbers: number[]): number {
 
 // Example usage:
 // For a single student
+// generateReportCard({
+//     academicYearId: 1,
+//     examSequenceId: 1,
+//     studentId: 1
+// }).then(console.log).catch(console.error);
+
+// For all students in a subclass
 generateReportCard({
     academicYearId: 1,
     examSequenceId: 1,
-    studentId: 1
+    subclassId: 1
 }).then(console.log).catch(console.error);
-
-// For all students in a subclass
-// generateReportCard({ 
-//    academicYearId: 1, 
-//    examSequenceId: 1, 
-//    subclassId: 1 
-// }).then(console.log).catch(console.error);

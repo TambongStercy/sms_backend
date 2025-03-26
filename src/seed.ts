@@ -22,7 +22,6 @@ async function main() {
     const term = await prisma.term.create({
         data: {
             name: 'First Term',
-            number: 1,
             start_date: new Date('2024-09-01'),
             end_date: new Date('2024-12-31'),
         },

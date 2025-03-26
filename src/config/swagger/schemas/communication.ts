@@ -18,27 +18,29 @@
  *           description: Announcement content
  *           example: Due to weather conditions, school will be closed tomorrow
  *         audience:
- *           type: string
- *           enum: [ALL, STUDENTS, TEACHERS, PARENTS, STAFF]
+ *           $ref: '#/components/schemas/Audience'
  *           description: Target audience for the announcement
- *           example: ALL
- *         created_by_id:
+ *           example: INTERNAL
+ *         createdById:
  *           type: integer
  *           description: ID of the user who created the announcement
  *           example: 1
- *         academic_year_id:
+ *         academicYearId:
  *           type: integer
- *           description: ID of the academic year this announcement belongs to
- *           example: 2
- *         created_at:
+ *           description: Academic year ID
+ *           example: 1
+ *         datePosted:
  *           type: string
  *           format: date-time
- *           description: Date and time when the announcement was created
+ *           description: Date when the announcement was posted
+ *           example: 2023-09-15T08:00:00.000Z
+ *         createdAt:
+ *           type: string
+ *           format: date-time
  *           example: 2023-01-01T12:00:00.000Z
- *         updated_at:
+ *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the announcement was last updated
  *           example: 2023-01-01T12:00:00.000Z
  *
  *     CreateAnnouncementRequest:
@@ -57,11 +59,10 @@
  *           description: Announcement content
  *           example: Due to weather conditions, school will be closed tomorrow
  *         audience:
- *           type: string
- *           enum: [ALL, STUDENTS, TEACHERS, PARENTS, STAFF]
+ *           $ref: '#/components/schemas/Audience'
  *           description: Target audience for the announcement
- *           example: ALL
- *         academic_year_id:
+ *           example: INTERNAL
+ *         academicYearId:
  *           type: integer
  *           description: ID of the academic year this announcement belongs to (optional)
  *           example: 2
@@ -69,10 +70,10 @@
  *     SendNotificationRequest:
  *       type: object
  *       required:
- *         - user_id
+ *         - userId
  *         - message
  *       properties:
- *         user_id:
+ *         userId:
  *           type: integer
  *           description: ID of the user to send the notification to
  *           example: 10
@@ -119,18 +120,18 @@
  *             id:
  *               type: integer
  *               example: 1
- *             user_id:
+ *             userId:
  *               type: integer
  *               example: 10
  *             message:
  *               type: string
  *               example: Please check your child's attendance record
- *             date_sent:
+ *             dateSent:
  *               type: string
  *               format: date-time
  *               example: 2023-01-01T12:00:00.000Z
  *             status:
- *               type: string
+ *               $ref: '#/components/schemas/NotificationStatus'
  *               example: SENT
  *       description: Response for a successful request to send a notification
  *

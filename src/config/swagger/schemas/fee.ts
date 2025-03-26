@@ -2,176 +2,91 @@
  * @swagger
  * components:
  *   schemas:
- *     SchoolFee:
+ *     SchoolFees:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the school fee record
+ *           description: Fee ID
  *           example: 1
- *         amount_expected:
+ *         enrollmentId:
+ *           type: integer
+ *           description: Student enrollment ID
+ *           example: 1
+ *         academicYearId:
+ *           type: integer
+ *           description: Academic year ID
+ *           example: 1
+ *         feeAmount:
  *           type: number
- *           format: float
- *           description: Total amount expected to be paid
- *           example: 150000
- *         amount_paid:
+ *           description: Total fee amount
+ *           example: 100000
+ *         amountPaid:
  *           type: number
- *           format: float
  *           description: Amount already paid
  *           example: 75000
- *         academic_year_id:
- *           type: integer
- *           description: ID of the academic year
- *           example: 1
- *         due_date:
+ *         remainingAmount:
+ *           type: number
+ *           description: Remaining amount to be paid
+ *           example: 25000
+ *         status:
+ *           type: string
+ *           enum: [PAID, PARTIAL, UNPAID]
+ *           description: Payment status
+ *           example: PARTIAL
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Deadline for fee payment
- *           example: "2023-10-31T23:59:59Z"
- *         enrollment_id:
- *           type: integer
- *           description: ID of the student enrollment
- *           example: 1
- *         created_at:
+ *           example: 2023-01-01T12:00:00.000Z
+ *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the fee record was created
- *           example: "2023-01-01T12:00:00Z"
- *         updated_at:
- *           type: string
- *           format: date-time
- *           description: Date and time when the fee record was last updated
- *           example: "2023-01-01T12:00:00Z"
- *       description: School fee information
- *     
+ *           example: 2023-01-01T12:00:00.000Z
+ *
  *     PaymentTransaction:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the payment transaction
+ *           description: Transaction ID
  *           example: 1
- *         enrollment_id:
+ *         enrollmentId:
  *           type: integer
- *           description: ID of the student enrollment
+ *           description: Student enrollment ID
  *           example: 1
- *         academic_year_id:
+ *         academicYearId:
  *           type: integer
- *           description: ID of the academic year
+ *           description: Academic year ID
  *           example: 1
  *         amount:
  *           type: number
- *           format: float
- *           description: Amount paid in this transaction
- *           example: 50000
- *         payment_date:
+ *           description: Payment amount
+ *           example: 25000
+ *         paymentDate:
  *           type: string
  *           format: date-time
- *           description: Date and time of the payment
- *           example: "2023-09-15T10:30:00Z"
- *         receipt_number:
+ *           description: Date of payment
+ *           example: 2023-09-15T10:30:00.000Z
+ *         feeId:
+ *           type: integer
+ *           description: School fees ID
+ *           example: 1
+ *         receiptNumber:
  *           type: string
- *           description: Receipt number for the payment
+ *           description: Receipt number
  *           example: "REC-2023-001"
- *         payment_method:
- *           type: string
- *           enum: [CASH, CARD, ONLINE]
+ *         paymentMethod:
+ *           $ref: '#/components/schemas/PaymentMethod'
  *           description: Method of payment
- *           example: "CASH"
- *         created_at:
+ *           example: CARD
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the transaction was recorded
- *           example: "2023-09-15T10:30:00Z"
- *         updated_at:
+ *           example: 2023-01-01T12:00:00.000Z
+ *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the transaction was last updated
- *           example: "2023-09-15T10:30:00Z"
- *       description: Payment transaction information
- *     
- *     FeeDetail:
- *       type: object
- *       properties:
- *         fee:
- *           $ref: '#/components/schemas/SchoolFee'
- *         student:
- *           $ref: '#/components/schemas/Student'
- *         transactions:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/PaymentTransaction'
- *       description: Detailed fee information including student and payment transactions
- *     
- *     CreateFeeRequest:
- *       type: object
- *       required:
- *         - student_id
- *         - academic_year_id
- *         - amount_expected
- *         - due_date
- *       properties:
- *         student_id:
- *           type: integer
- *           description: ID of the student
- *           example: 1
- *         academic_year_id:
- *           type: integer
- *           description: ID of the academic year
- *           example: 1
- *         amount_expected:
- *           type: number
- *           format: float
- *           description: Total amount expected to be paid
- *           example: 150000
- *         amount_paid:
- *           type: number
- *           format: float
- *           description: Initial amount paid (if any)
- *           example: 0
- *         due_date:
- *           type: string
- *           format: date-time
- *           description: Deadline for fee payment
- *           example: "2023-10-31T23:59:59Z"
- *       description: Information required to create a new fee record
- *     
- *     RecordPaymentRequest:
- *       type: object
- *       required:
- *         - amount
- *         - payment_method
- *         - student_id
- *       properties:
- *         student_id:
- *           type: integer
- *           description: ID of the student
- *           example: 1
- *         academic_year_id:
- *           type: integer
- *           description: ID of the academic year (optional, defaults to current academic year)
- *           example: 1
- *         amount:
- *           type: number
- *           format: float
- *           description: Amount paid in this transaction
- *           example: 50000
- *         payment_date:
- *           type: string
- *           format: date-time
- *           description: Date and time of the payment (defaults to current time if not provided)
- *           example: "2023-09-15T10:30:00Z"
- *         receipt_number:
- *           type: string
- *           description: Receipt number for the payment
- *           example: "REC-2023-001"
- *         payment_method:
- *           type: string
- *           enum: [CASH, CARD, ONLINE]
- *           description: Method of payment
- *           example: "CASH"
- *       description: Information required to record a payment transaction
+ *           example: 2023-01-01T12:00:00.000Z
  */
 
-// Export empty object as this file is only used for Swagger documentation
 export { }; 

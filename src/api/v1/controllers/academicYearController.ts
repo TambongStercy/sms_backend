@@ -5,6 +5,8 @@ import * as academicYearService from '../services/academicYearService';
 export const getAllAcademicYears = async (req: Request, res: Response) => {
     try {
         const years = await academicYearService.getAllAcademicYears();
+
+        // Response will be automatically converted to camelCase by middleware
         res.json({
             success: true,
             data: years
@@ -20,7 +22,16 @@ export const getAllAcademicYears = async (req: Request, res: Response) => {
 
 export const createAcademicYear = async (req: Request, res: Response) => {
     try {
-        const newYear = await academicYearService.createAcademicYear(req.body);
+        // No need to convert - middleware already converts to snake_case
+        const { start_date, end_date, name } = req.body;
+
+        const newYear = await academicYearService.createAcademicYear({
+            start_date,
+            end_date,
+            name,
+        });
+
+        // Response will be automatically converted to camelCase by middleware
         res.status(201).json({
             success: true,
             data: newYear
@@ -44,6 +55,8 @@ export const getAcademicYearById = async (req: Request, res: Response): Promise<
                 error: 'Academic year not found'
             });
         }
+
+        // Response will be automatically converted to camelCase by middleware
         res.status(200).json({
             success: true,
             data: year
@@ -60,7 +73,14 @@ export const getAcademicYearById = async (req: Request, res: Response): Promise<
 export const updateAcademicYear = async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
-        const updatedYear = await academicYearService.updateAcademicYear(id, req.body);
+        const { start_date, end_date } = req.body;
+
+        const updatedYear = await academicYearService.updateAcademicYear(id, {
+            start_date,
+            end_date
+        });
+
+        // Response will be automatically converted to camelCase by middleware
         res.json({
             success: true,
             data: updatedYear
@@ -91,43 +111,13 @@ export const deleteAcademicYear = async (req: Request, res: Response) => {
     }
 };
 
-export const setDefaultAcademicYear = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const yearId = parseInt(req.params.id);
-
-        // Check if the academic year exists
-        const year = await academicYearService.getAcademicYearById(yearId);
-        if (!year) {
-            return res.status(404).json({
-                success: false,
-                error: 'Academic year not found'
-            });
-        }
-
-        // Set as default (implement this method in your service)
-        await academicYearService.setAsDefault(yearId);
-
-        res.json({
-            success: true,
-            message: `Academic year ${year.start_date} set as default`,
-            data: year
-        });
-    } catch (error: any) {
-        console.error('Error setting default academic year:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-};
-
 export const addTerm = async (req: Request, res: Response): Promise<any> => {
     try {
         const yearId = parseInt(req.params.id);
-        const { name, startDate, endDate } = req.body;
+        const { name, start_date, end_date } = req.body;
 
         // Validate required fields
-        if (!name || !startDate || !endDate) {
+        if (!name || !start_date || !end_date) {
             return res.status(400).json({
                 success: false,
                 error: 'Term name, start date, and end date are required'
@@ -143,13 +133,14 @@ export const addTerm = async (req: Request, res: Response): Promise<any> => {
             });
         }
 
-        // Add term to academic year (implement this method in your service)
+        // Add term to academic year
         const term = await academicYearService.addTermToYear(yearId, {
             name,
-            start_date: new Date(startDate),
-            end_date: new Date(endDate)
+            start_date: new Date(start_date),
+            end_date: new Date(end_date)
         });
 
+        // Response will be automatically converted to camelCase by middleware
         res.status(201).json({
             success: true,
             message: `Term "${name}" added to academic year ${year.start_date}`,

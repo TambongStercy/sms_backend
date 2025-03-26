@@ -7,352 +7,321 @@
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the exam paper
+ *           description: Exam paper ID
  *           example: 1
- *         name:
+ *         title:
  *           type: string
- *           description: Name of the exam paper
- *           example: "Mathematics Mid-Term Exam"
- *         subject_id:
+ *           description: Exam paper title
+ *           example: Mathematics Exam Paper
+ *         description:
+ *           type: string
+ *           description: Description of the exam paper
+ *           example: Final mathematics examination for term 1
+ *         subjectId:
  *           type: integer
- *           description: ID of the subject
+ *           description: ID of the subject associated with this exam paper
+ *           example: 3
+ *         termId:
+ *           type: integer
+ *           description: ID of the term associated with this exam paper
+ *           example: 1
+ *         classId:
+ *           type: integer
+ *           description: ID of the class for which this exam paper is designated
  *           example: 2
- *         academic_year_id:
+ *         academicYearId:
  *           type: integer
- *           description: ID of the academic year
+ *           description: ID of the academic year for this exam paper
  *           example: 1
- *         exam_date:
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time of the exam
- *           example: "2023-10-15T09:00:00Z"
- *         duration:
- *           type: integer
- *           description: Duration of the exam in minutes
- *           example: 120
- *         created_at:
+ *           description: Timestamp when the exam paper was created
+ *           example: 2023-03-01T12:00:00Z
+ *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the exam paper was created
- *           example: "2023-09-01T12:00:00Z"
- *         updated_at:
- *           type: string
- *           format: date-time
- *           description: Date and time when the exam paper was last updated
- *           example: "2023-09-01T12:00:00Z"
- *       description: Exam paper information
- *     
+ *           description: Timestamp when the exam paper was last updated
+ *           example: 2023-03-05T15:30:00Z
+ *         questions:
+ *           type: array
+ *           description: List of questions in this exam paper
+ *           items:
+ *             $ref: '#/components/schemas/Question'
+ * 
  *     Question:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the question
+ *           description: Question ID
  *           example: 1
- *         subject_id:
+ *         examPaperId:
  *           type: integer
- *           description: ID of the subject
- *           example: 2
- *         question_text:
+ *           description: ID of the exam paper this question belongs to
+ *           example: 1
+ *         text:
  *           type: string
- *           description: Text of the question
- *           example: "What is the formula for the area of a circle?"
- *         question_type:
- *           type: string
- *           enum: [MCQ, LONG_ANSWER]
+ *           description: Question text
+ *           example: Solve for x in the equation 2x + 5 = 15
+ *         type:
+ *           $ref: '#/components/schemas/QuestionType'
  *           description: Type of question
- *           example: "MCQ"
- *         options:
- *           type: object
- *           description: Options for multiple choice questions (JSON format)
- *           example: {"A": "πr", "B": "πr²", "C": "2πr", "D": "2πr²"}
- *         correct_answer:
- *           type: string
- *           description: Correct answer for the question
- *           example: "B"
- *         topic:
- *           type: string
- *           description: Topic or category of the question
- *           example: "Geometry"
- *         created_at:
- *           type: string
- *           format: date-time
- *           description: Date and time when the question was created
- *           example: "2023-08-15T10:30:00Z"
- *         updated_at:
- *           type: string
- *           format: date-time
- *           description: Date and time when the question was last updated
- *           example: "2023-08-15T10:30:00Z"
- *       description: Question information
- *     
- *     ExamPaperQuestion:
- *       type: object
- *       properties:
- *         exam_paper_id:
+ *           example: MCQ
+ *         points:
  *           type: integer
- *           description: ID of the exam paper
- *           example: 1
- *         question_id:
- *           type: integer
- *           description: ID of the question
+ *           description: Maximum points for this question
  *           example: 5
- *         order:
+ *         sequence:
  *           type: integer
  *           description: Order of the question in the exam paper
- *           example: 3
- *       description: Relationship between an exam paper and a question
- *     
- *     CreateExamPaperRequest:
- *       type: object
- *       required:
- *         - name
- *         - subject_id
- *         - academic_year_id
- *         - exam_date
- *         - duration
- *       properties:
- *         name:
- *           type: string
- *           description: Name of the exam paper
- *           example: "Mathematics Mid-Term Exam"
- *         subject_id:
- *           type: integer
- *           description: ID of the subject
- *           example: 2
- *         academic_year_id:
- *           type: integer
- *           description: ID of the academic year
  *           example: 1
- *         exam_date:
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time of the exam
- *           example: "2023-10-15T09:00:00Z"
- *         duration:
- *           type: integer
- *           description: Duration of the exam in minutes
- *           example: 120
- *       description: Information required to create a new exam paper
- *     
- *     CreateQuestionRequest:
- *       type: object
- *       required:
- *         - subject_id
- *         - question_text
- *         - question_type
- *       properties:
- *         subject_id:
- *           type: integer
- *           description: ID of the subject
- *           example: 2
- *         question_text:
+ *           description: Timestamp when the question was created
+ *           example: 2023-03-02T10:00:00Z
+ *         updatedAt:
  *           type: string
- *           description: Text of the question
- *           example: "What is the formula for the area of a circle?"
- *         question_type:
- *           type: string
- *           enum: [MCQ, LONG_ANSWER]
- *           description: Type of question
- *           example: "MCQ"
+ *           format: date-time
+ *           description: Timestamp when the question was last updated
+ *           example: 2023-03-02T10:00:00Z
  *         options:
- *           type: object
- *           description: Options for multiple choice questions (JSON format)
- *           example: {"A": "πr", "B": "πr²", "C": "2πr", "D": "2πr²"}
- *         correct_answer:
- *           type: string
- *           description: Correct answer for the question
- *           example: "B"
- *         topic:
- *           type: string
- *           description: Topic or category of the question
- *           example: "Geometry"
- *       description: Information required to create a new question
- *     
- *     Mark:
+ *           type: array
+ *           description: List of answer options for multiple choice questions
+ *           items:
+ *             $ref: '#/components/schemas/Option'
+ * 
+ *     Option:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the mark
+ *           description: Option ID
  *           example: 1
- *         enrollment_id:
+ *         questionId:
  *           type: integer
- *           description: ID of the student enrollment
- *           example: 5
- *         subclass_subject_id:
+ *           description: ID of the question this option belongs to
+ *           example: 1
+ *         text:
+ *           type: string
+ *           description: Option text
+ *           example: x = 5
+ *         sequence:
  *           type: integer
- *           description: ID of the subclass subject
- *           example: 3
- *         teacher_id:
+ *           description: Order of the option in the list
+ *           example: 1
+ *         isCorrect:
+ *           type: boolean
+ *           description: Whether this option is correct
+ *           example: true
+ * 
+ *     ExamSubmission:
+ *       type: object
+ *       properties:
+ *         id:
  *           type: integer
- *           description: ID of the teacher who recorded the mark
- *           example: 8
- *         exam_sequence_id:
+ *           description: Submission ID
+ *           example: 1
+ *         examPaperId:
  *           type: integer
- *           description: ID of the exam sequence
- *           example: 2
- *         score:
- *           type: number
- *           format: float
- *           description: Score achieved by the student
- *           example: 85.5
- *         created_at:
+ *           description: ID of the exam paper this submission is for
+ *           example: 1
+ *         studentId:
+ *           type: integer
+ *           description: ID of the student who made the submission
+ *           example: 15
+ *         submittedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the mark was created
- *           example: "2023-10-20T14:30:00Z"
- *         updated_at:
+ *           description: Timestamp when the submission was made
+ *           example: 2023-03-15T14:30:00Z
+ *         totalScore:
+ *           type: integer
+ *           description: Total score achieved
+ *           example: 85
+ *         totalPossible:
+ *           type: integer
+ *           description: Maximum possible score
+ *           example: 100
+ *         status:
+ *           type: string
+ *           enum: [SUBMITTED, GRADED, PENDING_REVIEW]
+ *           description: Status of the submission
+ *           example: GRADED
+ *         answers:
+ *           type: array
+ *           description: List of answers provided in this submission
+ *           items:
+ *             $ref: '#/components/schemas/Answer'
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the mark was last updated
- *           example: "2023-10-20T14:30:00Z"
- *       description: Mark information
- *     
- *     CreateMarkRequest:
+ *           description: Timestamp when the submission record was created
+ *           example: 2023-03-15T14:30:00Z
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the submission was last updated
+ *           example: 2023-03-16T09:00:00Z
+ * 
+ *     Answer:
  *       type: object
- *       required:
- *         - student_id
- *         - subclass_subject_id
- *         - exam_sequence_id
- *         - score
  *       properties:
- *         student_id:
+ *         id:
  *           type: integer
- *           description: ID of the student
- *           example: 5
- *         academic_year_id:
- *           type: integer
- *           description: ID of the academic year (optional, defaults to current academic year)
+ *           description: Answer ID
  *           example: 1
- *         subclass_subject_id:
+ *         submissionId:
  *           type: integer
- *           description: ID of the subclass subject
- *           example: 3
- *         exam_sequence_id:
+ *           description: ID of the submission this answer belongs to
+ *           example: 1
+ *         questionId:
  *           type: integer
- *           description: ID of the exam sequence
- *           example: 2
- *         score:
- *           type: number
- *           format: float
- *           description: Score achieved by the student
- *           example: 85.5
- *       description: Information required to create a new mark
- *     
- *     UpdateMarkRequest:
+ *           description: ID of the question this answer responds to
+ *           example: 1
+ *         text:
+ *           type: string
+ *           description: Text answer
+ *           example: x = 5
+ *         selectedOptions:
+ *           type: array
+ *           description: IDs of selected options (for multiple choice questions)
+ *           items:
+ *             type: integer
+ *           example: [1]
+ *         points:
+ *           type: integer
+ *           description: Points awarded for this answer
+ *           example: 5
+ *         comment:
+ *           type: string
+ *           description: Teacher's comment on this answer
+ *           example: Correct solution with clear working
+ *         isCorrect:
+ *           type: boolean
+ *           description: Whether the answer is correct
+ *           example: true
+ * 
+ *     CreateExamPaperRequest:
  *       type: object
  *       required:
- *         - score
+ *         - title
+ *         - subjectId
+ *         - termId
+ *         - classId
+ *         - academicYearId
  *       properties:
- *         score:
- *           type: number
- *           format: float
- *           description: Updated score achieved by the student
- *           example: 87.5
- *       description: Information required to update a mark
- *
- *     # Standardized Response Schemas
- *     ExamPaperListResponse:
+ *         title:
+ *           type: string
+ *           description: Exam paper title
+ *           example: Mathematics Exam Paper
+ *         description:
+ *           type: string
+ *           description: Description of the exam paper
+ *           example: Final mathematics examination for term 1
+ *         subjectId:
+ *           type: integer
+ *           description: ID of the subject
+ *           example: 3
+ *         termId:
+ *           type: integer
+ *           description: ID of the term
+ *           example: 1
+ *         classId:
+ *           type: integer
+ *           description: ID of the class
+ *           example: 2
+ *         academicYearId:
+ *           type: integer
+ *           description: ID of the academic year
+ *           example: 1
+ *         totalTimeMinutes:
+ *           type: integer
+ *           description: Total time allowed for the exam in minutes
+ *           example: 120
+ *         passingPercentage:
+ *           type: integer
+ *           description: Percentage score required to pass
+ *           example: 50
+ *         questions:
+ *           type: array
+ *           description: Questions to include in the exam paper
+ *           items:
+ *             type: object
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 description: Question text
+ *                 example: Solve for x in the equation 2x + 5 = 15
+ *               type:
+ *                 $ref: '#/components/schemas/QuestionType'
+ *                 description: Type of question
+ *                 example: MCQ
+ *               points:
+ *                 type: integer
+ *                 description: Maximum points for this question
+ *                 example: 5
+ *               sequence:
+ *                 type: integer
+ *                 description: Order of the question in the exam paper
+ *                 example: 1
+ *               options:
+ *                 type: array
+ *                 description: Answer options for multiple choice questions
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     text:
+ *                       type: string
+ *                       description: Option text
+ *                       example: x = 5
+ *                     isCorrect:
+ *                       type: boolean
+ *                       description: Whether this option is correct
+ *                       example: true
+ *                     sequence:
+ *                       type: integer
+ *                       description: Order of the option in the list
+ *                       example: 1
+ * 
+ *     SubmitExamRequest:
  *       type: object
+ *       required:
+ *         - examPaperId
+ *         - studentId
+ *         - answers
  *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         data:
- *           type: object
- *           properties:
- *             data:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/ExamPaper'
- *             meta:
- *               type: object
- *               properties:
- *                 total:
+ *         examPaperId:
+ *           type: integer
+ *           description: ID of the exam paper
+ *           example: 1
+ *         studentId:
+ *           type: integer
+ *           description: ID of the student making the submission
+ *           example: 15
+ *         answers:
+ *           type: array
+ *           description: Answers to questions
+ *           items:
+ *             type: object
+ *             properties:
+ *               questionId:
+ *                 type: integer
+ *                 description: ID of the question
+ *                 example: 1
+ *               text:
+ *                 type: string
+ *                 description: Text answer
+ *                 example: x = 5
+ *               selectedOptions:
+ *                 type: array
+ *                 description: IDs of selected options (for multiple choice questions)
+ *                 items:
  *                   type: integer
- *                   example: 18
- *                 page:
- *                   type: integer
- *                   example: 1
- *                 limit:
- *                   type: integer
- *                   example: 10
- *                 totalPages:
- *                   type: integer
- *                   example: 2
- *       description: Response for a list of exam papers with pagination
- *
- *     ExamPaperDetailResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         data:
- *           type: object
- *           properties:
- *             id:
- *               type: integer
- *               example: 1
- *             name:
- *               type: string
- *               example: "Mathematics Mid-Term Exam"
- *             subject:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                   example: 2
- *                 name:
- *                   type: string
- *                   example: "Mathematics"
- *                 category:
- *                   type: string
- *                   example: "SCIENCE_AND_TECHNOLOGY"
- *             exam_date:
- *               type: string
- *               format: date-time
- *               example: "2023-10-15T09:00:00Z"
- *             duration:
- *               type: integer
- *               example: 120
- *             academic_year:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                   example: 1
- *                 name:
- *                   type: string
- *                   example: "2023-2024"
- *             questions:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                     example: 3
- *                   question_text:
- *                     type: string
- *                     example: "What is the formula for the area of a circle?"
- *                   question_type:
- *                     type: string
- *                     example: "MCQ"
- *                   options:
- *                     type: object
- *                     example: {"A": "πr", "B": "πr²", "C": "2πr", "D": "2πr²"}
- *                   order:
- *                     type: integer
- *                     example: 1
- *             created_at:
- *               type: string
- *               format: date-time
- *               example: "2023-09-01T12:00:00Z"
- *       description: Response for a detailed view of an exam paper including questions
- *
- *     ExamPaperCreatedResponse:
+ *                 example: [1]
+ * 
+ *     ExamPaperResponse:
  *       type: object
  *       properties:
  *         success:
@@ -360,79 +329,33 @@
  *           example: true
  *         data:
  *           $ref: '#/components/schemas/ExamPaper'
- *         message:
- *           type: string
- *           example: "Exam paper created successfully"
- *       description: Response after successfully creating an exam paper
- *
- *     QuestionListResponse:
+ * 
+ *     SubmissionResponse:
  *       type: object
  *       properties:
  *         success:
  *           type: boolean
  *           example: true
  *         data:
- *           type: object
- *           properties:
- *             data:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Question'
- *             meta:
- *               type: object
- *               properties:
- *                 total:
- *                   type: integer
- *                   example: 45
- *                 page:
- *                   type: integer
- *                   example: 1
- *                 limit:
- *                   type: integer
- *                   example: 15
- *                 totalPages:
- *                   type: integer
- *                   example: 3
- *       description: Response for a list of questions with pagination
- *
- *     QuestionCreatedResponse:
+ *           $ref: '#/components/schemas/ExamSubmission'
+ * 
+ *     GradeAnswerRequest:
  *       type: object
+ *       required:
+ *         - points
  *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         data:
- *           $ref: '#/components/schemas/Question'
- *         message:
+ *         points:
+ *           type: integer
+ *           description: Points to award for the answer
+ *           example: 4
+ *         comment:
  *           type: string
- *           example: "Question created successfully"
- *       description: Response after successfully creating a question
- *
- *     QuestionsAddedToExamResponse:
- *       type: object
- *       properties:
- *         success:
+ *           description: Comment on the student's answer
+ *           example: Good attempt but missed one step in the solution
+ *         isCorrect:
  *           type: boolean
- *           example: true
- *         data:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/ExamPaperQuestion'
- *         message:
- *           type: string
- *           example: "Questions added to exam successfully"
- *       description: Response after successfully adding questions to an exam paper
- *
- *     ErrorResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
+ *           description: Whether the answer is correct
  *           example: false
- *         error:
- *           type: string
- *           example: "An error occurred while processing your request"
- *       description: Standard error response
  */
 
 // Export empty object as this file is only used for Swagger documentation

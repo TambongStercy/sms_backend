@@ -1,0 +1,41 @@
+[x] task1: 
+-Add capacity to subclass,
+
+[x] task2: 
+-Add an endpoint to assign a subject to a class(all subclasses of that class).
+
+[x] task3: 
+-Add an endpoint to create a user with role 
+directly and optionaly important assignments
+(EG: linking parent to student, linking teacher to subject, etc)
+
+[x] task4: 
+-Add a way to know classes hierachically and their fee to be paid
+
+[x] task5: 
+-Add creation of fee of a student 
+automatically after manual assignment(enrollement) 
+of a student to a subclass
+
+[ ] task6: 
+-Create a table that will save the cummulative 
+averages of students every sequence when a 
+reportcard is generated or scheduled to 
+run once at the end of the sequence
+
+[ ] task7: 
+WARNING:(this shouldn't include things with start and end dates) 
+Creating a new academic year and if the generated 
+academic year is the current one, then will migrate 
+all data of the previous academic year to the current one, 
+while sending the students that have a passed grade 
+(cummulative average of 10 and above in that year) 
+to the next class(if there is a next class else do nothing) 
+and else reassigned to the current class with a true 
+repeat value not forgetting to automatically create 
+the fee of a student accoding to thier class
+
+[ ] task8: 
+-Automate the creation of things
+like acedemic year
+(with data migration explained above) after the end of 

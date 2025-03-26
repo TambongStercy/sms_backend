@@ -9,7 +9,7 @@
  *           type: integer
  *           description: Notification ID
  *           example: 1
- *         user_id:
+ *         userId:
  *           type: integer
  *           description: ID of the user the notification belongs to
  *           example: 10
@@ -17,7 +17,7 @@
  *           type: string
  *           description: Notification message content
  *           example: New announcement posted
- *         date_sent:
+ *         dateSent:
  *           type: string
  *           format: date-time
  *           description: Date and time the notification was sent
@@ -26,17 +26,46 @@
  *           type: string
  *           enum: [SENT, DELIVERED, READ]
  *           description: Current status of the notification
- *           example: DELIVERED
- *         created_at:
+ *           example: SENT
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the notification was created
  *           example: 2023-01-01T12:00:00.000Z
- *         updated_at:
+ *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the notification was last updated
  *           example: 2023-01-01T12:00:00.000Z
+ *         statistics:
+ *           type: object
+ *           properties:
+ *             attendance:
+ *               type: integer
+ *               description: Attendance percentage
+ *               example: 95
+ *             assignments:
+ *               type: integer
+ *               description: Number of pending assignments
+ *               example: 3
+ *             fees:
+ *               type: object
+ *               properties:
+ *                 totalAmount:
+ *                   type: number
+ *                   description: Total fee amount
+ *                   example: 50000
+ *                 amountPaid:
+ *                   type: number
+ *                   description: Amount already paid
+ *                   example: 30000
+ *                 amountDue:
+ *                   type: number
+ *                   description: Amount still due
+ *                   example: 20000
+ *                 deadline:
+ *                   type: string
+ *                   format: date
+ *                   description: Payment deadline
+ *                   example: 2023-09-30
  *
  *     DeviceRegistrationRequest:
  *       type: object
@@ -283,29 +312,9 @@
  *         data:
  *           type: object
  *           properties:
- *             syncTimestamp:
+ *             message:
  *               type: string
- *               format: date-time
- *               example: 2023-01-02T12:00:00.000Z
- *             updates:
- *               type: object
- *               properties:
- *                 students:
- *                   type: array
- *                   items:
- *                     type: object
- *                 classes:
- *                   type: array
- *                   items:
- *                     type: object
- *                 subjects:
- *                   type: array
- *                   items:
- *                     type: object
- *                 announcements:
- *                   type: array
- *                   items:
- *                     type: object
+ *               example: Data synced successfully
  *       description: Response for a successful data synchronization request
  *
  *     ErrorResponse:

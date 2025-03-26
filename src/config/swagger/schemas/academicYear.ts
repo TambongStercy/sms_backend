@@ -15,14 +15,14 @@
  *           example: First Term
  *         startDate:
  *           type: string
- *           format: date-time
+ *           format: date
  *           description: Term start date
- *           example: 2023-09-01T00:00:00.000Z
+ *           example: 2023-09-01
  *         endDate:
  *           type: string
- *           format: date-time
+ *           format: date
  *           description: Term end date
- *           example: 2023-12-20T00:00:00.000Z
+ *           example: 2023-12-15
  *         academicYearId:
  *           type: integer
  *           description: ID of the academic year this term belongs to
@@ -48,34 +48,40 @@
  *         name:
  *           type: string
  *           description: Academic year name
- *           example: 2023-2024
+ *           example: 2023-2024 Academic Year
  *         startDate:
  *           type: string
- *           format: date-time
+ *           format: date
  *           description: Academic year start date
- *           example: 2023-09-01T00:00:00.000Z
+ *           example: 2023-09-01
  *         endDate:
  *           type: string
- *           format: date-time
+ *           format: date
  *           description: Academic year end date
- *           example: 2024-06-30T00:00:00.000Z
- *         isDefault:
+ *           example: 2024-06-30
+ *         isActive:
  *           type: boolean
- *           description: Whether this is the default academic year
+ *           description: Indicates if this is the current academic year
  *           example: true
  *         terms:
  *           type: array
+ *           description: Terms within this academic year
  *           items:
  *             $ref: '#/components/schemas/Term'
+ *         examPapers:
+ *           type: array
+ *           description: Exam papers associated with this academic year
+ *           items:
+ *             type: object
  *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the academic year was created
+ *           description: Creation timestamp
  *           example: 2023-01-01T12:00:00.000Z
  *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the academic year was last updated
+ *           description: Last update timestamp
  *           example: 2023-01-01T12:00:00.000Z
  *
  *     CreateAcademicYearRequest:
@@ -88,7 +94,7 @@
  *         name:
  *           type: string
  *           description: Academic year name
- *           example: 2024-2025
+ *           example: 2024-2025 Academic Year
  *         startDate:
  *           type: string
  *           format: date
@@ -99,10 +105,6 @@
  *           format: date
  *           description: Academic year end date
  *           example: 2025-06-30
- *         isDefault:
- *           type: boolean
- *           description: Whether this should be the default academic year
- *           example: false
  *
  *     UpdateAcademicYearRequest:
  *       type: object
@@ -110,7 +112,7 @@
  *         name:
  *           type: string
  *           description: Academic year name
- *           example: 2024-2025 Updated
+ *           example: 2024-2025 Academic Year Update
  *         startDate:
  *           type: string
  *           format: date
@@ -121,10 +123,6 @@
  *           format: date
  *           description: Academic year end date
  *           example: 2025-06-15
- *         isDefault:
- *           type: boolean
- *           description: Whether this should be the default academic year
- *           example: false
  *
  *     TermRequest:
  *       type: object
@@ -191,42 +189,36 @@
  *           $ref: '#/components/schemas/AcademicYear'
  *       description: Response for a successful request to update an academic year
  *
- *     AcademicYearDeletedResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         message:
- *           type: string
- *           example: "Academic year deleted successfully"
- *       description: Response for a successful request to delete an academic year
- *
- *     AcademicYearDefaultResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         message:
- *           type: string
- *           example: "Academic year 2023-2024 set as default"
- *         data:
- *           $ref: '#/components/schemas/AcademicYear'
- *       description: Response for a successful request to set an academic year as default
- *
  *     TermCreatedResponse:
  *       type: object
  *       properties:
  *         success:
  *           type: boolean
  *           example: true
- *         message:
- *           type: string
- *           example: "Term \"First Term\" added to academic year 2023-2024"
  *         data:
  *           $ref: '#/components/schemas/Term'
- *       description: Response for a successful request to add a term to an academic year
+ *       description: Response for a successful request to create a new term
+ *
+ *     TermUpdatedResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           $ref: '#/components/schemas/Term'
+ *       description: Response for a successful request to update a term
+ *
+ *     TermDeletedResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           example: Term deleted successfully
+ *       description: Response for a successful request to delete a term
  *
  *     ErrorResponse:
  *       type: object

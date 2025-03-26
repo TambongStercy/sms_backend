@@ -33,9 +33,9 @@ export const getDashboard = async (req: AuthenticatedRequest, res: Response) => 
 
 export const registerDevice = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
     try {
-        const { deviceToken, deviceType } = req.body;
+        const { device_token, device_type } = req.body;
 
-        if (!deviceToken || !deviceType) {
+        if (!device_token || !device_type) {
             return res.status(400).json({
                 success: false,
                 error: 'Device token and type are required'
@@ -49,8 +49,8 @@ export const registerDevice = async (req: AuthenticatedRequest, res: Response): 
             message: 'Device registered successfully',
             data: {
                 userId: req.user?.id,
-                deviceToken,
-                deviceType
+                device_token,
+                device_type
             }
         });
     } catch (error: any) {
@@ -73,23 +73,33 @@ export const getNotifications = async (req: AuthenticatedRequest, res: Response)
             return;
         }
 
+        // Parse query parameters
+        const page = req.query.page ? parseInt(req.query.page as string) : 1;
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+        const status = req.query.status as string || 'all';
+
         // Use empty array as fallback if user has no notifications
         let notifications: any[] = [];
 
         try {
-            notifications = await mobileService.getNotifications(Number(req.user.id));
+            notifications = await mobileService.getNotifications(Number(req.user.id), status);
+
+            // Note: Actual pagination and filtering is not fully implemented in the service
+            // This is a placeholder for future implementation
         } catch (notifError) {
             console.warn('Error fetching notifications, using empty array:', notifError);
         }
 
+        // For now, return all notifications with pagination metadata
+        // In a real implementation, you would apply actual pagination and filtering
         res.json({
             success: true,
             data: notifications,
             meta: {
                 total: notifications.length,
-                page: 1,
-                limit: notifications.length,
-                totalPages: 1
+                page: page,
+                limit: limit,
+                totalPages: Math.ceil(notifications.length / limit) || 1
             }
         });
     } catch (error: any) {

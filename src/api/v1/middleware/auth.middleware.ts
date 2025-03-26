@@ -178,6 +178,8 @@ export const authorize = (roles: string[]) => {
         if (req.user.role && roles.some(role => req.user!.role!.includes(role))) {
             next();
         } else {
+            console.log(req.user?.role);
+            console.log(roles);
             res.status(403).json({ error: `Forbidden: Insufficient permissions(Your Role: ${req.user?.role})` });
         }
     };

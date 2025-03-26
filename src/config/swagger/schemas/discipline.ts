@@ -2,252 +2,430 @@
  * @swagger
  * components:
  *   schemas:
- *     DisciplineIssue:
+ *     DisciplineRecord:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the discipline issue
+ *           description: Discipline record ID
  *           example: 1
- *         enrollment_id:
+ *         studentId:
  *           type: integer
- *           description: ID of the student enrollment
- *           example: 1
+ *           description: ID of the student
+ *           example: 10
+ *         academicYearId:
+ *           type: integer
+ *           description: ID of the academic year
+ *           example: 2
  *         description:
  *           type: string
  *           description: Description of the discipline issue
- *           example: "Disrupted class by talking loudly"
- *         notes:
+ *           example: "Disrupting class during Mathematics lesson"
+ *         date:
  *           type: string
- *           description: Additional notes about the issue
- *           example: "Student has been warned twice before"
- *         assigned_by_id:
+ *           format: date
+ *           description: Date when the discipline issue occurred
+ *           example: "2023-09-15"
+ *         action:
+ *           type: string
+ *           description: Action taken in response to the discipline issue
+ *           example: "Verbal warning and detention after school"
+ *         severity:
+ *           type: string
+ *           enum: [MINOR, MODERATE, MAJOR, CRITICAL]
+ *           description: Severity level of the discipline issue
+ *           example: "MODERATE"
+ *         status:
+ *           type: string
+ *           enum: [PENDING, RESOLVED, ONGOING]
+ *           description: Current status of the discipline issue
+ *           example: "RESOLVED"
+ *         assignedById:
  *           type: integer
- *           description: ID of the user who reported the issue
+ *           description: ID of the user who assigned the discipline record
  *           example: 5
- *         reviewed_by_id:
+ *         reviewedById:
  *           type: integer
- *           description: ID of the user who reviewed the issue
+ *           description: ID of the user who reviewed the discipline record
  *           example: 3
- *         created_at:
+ *         parentNotified:
+ *           type: boolean
+ *           description: Whether the parent has been notified
+ *           example: true
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the issue was recorded
- *           example: "2023-09-15T10:30:00Z"
- *         updated_at:
+ *           description: Date and time when the record was created
+ *           example: 2023-09-15T14:30:00.000Z
+ *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the issue was last updated
- *           example: "2023-09-15T10:30:00Z"
- *       description: Discipline issue information
- *     
- *     StudentAbsence:
+ *           description: Date and time when the record was last updated
+ *           example: 2023-09-16T10:15:00.000Z
+ *
+ *     StudentAttendance:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the absence record
+ *           description: Attendance record ID
  *           example: 1
- *         enrollment_id:
+ *         studentId:
  *           type: integer
- *           description: ID of the student enrollment
- *           example: 1
- *         teacher_period_id:
+ *           description: ID of the student
+ *           example: 10
+ *         academicYearId:
  *           type: integer
- *           description: ID of the teacher period (class session)
+ *           description: ID of the academic year
+ *           example: 2
+ *         date:
+ *           type: string
+ *           format: date
+ *           description: Date of the attendance record
+ *           example: "2023-09-15"
+ *         status:
+ *           type: string
+ *           enum: [PRESENT, ABSENT, LATE, EXCUSED]
+ *           description: Attendance status
+ *           example: "ABSENT"
+ *         reason:
+ *           type: string
+ *           description: Reason for absence or lateness
+ *           example: "Medical appointment"
+ *         periodId:
+ *           type: integer
+ *           description: ID of the period (class session)
+ *           example: 3
+ *         recordedById:
+ *           type: integer
+ *           description: ID of the user who recorded the attendance
  *           example: 5
- *         assigned_by_id:
+ *         minutesLate:
  *           type: integer
- *           description: ID of the user who recorded the absence
- *           example: 5
- *       description: Student absence information
+ *           description: Minutes late (if status is LATE)
+ *           example: 15
  *     
- *     TeacherAbsence:
+ *     TeacherAttendance:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the absence record
+ *           description: Attendance record ID
  *           example: 1
- *         teacher_id:
+ *         teacherId:
  *           type: integer
  *           description: ID of the teacher
  *           example: 5
+ *         academicYearId:
+ *           type: integer
+ *           description: ID of the academic year
+ *           example: 2
+ *         date:
+ *           type: string
+ *           format: date
+ *           description: Date of the attendance record
+ *           example: "2023-09-15"
+ *         status:
+ *           type: string
+ *           enum: [PRESENT, ABSENT, LATE, EXCUSED]
+ *           description: Attendance status
+ *           example: "ABSENT"
  *         reason:
  *           type: string
- *           description: Reason for the absence
- *           example: "Sick leave"
- *         teacher_period_id:
+ *           description: Reason for absence or lateness
+ *           example: "Medical appointment"
+ *         periodId:
  *           type: integer
- *           description: ID of the teacher period (class session)
- *           example: 10
- *         assigned_by_id:
- *           type: integer
- *           description: ID of the user who recorded the absence
+ *           description: ID of the period (class session)
  *           example: 3
- *         created_at:
- *           type: string
- *           format: date-time
- *           description: Date and time when the absence was recorded
- *           example: "2023-09-15T10:30:00Z"
- *         updated_at:
- *           type: string
- *           format: date-time
- *           description: Date and time when the absence record was last updated
- *           example: "2023-09-15T10:30:00Z"
- *       description: Teacher absence information
- *     
- *     RecordDisciplineIssueRequest:
- *       type: object
- *       required:
- *         - student_id
- *         - description
- *       properties:
- *         student_id:
+ *         recordedById:
  *           type: integer
- *           description: ID of the student
- *           example: 1
- *         academic_year_id:
- *           type: integer
- *           description: ID of the academic year (optional, defaults to current academic year)
- *           example: 1
- *         description:
- *           type: string
- *           description: Description of the discipline issue
- *           example: "Disrupted class by talking loudly"
- *         notes:
- *           type: string
- *           description: Additional notes about the issue
- *           example: "Student has been warned twice before"
- *       description: Information required to record a discipline issue
- *     
+ *           description: ID of the user who recorded the attendance
+ *           example: 2
+ *
  *     RecordStudentAttendanceRequest:
  *       type: object
  *       required:
- *         - student_id
+ *         - studentId
+ *         - date
+ *         - status
+ *         - periodId
  *       properties:
- *         student_id:
+ *         studentId:
  *           type: integer
  *           description: ID of the student
- *           example: 1
- *         academic_year_id:
+ *           example: 10
+ *         date:
+ *           type: string
+ *           format: date
+ *           description: Date of the attendance record
+ *           example: "2023-09-15"
+ *         status:
+ *           type: string
+ *           enum: [PRESENT, ABSENT, LATE, EXCUSED]
+ *           description: Attendance status
+ *           example: "ABSENT"
+ *         reason:
+ *           type: string
+ *           description: Reason for absence or lateness
+ *           example: "Medical appointment"
+ *         periodId:
  *           type: integer
- *           description: ID of the academic year (optional, defaults to current academic year)
- *           example: 1
- *         teacher_period_id:
+ *           description: ID of the period (class session)
+ *           example: 3
+ *         minutesLate:
  *           type: integer
- *           description: ID of the teacher period (class session)
- *           example: 5
- *       description: Information required to record a student absence
- *     
+ *           description: Minutes late (if status is LATE)
+ *           example: 15
+ *         academicYearId:
+ *           type: integer
+ *           description: ID of the academic year (optional, defaults to current)
+ *           example: 2
+ *
  *     RecordTeacherAttendanceRequest:
  *       type: object
  *       required:
- *         - teacher_id
- *         - reason
+ *         - teacherId
+ *         - date
+ *         - status
+ *         - periodId
  *       properties:
- *         teacher_id:
+ *         teacherId:
  *           type: integer
  *           description: ID of the teacher
  *           example: 5
+ *         date:
+ *           type: string
+ *           format: date
+ *           description: Date of the attendance record
+ *           example: "2023-09-15"
+ *         status:
+ *           type: string
+ *           enum: [PRESENT, ABSENT, LATE, EXCUSED]
+ *           description: Attendance status
+ *           example: "ABSENT"
  *         reason:
  *           type: string
- *           description: Reason for the absence
- *           example: "Sick leave"
- *         teacher_period_id:
+ *           description: Reason for absence or lateness
+ *           example: "Medical appointment"
+ *         periodId:
  *           type: integer
- *           description: ID of the teacher period (class session)
- *           example: 10
- *       description: Information required to record a teacher absence
+ *           description: ID of the period (class session)
+ *           example: 3
+ *         academicYearId:
+ *           type: integer
+ *           description: ID of the academic year (optional, defaults to current)
+ *           example: 2
  *
- *     DisciplineResponse:
+ *     RecordDisciplineIssueRequest:
  *       type: object
+ *       required:
+ *         - studentId
+ *         - description
+ *         - date
+ *         - severity
  *       properties:
- *         success:
- *           type: boolean
- *           description: Indicates whether the operation was successful
- *           example: true
- *         message:
+ *         studentId:
+ *           type: integer
+ *           description: ID of the student
+ *           example: 10
+ *         description:
  *           type: string
- *           description: A message describing the result of the operation
- *           example: "Discipline issue recorded successfully"
- *         data:
- *           $ref: '#/components/schemas/DisciplineIssue'
- *       description: Standard response format for discipline operations
+ *           description: Description of the discipline issue
+ *           example: "Disrupting class during Mathematics lesson"
+ *         date:
+ *           type: string
+ *           format: date
+ *           description: Date when the discipline issue occurred
+ *           example: "2023-09-15"
+ *         action:
+ *           type: string
+ *           description: Action taken in response to the discipline issue
+ *           example: "Verbal warning and detention after school"
+ *         severity:
+ *           type: string
+ *           enum: [MINOR, MODERATE, MAJOR, CRITICAL]
+ *           description: Severity level of the discipline issue
+ *           example: "MODERATE"
+ *         status:
+ *           type: string
+ *           enum: [PENDING, RESOLVED, ONGOING]
+ *           description: Current status of the discipline issue
+ *           example: "PENDING"
+ *         parentNotified:
+ *           type: boolean
+ *           description: Whether the parent has been notified
+ *           example: false
+ *         academicYearId:
+ *           type: integer
+ *           description: ID of the academic year (optional, defaults to current)
+ *           example: 2
  *
  *     StudentAttendanceResponse:
  *       type: object
  *       properties:
  *         success:
  *           type: boolean
- *           description: Indicates whether the operation was successful
  *           example: true
- *         message:
- *           type: string
- *           description: A message describing the result of the operation
- *           example: "Student attendance recorded successfully"
  *         data:
- *           $ref: '#/components/schemas/StudentAbsence'
- *       description: Standard response format for student attendance operations
+ *           type: object
+ *           properties:
+ *             attendance:
+ *               $ref: '#/components/schemas/StudentAttendance'
+ *             student:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 10
+ *                 name:
+ *                   type: string
+ *                   example: "John Doe"
+ *                 matricule:
+ *                   type: string
+ *                   example: "STD2023010"
+ *             period:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 3
+ *                 name:
+ *                   type: string
+ *                   example: "Period 3 (11:00 - 12:00)"
+ *                 timeSlot:
+ *                   type: string
+ *                   example: "11:00 - 12:00"
  *
  *     TeacherAttendanceResponse:
  *       type: object
  *       properties:
  *         success:
  *           type: boolean
- *           description: Indicates whether the operation was successful
  *           example: true
- *         message:
- *           type: string
- *           description: A message describing the result of the operation
- *           example: "Teacher attendance recorded successfully"
  *         data:
- *           $ref: '#/components/schemas/TeacherAbsence'
- *       description: Standard response format for teacher attendance operations
+ *           type: object
+ *           properties:
+ *             attendance:
+ *               $ref: '#/components/schemas/TeacherAttendance'
+ *             teacher:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 5
+ *                 name:
+ *                   type: string
+ *                   example: "Sarah Johnson"
+ *             period:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 3
+ *                 name:
+ *                   type: string
+ *                   example: "Period 3 (11:00 - 12:00)"
+ *                 timeSlot:
+ *                   type: string
+ *                   example: "11:00 - 12:00"
+ *
+ *     DisciplineResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           type: object
+ *           properties:
+ *             discipline:
+ *               $ref: '#/components/schemas/DisciplineRecord'
+ *             student:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 10
+ *                 name:
+ *                   type: string
+ *                   example: "John Doe"
+ *                 matricule:
+ *                   type: string
+ *                   example: "STD2023010"
  *
  *     DisciplineListResponse:
  *       type: object
  *       properties:
  *         success:
  *           type: boolean
- *           description: Indicates whether the operation was successful
  *           example: true
  *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/DisciplineRecord'
+ *         meta:
  *           type: object
  *           properties:
- *             data:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/DisciplineIssue'
- *             meta:
- *               type: object
- *               properties:
- *                 total:
- *                   type: integer
- *                   example: 15
- *                 page:
- *                   type: integer
- *                   example: 1
- *                 limit:
- *                   type: integer
- *                   example: 10
- *                 totalPages:
- *                   type: integer
- *                   example: 2
- *       description: Standard response format for discipline listing
+ *             total:
+ *               type: integer
+ *               example: 25
+ *             page:
+ *               type: integer
+ *               example: 1
+ *             limit:
+ *               type: integer
+ *               example: 10
+ *             totalPages:
+ *               type: integer
+ *               example: 3
  *
  *     DisciplineHistoryResponse:
  *       type: object
  *       properties:
  *         success:
  *           type: boolean
- *           description: Indicates whether the operation was successful
  *           example: true
  *         data:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/DisciplineIssue'
- *       description: Standard response format for discipline history
+ *           type: object
+ *           properties:
+ *             student:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 10
+ *                 name:
+ *                   type: string
+ *                   example: "John Doe"
+ *                 matricule:
+ *                   type: string
+ *                   example: "STD2023010"
+ *             disciplineRecords:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/DisciplineRecord'
+ *             statistics:
+ *               type: object
+ *               properties:
+ *                 totalRecords:
+ *                   type: integer
+ *                   example: 5
+ *                 bySeverity:
+ *                   type: object
+ *                   properties:
+ *                     MINOR:
+ *                       type: integer
+ *                       example: 2
+ *                     MODERATE:
+ *                       type: integer
+ *                       example: 2
+ *                     MAJOR:
+ *                       type: integer
+ *                       example: 1
+ *                     CRITICAL:
+ *                       type: integer
+ *                       example: 0
  */
 
 // Export empty object as this file is only used for Swagger documentation

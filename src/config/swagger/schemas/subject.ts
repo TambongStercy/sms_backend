@@ -7,151 +7,127 @@
  *       properties:
  *         id:
  *           type: integer
- *           description: Subject ID
+ *           description: Unique subject ID
  *           example: 1
  *         name:
  *           type: string
  *           description: Subject name
  *           example: Mathematics
  *         category:
- *           type: string
- *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
+ *           $ref: '#/components/schemas/SubjectCategory'
  *           description: Subject category
  *           example: SCIENCE_AND_TECHNOLOGY
- *         created_at:
+ *         createdAt:
  *           type: string
  *           format: date-time
  *           description: Date and time when the subject was created
  *           example: 2023-01-01T12:00:00.000Z
- *         updated_at:
+ *         updatedAt:
  *           type: string
  *           format: date-time
  *           description: Date and time when the subject was last updated
  *           example: 2023-01-01T12:00:00.000Z
+ *         subjectTeachers:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SubjectTeacher'
+ *         subclassSubjects:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SubclassSubject'
  *
- *     SubjectDetail:
+ *     SubjectTeacher:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
+ *           example: 1
+ *         subjectId:
+ *           type: integer
+ *           example: 1
+ *         teacherId:
+ *           type: integer
+ *           example: 1
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           example: 2023-01-01T12:00:00.000Z
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           example: 2023-01-01T12:00:00.000Z
+ *
+ *     AssignSubjectToClassRequest:
+ *       type: object
+ *       required:
+ *         - coefficient
+ *         - mainTeacherId
+ *       properties:
+ *         coefficient:
+ *           type: number
+ *           description: Coefficient (weight) of the subject in the curriculum
+ *           example: 4
+ *         mainTeacherId:
+ *           type: integer
+ *           description: ID of the main teacher for this subject
+ *           example: 3
+ *       description: Information required to assign a subject to all subclasses of a class
+ *     
+ *     SubclassSubjectResponse:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: SubclassSubject ID
+ *           example: 1
+ *         subjectId:
+ *           type: integer
  *           description: Subject ID
  *           example: 1
- *         name:
- *           type: string
- *           description: Subject name
- *           example: Mathematics
- *         category:
- *           type: string
- *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
- *           description: Subject category
- *           example: SCIENCE_AND_TECHNOLOGY
- *         subject_teachers:
- *           type: array
- *           items:
- *             type: object
- *             properties:
- *               id:
- *                 type: integer
- *                 description: SubjectTeacher ID
- *               teacher:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                     description: Teacher ID
- *                   name:
- *                     type: string
- *                     description: Teacher name
- *                   email:
- *                     type: string
- *                     description: Teacher email
- *         subclass_subjects:
- *           type: array
- *           items:
- *             type: object
- *             properties:
- *               id:
- *                 type: integer
- *                 description: SubclassSubject ID
- *               coefficient:
- *                 type: number
- *                 description: Subject coefficient in this subclass
- *               subclass:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                     description: Subclass ID
- *                   name:
- *                     type: string
- *                     description: Subclass name
- *                   class:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         description: Class ID
- *                       name:
- *                         type: string
- *                         description: Class name
- *               main_teacher:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                     description: Teacher ID
- *                   name:
- *                     type: string
- *                     description: Teacher name
- *         created_at:
- *           type: string
- *           format: date-time
- *           description: Date and time when the subject was created
- *           example: 2023-01-01T12:00:00.000Z
- *         updated_at:
- *           type: string
- *           format: date-time
- *           description: Date and time when the subject was last updated
- *           example: 2023-01-01T12:00:00.000Z
- *
- *     CreateSubjectRequest:
- *       type: object
- *       required:
- *         - name
- *         - category
- *       properties:
- *         name:
- *           type: string
- *           description: Subject name
- *           example: Physics
- *         category:
- *           type: string
- *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
- *           description: Subject category
- *           example: SCIENCE_AND_TECHNOLOGY
- *
- *     UpdateSubjectRequest:
- *       type: object
- *       properties:
- *         name:
- *           type: string
- *           description: Subject name
- *           example: Advanced Physics
- *         category:
- *           type: string
- *           enum: [SCIENCE_AND_TECHNOLOGY, LANGUAGES_AND_LITERATURE, HUMAN_AND_SOCIAL_SCIENCE, OTHERS]
- *           description: Subject category
- *           example: SCIENCE_AND_TECHNOLOGY
- *
- *     AssignTeacherRequest:
- *       type: object
- *       required:
- *         - teacher_id
- *       properties:
- *         teacher_id:
+ *         subclassId:
  *           type: integer
- *           description: ID of the teacher to assign to the subject
- *           example: 5
+ *           description: Subclass ID
+ *           example: 2
+ *         coefficient:
+ *           type: number
+ *           description: Subject coefficient
+ *           example: 4
+ *         mainTeacherId:
+ *           type: integer
+ *           description: Main teacher ID
+ *           example: 3
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Date and time when the relationship was created
+ *           example: 2023-01-01T12:00:00.000Z
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Date and time when the relationship was last updated
+ *           example: 2023-01-01T12:00:00.000Z
+ *         subject:
+ *           $ref: '#/components/schemas/Subject'
+ *         subclass:
+ *           $ref: '#/components/schemas/Subclass'
+ *         mainTeacher:
+ *           $ref: '#/components/schemas/User'
+ *       description: SubclassSubject relationship information
+ *     
+ *     AssignSubjectToClassResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           example: "Subject successfully assigned to all subclasses of class ID 1"
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SubclassSubjectResponse'
+ *       description: Response for successfully assigning a subject to all subclasses of a class
  */
 
 export { }; 

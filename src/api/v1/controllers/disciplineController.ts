@@ -5,7 +5,7 @@ import { extractPaginationAndFilters } from '../../../utils/pagination';
 
 export const getAllDisciplineIssues = async (req: Request, res: Response) => {
     try {
-        // Define allowed filters for discipline issues
+        // Define allowed filters for discipline issues - snake_case for service
         const allowedFilters = [
             'student_id',
             'class_id',
@@ -22,13 +22,13 @@ export const getAllDisciplineIssues = async (req: Request, res: Response) => {
         const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
 
         // Get academic year from query if provided
-        const academicYearId = req.query.academic_year_id ?
+        const academic_year_id = req.query.academic_year_id ?
             parseInt(req.query.academic_year_id as string) : undefined;
 
         const result = await disciplineService.getAllDisciplineIssues(
             paginationOptions,
             filterOptions,
-            academicYearId
+            academic_year_id
         );
 
         res.json({
@@ -44,9 +44,24 @@ export const getAllDisciplineIssues = async (req: Request, res: Response) => {
     }
 };
 
-export const recordStudentAttendance = async (req: Request, res: Response) => {
+export const recordStudentAttendance = async (req: Request, res: Response): Promise<any> => {
     try {
-        const attendance = await disciplineService.recordStudentAttendance(req.body);
+        // Check if user is authenticated
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated or missing ID'
+            });
+        }
+
+        // Use the body directly - middleware handles conversion
+        const attendanceData = {
+            ...req.body,
+            assigned_by_id: req.user.id // Set assigned_by_id from authenticated user
+        };
+
+        const attendance = await disciplineService.recordStudentAttendance(attendanceData);
+
         res.status(201).json({
             success: true,
             message: 'Student attendance recorded successfully',
@@ -72,9 +87,24 @@ export const recordStudentAttendance = async (req: Request, res: Response) => {
     }
 };
 
-export const recordTeacherAttendance = async (req: Request, res: Response) => {
+export const recordTeacherAttendance = async (req: Request, res: Response): Promise<any> => {
     try {
-        const attendance = await disciplineService.recordTeacherAttendance(req.body);
+        // Check if user is authenticated
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated or missing ID'
+            });
+        }
+
+        // Use the body directly - middleware handles conversion
+        const attendanceData = {
+            ...req.body,
+            assigned_by_id: req.user.id // Set assigned_by_id from authenticated user
+        };
+
+        const attendance = await disciplineService.recordTeacherAttendance(attendanceData);
+
         res.status(201).json({
             success: true,
             message: 'Teacher attendance recorded successfully',
@@ -100,9 +130,24 @@ export const recordTeacherAttendance = async (req: Request, res: Response) => {
     }
 };
 
-export const recordDisciplineIssue = async (req: Request, res: Response) => {
+export const recordDisciplineIssue = async (req: Request, res: Response): Promise<any> => {
     try {
-        const issue = await disciplineService.recordDisciplineIssue(req.body);
+        // Check if user is authenticated
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated or missing ID'
+            });
+        }
+
+        // Use the body directly - middleware handles conversion
+        const issueData = {
+            ...req.body,
+            assigned_by_id: req.user.id // Set assigned_by_id from authenticated user
+        };
+
+        const issue = await disciplineService.recordDisciplineIssue(issueData);
+
         res.status(201).json({
             success: true,
             message: 'Discipline issue recorded successfully',

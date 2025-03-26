@@ -1,0 +1,561 @@
+@baseUrl = http://localhost:4000/api/v1
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJzdXBlcm1hbmFnZXJAc2Nob29sLmNvbSIsInJvbGUiOlsiU1VQRVJfTUFOQUdFUiJdLCJpYXQiOjE3NDI0OTY5NDcsImV4cCI6MTc0MjU4MzM0N30._bfLsQme2KhqKm_CwAUtWKzCYp9LoaMxHKW5om9x6u0
+
+###
+# @name login
+# Login with admin credentials
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+# {
+#   "email": "admin@school.com",
+#   "password": "securePassword123"
+# }
+
+{
+    "email": "supermanager@school.com",
+    "password": "SuperManager@123"
+}
+
+###
+# Save the token from the login response
+@token = {{login.response.body.data.token}}
+
+###
+# Create Super Admin User (if not already created)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Admin User",
+  "email": "admin@school.com",
+  "password": "securePassword123",
+  "gender": "Male",
+  "date_of_birth": "1985-01-01",
+  "phone": "123456789",
+  "address": "Admin Address"
+}
+
+###
+# Assign Super Manager Role
+POST {{baseUrl}}/users/2/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "role": "SUPER_MANAGER"
+}
+
+###
+# Create Academic Year
+POST {{baseUrl}}/academic-years
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Year 1",
+  "start_date": "2024-09-01",
+  "end_date": "2025-06-30"
+}
+
+###
+# Get All Academic Years
+GET {{baseUrl}}/academic-years
+Authorization: Bearer {{token}}
+
+###
+# Add Term to Academic Year
+POST {{baseUrl}}/academic-years/3/terms
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "First Term",
+  "start_date": "2023-09-01",
+  "end_date": "2023-12-15"
+}
+
+###
+# Create Class
+POST {{baseUrl}}/classes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Form 1"
+}
+
+###
+# Get All Classes (with student counts)
+GET {{baseUrl}}/classes
+Authorization: Bearer {{token}}
+
+###
+# Get Class Details (with student counts)
+GET {{baseUrl}}/classes/1
+Authorization: Bearer {{token}}
+
+###
+# Create Subclass
+POST {{baseUrl}}/classes/1/sub-classes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Form 1 A"
+}
+
+###
+# Get All Subclasses (with student counts)
+GET {{baseUrl}}/classes/sub-classes
+Authorization: Bearer {{token}}
+
+###
+# Create Teacher User
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Teacher Example",
+  "email": "teacher@school.com",
+  "password": "teacher123",
+  "gender": "Female",
+  "date_of_birth": "1990-05-15",
+  "phone": "987654321",
+  "address": "Teacher Address"
+}
+
+###
+# Assign Teacher Role
+POST {{baseUrl}}/users/2/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "role": "TEACHER",
+  "academic_year_id": 3
+}
+
+###
+# Create Subject
+POST {{baseUrl}}/subjects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Mathematics",
+  "category": "SCIENCE_AND_TECHNOLOGY"
+}
+
+###
+# Get All Subjects
+GET {{baseUrl}}/subjects
+Authorization: Bearer {{token}}
+
+###
+# Assign Teacher to Subject
+POST {{baseUrl}}/subjects/1/teachers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "teacher_id": 3
+}
+
+###
+# Link Subject to Subclass
+POST {{baseUrl}}/subjects/1/sub-classes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "subclass_id": 1,
+  "coefficient": 4,
+  "main_teacher_id": 3
+}
+
+###
+# Link Subject to All Subclasses of a Class
+POST {{baseUrl}}/subjects/1/classes/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "coefficient": 4,
+  "main_teacher_id": 3
+} 
+
+###
+# Upload Student Photo
+# Note: This requires using a real file in a multipart request
+# Uncomment and update when testing with a real file
+# POST {{baseUrl}}/uploads
+# Authorization: Bearer {{token}}
+# Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+# 
+# ------WebKitFormBoundary7MA4YWxkTrZu0gW
+# Content-Disposition: form-data; name="file"; filename="student_photo.jpg"
+# Content-Type: image/jpeg
+# 
+# < ./student_photo.jpg
+# ------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+# Create Student
+POST {{baseUrl}}/students
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Student Name",
+  "matricule": "STD20230001",
+  "date_of_birth": "2005-05-15",
+  "place_of_birth": "City",
+  "gender": "Female",
+  "residence": "Address",
+  "former_school": "Previous School"
+}
+
+###
+# Get All Students
+GET {{baseUrl}}/students
+Authorization: Bearer {{token}}
+
+###
+# Enroll Student in Subclass
+# This will automatically create a school fee record based on the fee_amount of the parent class
+POST {{baseUrl}}/students/1/enroll
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "subclass_id": 1,
+  "academic_year_id": 3,
+  "repeater": false,
+  "photo": "http://localhost:3000/uploads/student_placeholder.jpg"
+}
+
+###
+# Create Parent User
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Parent Example",
+  "email": "parent@mail.com",
+  "password": "parent123",
+  "gender": "Male",
+  "date_of_birth": "1975-03-20",
+  "phone": "1122334455",
+  "address": "Parent Address"
+}
+
+###
+# Assign Parent Role
+POST {{baseUrl}}/users/3/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "role": "PARENT"
+}
+
+###
+# Link Parent to Student
+POST {{baseUrl}}/students/1/parents
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "parent_id": 4
+}
+
+###
+# Create Exam Sequence
+POST {{baseUrl}}/exams
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sequence_number": 1,
+  "term_id": 1,
+  "academic_year_id": 3
+}
+
+###
+# Get All Exam Sequences
+GET {{baseUrl}}/exams
+Authorization: Bearer {{token}}
+
+###
+# Create Exam Paper
+POST {{baseUrl}}/exams/papers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Mathematics Paper 1",
+  "subject_id": 1,
+  "exam_date": "2023-11-15T09:00:00Z",
+  "duration": 120,
+  "academic_year_id": 3
+}
+
+###
+# Record Student Mark (Option 1 - Using enrollment directly)
+POST {{baseUrl}}/marks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "student_id": 1,
+  "subject_id": 1,
+  "exam_id": 1,
+  "mark": 85
+}
+
+###
+# Record Student Mark (Option 2 - Using student, subject, exam IDs)
+POST {{baseUrl}}/marks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "exam_id": 1,
+  "student_id": 1,
+  "subject_id": 1,
+  "score": 85
+}
+
+###
+# Generate Report Card
+GET {{baseUrl}}/report-cards/student/1/?student_id=1&academic_year_id=3&exam_sequence_id=1
+Authorization: Bearer {{token}}
+
+###
+# Create Fee
+POST {{baseUrl}}/fees
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "student_id": 1,
+  "academic_year_id": 1,
+  "amount_expected": 75000,
+  "amount_paid": 0,
+  "due_date": "2023-10-31"
+}
+
+###
+# Get All Fees
+GET {{baseUrl}}/fees
+Authorization: Bearer {{token}}
+
+###
+# Record Fee Payment
+POST {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "amount": 25000,
+  "payment_date": "2023-09-15",
+  "payment_method": "CASH",
+  "receipt_number": "RCP-20230915-001"
+}
+
+###
+# Get Fee Payments
+GET {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{token}}
+
+###
+# Export Fee Reports
+GET {{baseUrl}}/fees/reports?format=excel&academic_year_id=1&subclass_id=1
+Authorization: Bearer {{token}}
+
+###
+# Get Mobile Dashboard
+GET {{baseUrl}}/mobile/dashboard
+Authorization: Bearer {{token}}
+
+###
+# Register Mobile Device
+POST {{baseUrl}}/mobile/register-device
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "device_token": "fcm-token-123456",
+  "device_type": "android"
+}
+
+###
+# Get Notifications
+GET {{baseUrl}}/mobile/notifications
+Authorization: Bearer {{token}}
+
+###
+# Test Data Sync
+POST {{baseUrl}}/mobile/data/sync
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "last_sync_timestamp": "2023-09-01T00:00:00Z",
+  "entities": ["students", "marks"]
+}
+
+###
+# Example using camelCase parameters (handled by middleware)
+# The below examples are kept with camelCase to demonstrate the middleware's ability
+# to handle camelCase to snake_case conversion automatically
+#
+# Create Exam Sequence with camelCase parameters
+POST {{baseUrl}}/exams
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sequenceNumber": 2,
+  "termId": 1,
+  "academicYearId": 3,
+  "startDate": "2023-12-01",
+  "endDate": "2023-12-15"
+}
+
+###
+# Create Exam Paper with camelCase parameters
+POST {{baseUrl}}/exams/papers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Physics Final Exam",
+  "subjectId": 1,
+  "examDate": "2023-12-10T10:00:00Z",
+  "duration": 180,
+  "academicYearId": 3
+}
+
+###
+# Record Student Mark with camelCase parameters
+POST {{baseUrl}}/marks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "examId": 1,
+  "studentId": 1,
+  "subjectId": 1,
+  "mark": 92,
+  "comment": "Excellent performance"
+}
+
+###
+# Get Report Cards with camelCase query parameters 
+GET {{baseUrl}}/reports/cards?studentId=1&academicYearId=3&examSequenceId=1
+Authorization: Bearer {{token}}
+
+###
+# Record Student Attendance
+POST {{baseUrl}}/attendance/students
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "student_id": 1,
+  "date": "2023-09-15",
+  "status": "ABSENT",
+  "reason": "Medical appointment",
+  "period_id": 3,
+  "minutes_late": 0
+}
+
+###
+# Record Teacher Attendance
+POST {{baseUrl}}/attendance/teachers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "teacher_id": 3,
+  "date": "2023-09-15",
+  "status": "ABSENT",
+  "reason": "Medical appointment",
+  "period_id": 3
+}
+
+###
+# Record Discipline Issue
+POST {{baseUrl}}/discipline
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "student_id": 1,
+  "description": "Disrupting class during Mathematics lesson",
+  "date": "2023-09-15",
+  "action": "Verbal warning and detention after school",
+  "severity": "MODERATE",
+  "status": "PENDING",
+  "parent_notified": false
+}
+
+###
+# Create Announcement
+POST {{baseUrl}}/communications/announcements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "School Closure",
+  "message": "School will be closed on Friday due to maintenance.",
+  "audience": "BOTH",
+  "academic_year_id": 3
+}
+
+###
+# Create User with Role and Optional Assignments
+POST {{baseUrl}}/users/with-role
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "email": "new.teacher@school.com",
+  "password": "password123",
+  "name": "New Teacher",
+  "gender": "Male",
+  "date_of_birth": "1985-06-15",
+  "phone": "9876543210",
+  "address": "456 Teacher Avenue, City",
+  "role": "TEACHER",
+  "teacherAssignments": [
+    {
+      "subjectId": 1
+    }
+  ]
+}
+
+###
+
+# Create Parent with Student Assignments
+POST {{baseUrl}}/users/with-role
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "email": "new.parent@example.com",
+  "password": "password123",
+  "name": "New Parent",
+  "gender": "Female",
+  "date_of_birth": "1975-08-20",
+  "phone": "8765432109",
+  "address": "789 Parent Street, City",
+  "role": "PARENT",
+  "parentAssignments": [
+    {
+      "studentId": 1
+    }
+  ]
+}

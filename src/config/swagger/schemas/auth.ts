@@ -22,12 +22,22 @@
  *     LoginResponse:
  *       type: object
  *       properties:
- *         token:
- *           type: string
- *           description: JWT authentication token
- *           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *         user:
- *           $ref: '#/components/schemas/User'
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           type: object
+ *           properties:
+ *             token:
+ *               type: string
+ *               description: JWT authentication token
+ *               example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *             expiresIn:
+ *               type: string
+ *               description: Token expiration time
+ *               example: "24h"
+ *             user:
+ *               $ref: '#/components/schemas/User'
  * 
  *     RegisterRequest:
  *       type: object
@@ -36,7 +46,7 @@
  *         - email
  *         - password
  *         - gender
- *         - date_of_birth
+ *         - dateOfBirth
  *         - phone
  *         - address
  *       properties:
@@ -55,11 +65,10 @@
  *           description: User's password
  *           example: securePassword123
  *         gender:
- *           type: string
- *           enum: [MALE, FEMALE, OTHER]
+ *           $ref: '#/components/schemas/Gender'
  *           description: User's gender
- *           example: MALE
- *         date_of_birth:
+ *           example: Male
+ *         dateOfBirth:
  *           type: string
  *           format: date
  *           description: User's date of birth
@@ -67,132 +76,180 @@
  *         phone:
  *           type: string
  *           description: User's phone number
- *           example: +1234567890
+ *           example: +237 680123456
  *         address:
  *           type: string
- *           description: User's physical address
- *           example: 123 Main St, City, Country
- *         id_card_num:
+ *           description: User's residential address
+ *           example: 123 Main Street, Yaoundé
+ *         idCardNum:
  *           type: string
- *           description: User's ID card number (optional)
+ *           description: User's ID card number
  *           example: ID12345678
  *         photo:
  *           type: string
- *           format: uri
- *           description: URL to user's profile photo (optional)
- *           example: https://example.com/photos/user1.jpg
+ *           description: URL to user's profile photo
+ *           example: https://example.com/profiles/john.jpg
  * 
  *     RegisterResponse:
  *       type: object
  *       properties:
  *         success:
  *           type: boolean
- *           description: Indicates if registration was successful
  *           example: true
  *         message:
  *           type: string
- *           description: Success message
  *           example: User registered successfully
- *         user:
- *           $ref: '#/components/schemas/User'
+ *         data:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *               example: 1
+ *             name:
+ *               type: string
+ *               example: John Doe
+ *             email:
+ *               type: string
+ *               example: john.doe@example.com
+ *             gender:
+ *               $ref: '#/components/schemas/Gender'
+ *               example: Male
+ *             dateOfBirth:
+ *               type: string
+ *               format: date
+ *               example: 1990-01-01
+ *             phone:
+ *               type: string
+ *               example: +237 680123456
+ *             address:
+ *               type: string
+ *               example: 123 Main Street, Yaoundé
+ *             idCardNum:
+ *               type: string
+ *               example: ID12345678
+ *             photo:
+ *               type: string
+ *               example: https://example.com/profiles/john.jpg
+ *             createdAt:
+ *               type: string
+ *               format: date-time
+ *               example: 2023-01-01T12:00:00.000Z
+ *             updatedAt:
+ *               type: string
+ *               format: date-time
+ *               example: 2023-01-01T12:00:00.000Z
  * 
  *     LogoutResponse:
  *       type: object
  *       properties:
  *         success:
  *           type: boolean
- *           description: Indicates if logout was successful
  *           example: true
  *         message:
  *           type: string
- *           description: Success message
  *           example: Logged out successfully
+ * 
+ *     ProfileResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           $ref: '#/components/schemas/User'
  *
  *     User:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: User's unique identifier
  *           example: 1
  *         name:
  *           type: string
- *           description: User's full name
  *           example: John Doe
  *         email:
  *           type: string
  *           format: email
- *           description: User's email address
  *           example: john.doe@example.com
  *         gender:
- *           type: string
- *           enum: [MALE, FEMALE, OTHER]
- *           description: User's gender
- *           example: MALE
- *         date_of_birth:
+ *           $ref: '#/components/schemas/Gender'
+ *           example: Male
+ *         dateOfBirth:
  *           type: string
  *           format: date
- *           description: User's date of birth
  *           example: 1990-01-01
  *         phone:
  *           type: string
- *           description: User's phone number
- *           example: +1234567890
+ *           example: +237 680123456
  *         address:
  *           type: string
- *           description: User's physical address
- *           example: 123 Main St, City, Country
- *         id_card_num:
+ *           example: 123 Main Street, Yaoundé
+ *         idCardNum:
  *           type: string
- *           description: User's ID card number
  *           example: ID12345678
  *         photo:
  *           type: string
- *           format: uri
- *           description: URL to user's profile photo
- *           example: https://example.com/photos/user1.jpg
- *         roles:
+ *           example: https://example.com/profiles/john.jpg
+ *         userRoles:
  *           type: array
- *           description: User's assigned roles
  *           items:
- *             $ref: '#/components/schemas/Role'
- *           example: [{id: 1, name: "ADMIN"}, {id: 2, name: "TEACHER"}]
- *         created_at:
+ *             $ref: '#/components/schemas/UserRole'
+ *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Timestamp when the user was created
- *           example: 2023-01-01T00:00:00Z
- *         updated_at:
+ *           example: 2023-01-01T12:00:00.000Z
+ *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Timestamp when the user was last updated
- *           example: 2023-01-01T00:00:00Z
+ *           example: 2023-01-01T12:00:00.000Z
  *
- *     Role:
+ *     UserRole:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Role's unique identifier
  *           example: 1
- *         name:
- *           type: string
- *           description: Role name
- *           example: ADMIN
+ *         role:
+ *           $ref: '#/components/schemas/Role'
+ *           example: PRINCIPAL
  *         description:
  *           type: string
- *           description: Role description
  *           example: Administrator with full access
- *         created_at:
+ * 
+ *     AuthenticatedRequest:
+ *       type: object
+ *       properties:
+ *         user:
+ *           $ref: '#/components/schemas/User'
+ * 
+ *     JwtPayload:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: User ID
+ *           example: 1
+ *         email:
  *           type: string
- *           format: date-time
- *           description: Timestamp when the role was created
- *           example: 2023-01-01T00:00:00Z
- *         updated_at:
+ *           format: email
+ *           description: User's email
+ *           example: john.doe@example.com
+ *         role:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Role'
+ *           example: ["PRINCIPAL", "TEACHER"]
+ * 
+ *     ErrorResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: false
+ *         error:
  *           type: string
- *           format: date-time
- *           description: Timestamp when the role was last updated
- *           example: 2023-01-01T00:00:00Z
+ *           description: Error message
+ *           example: "Invalid credentials"
  */
 
 // This file is for Swagger documentation only and doesn't export anything
