@@ -60,33 +60,6 @@ import { isTokenBlacklisted } from '../services/tokenBlacklistService';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 /**
- * JWT token payload interface
- * This defines what is stored in the JWT token
- */
-export interface JwtPayload {
-    id: number;
-    email: string;
-    role?: [string];
-    [key: string]: any;
-}
-
-// Add the user property to the Express Request interface directly
-// This augmentation approach avoids conflicts with other declarations
-declare global {
-    namespace Express {
-        interface Request {
-            user?: JwtPayload;
-        }
-    }
-}
-
-/**
- * Extended Request interface that includes the user property
- * This is used for better code readability and type safety
- */
-export type AuthenticatedRequest = Request;
-
-/**
  * Authentication middleware that verifies JWT tokens
  * 
  * This middleware:
@@ -118,10 +91,6 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
             return;
         }
 
-        // if(token == 'abcd1234'){
-        //     next()
-        // }
-
         // Check if token is blacklisted (logged out)
         if (isTokenBlacklisted(token)) {
             res.status(401).json({ error: 'Token has been invalidated' });
@@ -129,10 +98,10 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
         }
 
         // Verify the token
-        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
 
         // Add user to request object
-        (req as AuthenticatedRequest).user = decoded;
+        req.user = decoded;
 
         // Continue to the next middleware or route handler
         next();
@@ -166,9 +135,6 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
  */
 export const authorize = (roles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
-
-
-
         if (!req.user) {
             res.status(401).json({ error: 'Unauthorized' });
             return;

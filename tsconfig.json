@@ -27,14 +27,26 @@
         "baseUrl": ".",
         "typeRoots": [
             "./node_modules/@types",
-            "./src/types"
-        ]
+            "./src/types",
+            "./types"
+        ],
+        "paths": {
+            "express": [
+                "./node_modules/express"
+            ],
+            "@types/express": [
+                "./node_modules/@types/express"
+            ]
+        }
     },
     "ts-node": {
-        "swc": true
+        "swc": true,
+        "files": true
     },
     "include": [
-        "./src/**/*.ts"
+        "./src/**/*.ts",
+        "./src/types/**/*.d.ts",
+        "./types/**/*.d.ts"
     ],
     "exclude": [
         "node_modules"
