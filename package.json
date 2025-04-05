@@ -11,7 +11,7 @@
     "build": "npm install && rimraf dist && tsc && prisma generate && npm run postbuild",
     "postbuild": "node scripts/copy-assets.js",
     "swagger-docs": "ts-node scripts/swagger-test.ts && echo 'Swagger documentation generated successfully!'",
-    "create-super-manager": "ts-node create-super-manager.ts",
+    "create-super-manager": "ts-node ./scripts/create-super-manager.ts",
     "import-students": "ts-node import-students.ts",
     "prisma:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate"
