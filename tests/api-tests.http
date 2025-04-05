@@ -1,5 +1,5 @@
 @baseUrl = http://localhost:4000/api/v1
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJzdXBlcm1hbmFnZXJAc2Nob29sLmNvbSIsInJvbGUiOlsiU1VQRVJfTUFOQUdFUiJdLCJpYXQiOjE3NDI0OTY5NDcsImV4cCI6MTc0MjU4MzM0N30._bfLsQme2KhqKm_CwAUtWKzCYp9LoaMxHKW5om9x6u0
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJzdXBlcm1hbmFnZXJAc2Nob29sLmNvbSIsInJvbGUiOlsiVEVBQ0hFUiIsIk1BTkFHRVIiLCJHVUlEQU5DRV9DT1VOU0VMT1IiLCJQQVJFTlQiLCJQUklOQ0lQQUwiLCJCVVJTQVIiLCJESVNDSVBMSU5FX01BU1RFUiIsIlZJQ0VfUFJJTkNJUEFMIiwiU1VQRVJfTUFOQUdFUiJdLCJpYXQiOjE3NDM3NzkzODEsImV4cCI6MTc0Mzg2NTc4MX0.eznZ_E89-TkVgxMrPIKAdWo62lr3yWpE8I_EAtBDDnM
 
 ###
 # @name login
@@ -13,8 +13,13 @@ Content-Type: application/json
 # }
 
 {
+    "name": "Super Manager",
     "email": "supermanager@school.com",
-    "password": "SuperManager@123"
+    "password": "SuperManager@123",
+    "gender": "Male",
+    "date_of_birth": "1985-01-01",
+    "phone": "123456789",
+    "address": "Super Manager Address"
 }
 
 ###
@@ -59,30 +64,90 @@ Content-Type: application/json
 }
 
 ###
+# Create Academic Year with Terms
+POST {{baseUrl}}/academic-years
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Year 2024-2025",
+  "startDate": "2024-09-01",
+  "endDate": "2025-06-30",
+  "terms": [
+    {
+      "name": "First Term",
+      "startDate": "2024-09-01",
+      "endDate": "2024-12-15",
+      "feeDeadline": "2024-09-30"
+    },
+    {
+      "name": "Second Term",
+      "startDate": "2025-01-10", 
+      "endDate": "2025-03-31",
+      "feeDeadline": "2025-01-31"
+    },
+    {
+      "name": "Third Term",
+      "startDate": "2025-04-15",
+      "endDate": "2025-06-30",
+      "feeDeadline": "2025-04-30"
+    }
+  ]
+}
+
+###
 # Get All Academic Years
 GET {{baseUrl}}/academic-years
 Authorization: Bearer {{token}}
 
 ###
-# Add Term to Academic Year
+# Get Academic Year by ID (replace 1 with the actual ID)
+GET {{baseUrl}}/academic-years/1
+Authorization: Bearer {{token}}
+
+###
+# Get Terms for Academic Year (replace 1 with the actual ID)
+GET {{baseUrl}}/academic-years/1/terms
+Authorization: Bearer {{token}}
+
+###
+# Add Term to Academic Year (with fee deadline)
 POST {{baseUrl}}/academic-years/3/terms
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "name": "First Term",
-  "start_date": "2023-09-01",
-  "end_date": "2023-12-15"
+  "startDate": "2023-09-01",
+  "endDate": "2023-12-15",
+  "feeDeadline": "2023-10-15"
 }
 
 ###
-# Create Class
+# Create Class with specific fees
 POST {{baseUrl}}/classes
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "Form 1"
+  "name": "Form 3",
+  "level": 3,
+  "baseFee": 90000,
+  "newStudentAddFee": 18000,
+  "oldStudentAddFee": 8000,
+  "miscellaneousFee": 4000
+}
+
+###
+# Update Class fees (replace 1 with actual class ID)
+PUT {{baseUrl}}/classes/1 
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Form 1 Updated",
+  "baseFee": 78000,
+  "newStudentAddFee": 11000
 }
 
 ###
@@ -106,8 +171,48 @@ Content-Type: application/json
 }
 
 ###
-# Get All Subclasses (with student counts)
-GET {{baseUrl}}/classes/sub-classes
+# Get All Subclasses (Paginated)
+GET {{baseUrl}}/classes/sub-classes?limit=5
+Authorization: Bearer {{token}}
+
+###
+# Get Subclasses for a Specific Class (e.g., Class ID 1)
+GET {{baseUrl}}/classes/1/sub-classes?limit=5
+Authorization: Bearer {{token}}
+
+###
+# Update Subclass (Assumes Class ID 1, Subclass ID 1 exists)
+PUT {{baseUrl}}/classes/1/sub-classes/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Form 1 Alpha"
+}
+
+###
+# Assign a Class Master to a Subclass
+POST {{baseUrl}}/classes/sub-classes/1/class-master
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userId": 2
+}
+
+###
+# Get the Class Master of a Subclass
+GET {{baseUrl}}/classes/sub-classes/1/class-master
+Authorization: Bearer {{token}}
+
+###
+# Remove the Class Master from a Subclass
+DELETE {{baseUrl}}/classes/sub-classes/1/class-master
+Authorization: Bearer {{token}}
+
+###
+# Delete Subclass (Assumes Class ID 1, Subclass ID 1 exists)
+DELETE {{baseUrl}}/classes/1/sub-classes/1
 Authorization: Bearer {{token}}
 
 ###
@@ -117,7 +222,7 @@ Content-Type: application/json
 
 {
   "name": "Teacher Example",
-  "email": "teacher@school.com",
+  "email": "teacher@schoo.com",
   "password": "teacher123",
   "gender": "Female",
   "date_of_birth": "1990-05-15",
@@ -170,8 +275,7 @@ Content-Type: application/json
 
 {
   "subclass_id": 1,
-  "coefficient": 4,
-  "main_teacher_id": 3
+  "coefficient": 4
 }
 
 ###
@@ -277,9 +381,9 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "sequence_number": 1,
-  "term_id": 1,
-  "academic_year_id": 3
+  "sequenceNumber": 1,
+  "termId": 1,
+  "academicYearId": 3
 }
 
 ###
@@ -287,49 +391,89 @@ Content-Type: application/json
 GET {{baseUrl}}/exams
 Authorization: Bearer {{token}}
 
+# ###
+# # Create Exam Paper
+# POST {{baseUrl}}/exams/papers
+# Authorization: Bearer {{token}}
+# Content-Type: application/json
+
+# {
+#   "name": "Mathematics Paper 1",
+#   "subject_id": 1,
+#   "exam_date": "2023-11-15T09:00:00Z",
+#   "duration": 120,
+#   "academic_year_id": 3
+# }
+
 ###
-# Create Exam Paper
-POST {{baseUrl}}/exams/papers
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "name": "Mathematics Paper 1",
-  "subject_id": 1,
-  "exam_date": "2023-11-15T09:00:00Z",
-  "duration": 120,
-  "academic_year_id": 3
-}
-
-###
-# Record Student Mark (Option 1 - Using enrollment directly)
-POST {{baseUrl}}/marks
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "student_id": 1,
-  "subject_id": 1,
-  "exam_id": 1,
-  "mark": 85
-}
+#---------------------------------------
+# Marks Endpoints
+#---------------------------------------
 
 ###
 # Record Student Mark (Option 2 - Using student, subject, exam IDs)
+# Note: teacher_id is required by the service now
 POST {{baseUrl}}/marks
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "exam_id": 1,
-  "student_id": 1,
-  "subject_id": 1,
-  "score": 85
+  "examId": 1,
+  "studentId": 1,
+  "subjectId": 1,
+  "mark": 15, # Must be between 0 and 20
+  "teacherId": 2, # Assuming user ID 2 is the teacher recording
+  "comment": "Good effort."
 }
 
 ###
+# Get All Marks (Paginated)
+GET {{baseUrl}}/marks?limit=10&page=1
+Authorization: Bearer {{token}}
+
+###
+# Get All Marks for a Specific Student in an Academic Year
+# Replace studentId and academicYearId with actual values
+GET {{baseUrl}}/marks?studentId=1&academicYearId=4
+Authorization: Bearer {{token}}
+
+###
+# Get All Marks for a Specific Subclass and Exam Sequence
+# Replace subClassId and examSequenceId with actual values
+GET {{baseUrl}}/marks?subClassId=1&examSequenceId=1&academicYearId=4
+Authorization: Bearer {{token}}
+
+###
+# Get Marks with Score Range
+GET {{baseUrl}}/marks?minScore=10&maxScore=15
+Authorization: Bearer {{token}}
+
+###
+# Get Marks with Includes
+GET {{baseUrl}}/marks?limit=5&includeStudent=true&includeSubject=true&includeTeacher=true&includeExamSequence=true
+Authorization: Bearer {{token}}
+
+###
+# Update a Mark (replace markId with actual ID)
+# Note: teacher_id might be required depending on your update logic needs
+PUT {{baseUrl}}/marks/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "mark": 18, # Must be between 0 and 20
+  "comment": "Excellent improvement!"
+  # "teacherId": 2 # Optionally update the teacher who last modified?
+}
+
+###
+# Delete a Mark (replace markId with actual ID)
+DELETE {{baseUrl}}/marks/1
+Authorization: Bearer {{token}}
+
+###
 # Generate Report Card
-GET {{baseUrl}}/report-cards/student/1/?student_id=1&academic_year_id=3&exam_sequence_id=1
+GET {{baseUrl}}/report-cards/student/1/?studentId=1&academicYearId=3&examSequenceId=1
 Authorization: Bearer {{token}}
 
 ###
@@ -339,11 +483,11 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "student_id": 1,
-  "academic_year_id": 1,
-  "amount_expected": 75000,
-  "amount_paid": 0,
-  "due_date": "2023-10-31"
+  "studentId": 1,
+  "academicYearId": 1,
+  "amountExpected": 75000,
+  "amountPaid": 0,
+  "dueDate": "2023-10-31"
 }
 
 ###
@@ -359,9 +503,9 @@ Content-Type: application/json
 
 {
   "amount": 25000,
-  "payment_date": "2023-09-15",
-  "payment_method": "CASH",
-  "receipt_number": "RCP-20230915-001"
+  "paymentDate": "2023-09-15",
+  "paymentMethod": "CASH",
+  "receiptNumber": "RCP-20230915-001"
 }
 
 ###
@@ -386,8 +530,8 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "device_token": "fcm-token-123456",
-  "device_type": "android"
+  "deviceToken": "fcm-token-123456",
+  "deviceType": "android"
 }
 
 ###
@@ -402,7 +546,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "last_sync_timestamp": "2023-09-01T00:00:00Z",
+  "lastSyncTimestamp": "2023-09-01T00:00:00Z",
   "entities": ["students", "marks"]
 }
 
@@ -503,20 +647,62 @@ Content-Type: application/json
 }
 
 ###
+#---------------------------------------
+# Communication Endpoints
+#---------------------------------------
+
+###
 # Create Announcement
 POST {{baseUrl}}/communications/announcements
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "title": "School Closure",
-  "message": "School will be closed on Friday due to maintenance.",
-  "audience": "BOTH",
-  "academic_year_id": 3
+  "title": "Parent-Teacher Meeting",
+  "message": "A meeting for parents and teachers of Form 1 will be held next Tuesday.",
+  "audience": "BOTH", # Options: INTERNAL, EXTERNAL, BOTH
+  "academicYearId": 4 # Optional: Associate with a specific academic year
 }
 
 ###
-# Create User with Role and Optional Assignments
+# Get All Announcements (Paginated)
+GET {{baseUrl}}/communications/announcements?limit=10&page=1
+Authorization: Bearer {{token}}
+
+###
+# Send Mobile Notification (Example)
+# Note: Ensure the target user (userId: 10) exists
+POST {{baseUrl}}/communications/notifications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userId": 10, 
+  "message": "Reminder: School fees are due next week."
+}
+
+###
+# Register User and Assign Roles
+POST {{baseUrl}}/users/register-with-role
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "New Staff Member",
+  "email": "staff.new@school.com",
+  "password": "staffPass123!",
+  "gender": "Female",
+  "date_of_birth": "1992-11-25",
+  "phone": "+1234567000",
+  "address": "1 Staff Quarters",
+  "roles": [
+    { "role": "TEACHER", "academic_year_id": 3 },
+    { "role": "DISCIPLINE_MASTER", "academic_year_id": 3 }
+  ]
+}
+
+###
+# Create User with Role and Optional Assignments (Legacy)
 POST {{baseUrl}}/users/with-role
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -538,8 +724,7 @@ Content-Type: application/json
 }
 
 ###
-
-# Create Parent with Student Assignments
+# Create Parent with Student Assignments (Legacy)
 POST {{baseUrl}}/users/with-role
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -559,3 +744,52 @@ Content-Type: application/json
     }
   ]
 }
+
+###
+# Set/Replace User Roles for Current Academic Year (User ID 1)
+# Uses the new PUT endpoint to replace roles for the current year
+PUT {{baseUrl}}/users/1/roles/academic-year
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roles": ["TEACHER", "BURSAR"]
+}
+
+###
+# Assign Vice Principal (User 2) to Subclass (ID 1) for Current Year
+# Assumes User 2 exists and has VICE_PRINCIPAL role
+# Assumes Subclass 1 exists
+POST {{baseUrl}}/users/2/assignments/vice-principal
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "subClassId": 1
+  # "academicYearId": 3 // Optionally specify year
+}
+
+###
+# Remove Vice Principal (User 2) from Subclass (ID 1) for Current Year
+DELETE {{baseUrl}}/users/2/assignments/vice-principal/1
+Authorization: Bearer {{token}}
+#?academicYearId=3 // Optionally specify year
+
+###
+# Assign Discipline Master (User 5) to Subclass (ID 1) for Current Year
+# Assumes User 5 exists and has DISCIPLINE_MASTER role
+# Assumes Subclass 1 exists
+POST {{baseUrl}}/users/5/assignments/discipline-master
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "subClassId": 1
+  # "academicYearId": 3 // Optionally specify year
+}
+
+###
+# Remove Discipline Master (User 5) from Subclass (ID 1) for Current Year
+DELETE {{baseUrl}}/users/5/assignments/discipline-master/1
+Authorization: Bearer {{token}}
+#?academicYearId=3 // Optionally specify year

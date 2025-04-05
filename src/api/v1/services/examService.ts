@@ -97,25 +97,37 @@ export async function enterExamMarks(data: {
 }): Promise<Mark> {
     // Handle the case where student_id is provided instead of enrollment_id
     if (data.student_id && !data.enrollment_id) {
+        // Fetch current academic year ID if not provided
+        const yearId = data.academic_year_id ?? await getAcademicYearId();
+        if (!yearId) {
+            throw new Error("Academic year ID is required to find enrollment by student ID, but none was provided or found.");
+        }
+
         const enrollment = await getStudentSubclassByStudentAndYear(
             data.student_id,
-            data.academic_year_id
+            yearId // Use the determined yearId
         );
 
         if (!enrollment) {
-            throw new Error(`Student with ID ${data.student_id} is not enrolled in the specified academic year`);
+            throw new Error(`Student with ID ${data.student_id} is not enrolled in the specified academic year (${yearId})`);
         }
 
         data.enrollment_id = enrollment.id;
     }
 
+    // Ensure enrollment_id is present before creating the mark
+    if (!data.enrollment_id) {
+        throw new Error("Enrollment ID is required to enter marks.");
+    }
+
+
     return prisma.mark.create({
         data: {
-            enrollment_id: data.enrollment_id!,
+            enrollment_id: data.enrollment_id,
             subclass_subject_id: data.subclass_subject_id,
             exam_sequence_id: data.exam_sequence_id,
             score: data.score,
-            teacher_id: data.teacher_id,
+            teacher_id: data.teacher_id, // Keep using teacher_id for create operations
         },
     });
 }
@@ -136,147 +148,108 @@ export async function getAllMarks(
     filterOptions?: FilterOptions,
     academicYearId?: number
 ): Promise<PaginatedResult<Mark>> {
-    // Get current academic year if not explicitly provided
     const yearId = await getAcademicYearId(academicYearId);
 
-    // Process complex filters
+    const where: any = {};
     const processedFilters: any = { ...filterOptions };
+    let enrollmentFilter: any = {}; // Separate filter for enrollment relation
+    let include: any = { // Define base includes
+        // Always include enrollment relation to get student_id
+        enrollment: {
+            select: { student_id: true }
+        }
+    };
 
-    // Filter by student ID
-    if (filterOptions?.student_id) {
-        const studentId = parseInt(filterOptions.student_id as string);
+    // Build where clause based on filters
+    for (const key in processedFilters) {
+        const value = processedFilters[key];
+        if (value === undefined || value === null || value === '') continue;
 
-        if (yearId) {
-            // If academic year is specified, get the specific enrollment
-            const enrollment = await getStudentSubclassByStudentAndYear(studentId, yearId);
-            if (enrollment) {
-                processedFilters.enrollment_id = enrollment.id;
-            } else {
-                // If no enrollment found for this student in this year, return empty result
-                return {
-                    data: [],
-                    meta: {
-                        total: 0,
-                        page: paginationOptions?.page || 1,
-                        limit: paginationOptions?.limit || 10,
-                        totalPages: 0
-                    }
+        if (key === 'student_id') {
+            const studentId = parseInt(value as string);
+            if (!isNaN(studentId)) {
+                enrollmentFilter.student_id = studentId;
+            }
+        } else if (key === 'class_id') {
+            const classId = parseInt(value as string);
+            if (!isNaN(classId)) {
+                enrollmentFilter.subclass = { ...(enrollmentFilter.subclass || {}), class_id: classId };
+            }
+        } else if (key === 'subclass_id' || key === 'sub_class_id') {
+            // Handle both subclass_id and sub_class_id (from camelCase subClassId)
+            const subclassId = parseInt(value as string);
+            if (!isNaN(subclassId)) {
+                enrollmentFilter.subclass_id = subclassId;
+            }
+        } else if (key === 'subject_id') {
+            const subjectId = parseInt(value as string);
+            if (!isNaN(subjectId)) {
+                where.subclass_subject = { subject_id: subjectId };
+            }
+        } else if (key === 'exam_sequence_id') {
+            const examSequenceId = parseInt(value as string);
+            if (!isNaN(examSequenceId)) {
+                where.exam_sequence_id = examSequenceId;
+            }
+        } else if (key === 'minScore' || key === 'maxScore') {
+            const score = parseFloat(value as string);
+            if (!isNaN(score)) {
+                where.score = {
+                    ...(where.score || {}),
+                    [key === 'minScore' ? 'gte' : 'lte']: score
                 };
             }
-        } else {
-            // If no specific academic year, get all enrollments for this student
-            processedFilters.enrollment = {
-                student_id: studentId
-            };
-        }
-        delete processedFilters.student_id;
-    }
-
-    // Filter by class
-    if (filterOptions?.class_id) {
-        const classId = parseInt(filterOptions.class_id as string);
-        processedFilters.enrollment = {
-            ...(processedFilters.enrollment || {}),
-            subclass: {
-                class_id: classId
-            }
-        };
-        delete processedFilters.class_id;
-    }
-
-    // Filter by subclass
-    if (filterOptions?.subclass_id) {
-        const subclassId = parseInt(filterOptions.subclass_id as string);
-        processedFilters.enrollment = {
-            ...(processedFilters.enrollment || {}),
-            subclass_id: subclassId
-        };
-        delete processedFilters.subclass_id;
-    }
-
-    // Filter by subject
-    if (filterOptions?.subject_id) {
-        const subjectId = parseInt(filterOptions.subject_id as string);
-        processedFilters.subclass_subject = {
-            subject_id: subjectId
-        };
-        delete processedFilters.subject_id;
-    }
-
-    // Filter by exam sequence
-    if (filterOptions?.exam_sequence_id) {
-        processedFilters.exam_sequence_id = parseInt(filterOptions.exam_sequence_id as string);
-    }
-
-    // Filter by score range
-    if (filterOptions?.minScore && filterOptions?.maxScore) {
-        processedFilters.score = {
-            gte: parseFloat(filterOptions.minScore as string),
-            lte: parseFloat(filterOptions.maxScore as string)
-        };
-        delete processedFilters.minScore;
-        delete processedFilters.maxScore;
-    } else if (filterOptions?.minScore) {
-        processedFilters.score = {
-            gte: parseFloat(filterOptions.minScore as string)
-        };
-        delete processedFilters.minScore;
-    } else if (filterOptions?.maxScore) {
-        processedFilters.score = {
-            lte: parseFloat(filterOptions.maxScore as string)
-        };
-        delete processedFilters.maxScore;
-    }
-
-    // Setup includes
-    const include: any = {};
-
-    // Include student information
-    if (filterOptions?.includeStudent === 'true') {
-        include.enrollment = {
-            include: {
-                student: true,
-                subclass: {
-                    include: {
-                        class: true
-                    }
+        } else if (key.startsWith('include')) {
+            // Handle includes
+            if (value === 'true') {
+                if (key === 'includeStudent') {
+                    include.enrollment = {
+                        ...(include.enrollment || {}),
+                        // If selecting student_id, also include full student + subclass/class
+                        select: undefined, // Remove select if we need full include
+                        include: {
+                            student: true,
+                            subclass: { include: { class: true } }
+                        }
+                    };
+                } else if (key === 'includeSubject') {
+                    include.subclass_subject = { include: { subject: true } };
+                } else if (key === 'includeTeacher') {
+                    include.teacher = true;
+                } else if (key === 'includeExamSequence') {
+                    include.exam_sequence = { include: { term: true } };
                 }
             }
-        };
-        delete processedFilters.includeStudent;
+        }
     }
 
-    // Include subject information
-    if (filterOptions?.includeSubject === 'true') {
-        include.subclass_subject = {
-            include: {
-                subject: true
-            }
-        };
-        delete processedFilters.includeSubject;
+    // Add debugging
+    console.log('--- getAllMarks Debug ---');
+    console.log('Received filterOptions:', filterOptions);
+    console.log('Converted key check - subclass_id exists:', 'subclass_id' in processedFilters);
+    console.log('Converted key check - sub_class_id exists:', 'sub_class_id' in processedFilters);
+    console.log('Received academicYearId:', academicYearId);
+    console.log('Determined yearId:', yearId);
+
+    // Apply enrollment filters if any were added
+    if (Object.keys(enrollmentFilter).length > 0) {
+        if (yearId) {
+            enrollmentFilter.academic_year_id = yearId; // Add academic year to enrollment filter
+        }
+        where.enrollment = enrollmentFilter;
+    } else if (yearId) {
+        // If no other enrollment filters but year is specified, filter by year
+        where.enrollment = { academic_year_id: yearId };
     }
 
-    // Include teacher information
-    if (filterOptions?.includeTeacher === 'true') {
-        include.teacher = true;
-        delete processedFilters.includeTeacher;
-    }
-
-    // Include exam sequence information
-    if (filterOptions?.includeExamSequence === 'true') {
-        include.exam_sequence = {
-            include: {
-                term: true
-            }
-        };
-        delete processedFilters.includeExamSequence;
-    }
+    console.log('Constructed Prisma Where Clause:', JSON.stringify(where, null, 2));
+    console.log('Constructed Prisma Include Clause:', JSON.stringify(include, null, 2));
 
     return paginate<Mark>(
         prisma.mark,
         paginationOptions,
-        processedFilters,
-        Object.keys(include).length > 0 ? include : undefined
+        where,
+        include
     );
 }
 
@@ -286,67 +259,51 @@ export async function getAllExamPapers(
     filterOptions?: FilterOptions,
     academicYearId?: number
 ): Promise<PaginatedResult<ExamPaper>> {
-    // Get current academic year if not explicitly provided
+    // Get current academic year ID if not explicitly provided
     const yearId = await getAcademicYearId(academicYearId);
 
-    // Process filters
-    const processedFilters: any = { ...filterOptions };
+    // Initialize where clause
+    const where: any = {};
 
-    // Filter by academic year
+    // Add academic year filter if available
     if (yearId) {
-        processedFilters.academic_year_id = yearId;
+        where.academic_year_id = yearId;
     }
 
-    // Build custom query with the correct type
-    const query: any = {
-        where: processedFilters,
-        skip: ((paginationOptions?.page || 1) - 1) * (paginationOptions?.limit || 10),
-        take: paginationOptions?.limit || 10
-    };
+    // Process other filters provided in filterOptions
+    if (filterOptions) {
+        if (filterOptions.subject_id) {
+            where.subject_id = parseInt(filterOptions.subject_id as string);
+        }
+        if (filterOptions.name) {
+            where.name = {
+                contains: filterOptions.name,
+                mode: 'insensitive'
+            };
+        }
+        // Add other potential filters from filterOptions here
+    }
 
-    // Add ordering if provided
-    if (paginationOptions?.sortBy) {
-        query.orderBy = {
-            [paginationOptions.sortBy]: paginationOptions.sortOrder || 'asc'
+    // Setup includes based on filterOptions (example)
+    const include: any = {};
+    if (filterOptions?.includeSubject === 'true') {
+        include.subject = true;
+    }
+    if (filterOptions?.includeQuestions === 'true') {
+        include.questions = {
+            include: {
+                question: true
+            }
         };
     }
 
-    // Handle includes
-    if (filterOptions?.includeSubject === 'true' || filterOptions?.includeQuestions === 'true') {
-        query.include = {};
-
-        if (filterOptions?.includeSubject === 'true') {
-            query.include.subject = true;
-        }
-
-        if (filterOptions?.includeQuestions === 'true') {
-            // Use bracket notation to avoid type checking issues
-            query.include['exam_paper_questions'] = {
-                include: { question: true },
-                orderBy: { order: 'asc' }
-            };
-        }
-    }
-
-    // Count total records
-    const total = await prisma.examPaper.count({ where: processedFilters });
-
-    // Get data
-    const data = await prisma.examPaper.findMany(query);
-
-    // Calculate total pages
-    const totalPages = Math.ceil(total / (paginationOptions?.limit || 10));
-
-    // Return paginated result
-    return {
-        data,
-        meta: {
-            total,
-            page: paginationOptions?.page || 1,
-            limit: paginationOptions?.limit || 10,
-            totalPages
-        }
-    };
+    // Use the processed filters in the paginate function
+    return paginate<ExamPaper>(
+        prisma.examPaper,
+        paginationOptions,
+        where, // Use the constructed where clause
+        include // Use constructed includes
+    );
 }
 
 // Get a specific exam paper with its questions
@@ -607,9 +564,14 @@ async function generateStudentReportData(
                     subclass_subjects: {
                         include: {
                             subject: true,
-                            main_teacher: true,
                         },
                     },
+                    vice_principal_assignments: {
+                        include: {
+                            user: true,
+                        },
+                    },
+                    class_master: true,
                 },
             },
             marks: {
@@ -620,9 +582,9 @@ async function generateStudentReportData(
                     subclass_subject: {
                         include: {
                             subject: true,
-                            main_teacher: true,
                         },
                     },
+                    teacher: true
                 },
             },
             academic_year: true,
@@ -727,7 +689,7 @@ async function generateStudentReportData(
             mark: mark.score,
             weightedMark: mark.score * mark.subclass_subject.coefficient,
             rank: (allStudents.map((student) => student.marks.find(m => m.subclass_subject_id === mark.subclass_subject_id)).sort((a, b) => b!.score - a!.score).findIndex((m) => m?.enrollment.student_id === studentId) + 1) + 'th',
-            teacher: mark.subclass_subject.main_teacher.name,
+            teacher: mark.teacher.name,
             min: subjectStat.min,
             avg: parseFloat(subjectStat.avg.toFixed(2)),
             max: subjectStat.max,
@@ -823,7 +785,7 @@ async function generateStudentReportData(
         classInfo: {
             className: enrollment.subclass.class.name,
             enrolledStudents: allStudents.length,
-            classMaster: enrollment.subclass.subclass_subjects[0]?.main_teacher.name || 'Not Assigned',
+            classMaster: enrollment.subclass.class_master ? enrollment.subclass.class_master.name : 'Not Assigned',
             academicYear: `${enrollment.academic_year.start_date.getFullYear()}-${enrollment.academic_year.end_date.getFullYear()}`,
         },
         subjects,
@@ -1070,14 +1032,50 @@ export async function getAllExams(
     paginationOptions?: PaginationOptions,
     filterOptions?: FilterOptions
 ): Promise<PaginatedResult<ExamSequence>> {
+
+    // Get current academic year ID if academic_year_id filter is not explicitly set
+    let yearId = filterOptions?.academic_year_id ? parseInt(filterOptions.academic_year_id as string) : undefined;
+    if (!yearId) {
+        yearId = await getAcademicYearId() ?? undefined;
+    }
+
+    // Initialize where clause
+    const where: any = {};
+
+    // Add academic year filter if available
+    if (yearId) {
+        where.academic_year_id = yearId;
+    }
+
+    // Process other filters from filterOptions
+    if (filterOptions) {
+        if (filterOptions.term_id) {
+            where.term_id = parseInt(filterOptions.term_id as string);
+        }
+        if (filterOptions.sequence_number) {
+            where.sequence_number = parseInt(filterOptions.sequence_number as string);
+        }
+        // Remove academic_year_id from filterOptions as it's handled separately
+        delete filterOptions.academic_year_id;
+    }
+
+    // Setup includes
+    const include: any = {};
+    if (filterOptions?.includeTerm === 'true') {
+        include.term = true;
+        delete filterOptions.includeTerm; // Remove from filters after handling
+    }
+    if (filterOptions?.includeAcademicYear === 'true') {
+        include.academic_year = true;
+        delete filterOptions.includeAcademicYear; // Remove from filters after handling
+    }
+
+    // Use paginate utility
     return paginate<ExamSequence>(
         prisma.examSequence,
         paginationOptions,
-        filterOptions,
-        {
-            term: true,
-            academic_year: true
-        }
+        where, // Pass the constructed where clause
+        include // Pass the constructed include object
     );
 }
 
@@ -1125,28 +1123,34 @@ export async function deleteExam(id: number): Promise<ExamSequence> {
 }
 
 /**
- * Create a new mark
+ * Create or update a mark (Upsert)
  */
 export async function createMark(data: {
     exam_id: number;
     student_id: number;
     subject_id: number;
     mark: number;
-    teacher_id?: number;
-    comment?: string;
+    teacher_id: number;
 }): Promise<Mark> {
+    // Validate the mark score
+    if (data.mark < 0 || data.mark > 20) {
+        throw new Error('Mark must be between 0 and 20');
+    }
+
     // Find the enrollment for this student
     const enrollment = await prisma.enrollment.findFirst({
         where: {
             student_id: data.student_id
+            // Consider adding academic_year_id filter here based on exam_id if needed
+            // to ensure the correct enrollment is selected if a student has multiple.
         }
     });
 
     if (!enrollment) {
-        throw new Error('Student enrollment not found');
+        throw new Error('Student enrollment not found for the specified student ID');
     }
 
-    // Find the subclass_subject for this subject
+    // Find the subclass_subject for this subject within the student's subclass
     const subclassSubject = await prisma.subclassSubject.findFirst({
         where: {
             subject_id: data.subject_id,
@@ -1158,20 +1162,33 @@ export async function createMark(data: {
         throw new Error('Subject is not assigned to student\'s subclass');
     }
 
-    const teacher = data.teacher_id ?? subclassSubject.main_teacher_id;
+    // Prepare data for create and update
+    const markData = {
+        exam_sequence_id: data.exam_id,
+        enrollment_id: enrollment.id,
+        subclass_subject_id: subclassSubject.id,
+        teacher_id: data.teacher_id, // Keep using teacher_id for create operations
+        score: data.mark
+    };
 
-    // Create the mark
-    return prisma.mark.create({
-        data: {
-            exam_sequence_id: data.exam_id,
-            enrollment_id: enrollment.id,
-            subclass_subject_id: subclassSubject.id,
-            teacher_id: teacher, // Using main teacher as the default
-            score: data.mark,
-            // Add comment if provided and the schema supports it
-            ...(data.comment && { comment: data.comment })
+    const updateData = {
+        score: data.mark,
+        teacher_id: data.teacher_id // Use teacher_id directly for update too
+    };
+
+    // Use upsert to create or update the mark
+    return prisma.mark.upsert({
+        where: {
+            // Use the unique composite key defined in the schema
+            exam_sequence_id_enrollment_id_subclass_subject_id: {
+                exam_sequence_id: data.exam_id,
+                enrollment_id: enrollment.id,
+                subclass_subject_id: subclassSubject.id
+            }
         },
-        include: {
+        update: updateData, // Data to update if record exists
+        create: markData,    // Data to create if record doesn't exist
+        include: { // Include relations in the response
             exam_sequence: true,
             enrollment: {
                 include: {
@@ -1182,7 +1199,8 @@ export async function createMark(data: {
                 include: {
                     subject: true
                 }
-            }
+            },
+            teacher: true // Include the teacher associated with the mark
         }
     });
 }
@@ -1194,14 +1212,27 @@ export async function updateMark(
     id: number,
     data: { mark?: number; comment?: string; teacher_id?: number; }
 ): Promise<Mark> {
+    // Validate the mark score if it's being updated
+    if (data.mark !== undefined && (data.mark < 0 || data.mark > 20)) {
+        throw new Error('Mark must be between 0 and 20');
+    }
+
+    // Build the update data object
+    const updateData: any = {};
+
+    // Add score if provided
+    if (data.mark !== undefined) {
+        updateData.score = data.mark;
+    }
+
+    // Add teacher_id if provided
+    if (data.teacher_id !== undefined) {
+        updateData.teacher_id = data.teacher_id;
+    }
+
     return prisma.mark.update({
         where: { id },
-        data: {
-            score: data.mark,
-            teacher_id: data.teacher_id,
-            // Add comment if the schema supports it (as an optional field)
-            ...(data.comment !== undefined && { comment: data.comment })
-        },
+        data: updateData,
         include: {
             exam_sequence: true,
             enrollment: {

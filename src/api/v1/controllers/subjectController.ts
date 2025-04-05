@@ -2,21 +2,42 @@
 import { Request, Response } from 'express';
 import * as subjectService from '../services/subjectService';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
+import { Subject, SubjectTeacher, SubclassSubject } from '@prisma/client'; // Import necessary types
+
+// Helper function to transform subject data
+const transformSubject = (subject: any) => {
+    const transformed: any = { ...subject }; // Clone the subject object
+
+    // Rename subject_teachers to teachers
+    if (transformed.subject_teachers) {
+        transformed.teachers = transformed.subject_teachers.map((st: any) => st.teacher).filter(Boolean); // Extract teacher info and filter nulls if any
+        delete transformed.subject_teachers; // Remove original key
+    }
+
+    // Rename subclass_subjects to subclasses, including coefficient
+    if (transformed.subclass_subjects) {
+        transformed.subclasses = transformed.subclass_subjects.map((ss: any) => {
+            // Check if subclass exists before spreading
+            if (!ss.subclass) return null;
+            return {
+                ...ss.subclass,
+                coefficient: ss.coefficient // Add coefficient from the join table
+            };
+        }).filter(Boolean); // Filter out any null entries if subclass was missing
+        delete transformed.subclass_subjects; // Remove original key
+    }
+
+    return transformed;
+};
 
 export const getAllSubjects = async (req: Request, res: Response) => {
     try {
-        // Define allowed filters for subjects (use only snake_case internally)
         const allowedFilters = ['name', 'category', 'id', 'include_teachers', 'include_subclasses'];
-
-        // Extract pagination and filter parameters from the request
         const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
-
-        // Process specific filters if needed
         const processedFilters: any = { ...filterOptions };
-
-        // Include related data if requested
         const include: any = {};
 
+        // Setup includes based on query params
         if (filterOptions?.include_teachers === 'true') {
             include.subject_teachers = {
                 include: {
@@ -33,19 +54,23 @@ export const getAllSubjects = async (req: Request, res: Response) => {
                         include: {
                             class: true
                         }
-                    },
-                    main_teacher: true
+                    }
                 }
             };
             delete processedFilters.include_subclasses;
         }
 
-        const subjects = await subjectService.getAllSubjects(paginationOptions, processedFilters, include);
+        const result = await subjectService.getAllSubjects(paginationOptions, processedFilters, include);
 
-        // Let the middleware handle the case conversion
+        // Transform the data array within the result
+        const transformedData = result.data.map(transformSubject);
+
+
+        // Return the result object, replacing the original data with transformed data
         res.json({
             success: true,
-            ...subjects
+            ...result, // Spread the pagination fields (total, limit, offset, etc.)
+            data: transformedData // Override the data field with transformed data
         });
     } catch (error: any) {
         console.error('Error fetching subjects:', error);
@@ -108,9 +133,9 @@ export const assignTeacher = async (req: Request, res: Response) => {
 export const linkSubjectToSubClass = async (req: Request, res: Response) => {
     try {
         const subjectId = parseInt(req.params.id);
-        const { subclass_id, coefficient, main_teacher_id } = req.body;
+        const { subclass_id, coefficient } = req.body;
 
-        if (!subclass_id || !coefficient || !main_teacher_id) {
+        if (!subclass_id || !coefficient) {
             res.status(400).json({
                 success: false,
                 error: 'Subclass ID, coefficient, and main teacher ID are required'
@@ -120,8 +145,7 @@ export const linkSubjectToSubClass = async (req: Request, res: Response) => {
 
         const link = await subjectService.linkSubjectToSubClass(subjectId, {
             subclass_id,
-            coefficient,
-            main_teacher_id
+            coefficient
         });
 
         res.status(201).json({
@@ -140,6 +164,7 @@ export const linkSubjectToSubClass = async (req: Request, res: Response) => {
 export const getSubjectById = async (req: Request, res: Response): Promise<any> => {
     try {
         const subjectId = parseInt(req.params.id);
+        // Service function fetches includes by default
         const subject = await subjectService.getSubjectById(subjectId);
 
         if (!subject) {
@@ -149,9 +174,12 @@ export const getSubjectById = async (req: Request, res: Response): Promise<any> 
             });
         }
 
+        // Transform the single subject data
+        const transformedSubject = transformSubject(subject);
+
         res.json({
             success: true,
-            data: subject
+            data: transformedSubject
         });
     } catch (error: any) {
         console.error('Error fetching subject:', error);
@@ -224,14 +252,14 @@ export const deleteSubject = async (req: Request, res: Response): Promise<any> =
 
 /**
  * Assign a subject to all subclasses of a class
- * @param req Request object containing class_id, subject_id, coefficient, and main_teacher_id
+ * @param req Request object containing class_id, subject_id, coefficient
  * @param res Response object
  */
 export const assignSubjectToClass = async (req: Request, res: Response): Promise<void> => {
     try {
         const classId = parseInt(req.params.classId);
         const subjectId = parseInt(req.params.subjectId);
-        const { coefficient, main_teacher_id } = req.body;
+        const { coefficient } = req.body;
 
         // Validate inputs
         if (isNaN(classId) || isNaN(subjectId)) {
@@ -242,10 +270,10 @@ export const assignSubjectToClass = async (req: Request, res: Response): Promise
             return;
         }
 
-        if (!coefficient || !main_teacher_id) {
+        if (!coefficient) {
             res.status(400).json({
                 success: false,
-                error: 'Coefficient and main_teacher_id are required'
+                error: 'Coefficient are required'
             });
             return;
         }
@@ -255,8 +283,7 @@ export const assignSubjectToClass = async (req: Request, res: Response): Promise
             classId,
             subjectId,
             {
-                coefficient: parseFloat(coefficient),
-                main_teacher_id: parseInt(main_teacher_id)
+                coefficient: parseFloat(coefficient)
             }
         );
 

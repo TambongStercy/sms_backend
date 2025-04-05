@@ -236,8 +236,7 @@ async function generateStudentReportData(
                     class: true,
                     subclass_subjects: {
                         include: {
-                            subject: true,
-                            main_teacher: true,
+                            subject: true
                         },
                     },
                 },
@@ -249,8 +248,7 @@ async function generateStudentReportData(
                 include: {
                     subclass_subject: {
                         include: {
-                            subject: true,
-                            main_teacher: true,
+                            subject: true
                         },
                     },
                 },
@@ -679,8 +677,8 @@ function calculateStandardDeviation(numbers: number[]): number {
 // }).then(console.log).catch(console.error);
 
 // For all students in a subclass
-generateReportCard({
-    academicYearId: 1,
-    examSequenceId: 1,
-    subclassId: 1
+generateReportCard({ 
+   academicYearId: 1, 
+   examSequenceId: 1, 
+   subclassId: 1 
 }).then(console.log).catch(console.error);

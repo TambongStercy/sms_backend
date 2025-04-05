@@ -1,21 +1,9 @@
-import { Request as ExpressRequest, Response, NextFunction, Router } from 'express';
-import { JwtPayload } from 'jsonwebtoken';
+import { User } from '@prisma/client';
+
 declare global {
     namespace Express {
-        interface Request extends ExpressRequest {
-            user?: JwtPayload;
-            file?: Express.Multer.File;
-            files?: Express.Multer.File[];
+        interface Request {
+            user?: User;
         }
     }
-}
-
-declare module 'express' {
-    interface Request extends ExpressRequest {
-        user?: JwtPayload;
-        file?: Express.Multer.File;
-        files?: Express.Multer.File[];
-    }
-}
-
-export { Request, Response, NextFunction, Router }; 
+} 

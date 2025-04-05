@@ -1,0 +1,63 @@
+### School Management System - Marks Management API Flow
+@baseUrl = http://localhost:3000/api/v1
+@authToken = your-auth-token-here
+
+### 1. Get all academic years to select from
+GET {{baseUrl}}/academic-years
+Authorization: Bearer {{authToken}}
+
+### 2. Get all classes
+GET {{baseUrl}}/classes
+Authorization: Bearer {{authToken}}
+
+### 3. Get subclasses for a specific class (replace 1 with your class ID)
+GET {{baseUrl}}/classes/1/sub-classes
+Authorization: Bearer {{authToken}}
+
+### 4. Get terms for the selected academic year (replace 4 with your academic year ID)
+GET {{baseUrl}}/academic-years/4/terms
+Authorization: Bearer {{authToken}}
+
+### 5. Get exam sequences for a specific term and academic year
+GET {{baseUrl}}/exams?termId=1&academicYearId=4
+Authorization: Bearer {{authToken}}
+
+### 6. Get subjects for a specific subclass (replace 1 with your subclass ID)
+GET {{baseUrl}}/classes/sub-classes/1/subjects?includeSubjects=true
+Authorization: Bearer {{authToken}}
+
+### 7. Get all enrolled students for a specific subclass and academic year
+GET {{baseUrl}}/students?subclassId=1&academicYearId=4&status=ENROLLED
+Authorization: Bearer {{authToken}}
+
+### 8. Get existing marks for students in a specific context
+GET {{baseUrl}}/marks?subClassId=1&examSequenceId=2&academicYearId=4&subjectId=3
+Authorization: Bearer {{authToken}}
+
+### 9. Create a new mark for a student
+POST {{baseUrl}}/marks
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "studentId": 5,
+  "subjectId": 3,
+  "examId": 2,
+  "teacherId": 1,
+  "mark": 15.5,
+  "comment": null
+}
+
+### 10. Update an existing mark
+PUT {{baseUrl}}/marks/123
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "mark": 16.0,
+  "comment": "Good improvement"
+}
+
+### 11. Delete a mark if needed
+DELETE {{baseUrl}}/marks/123
+Authorization: Bearer {{authToken}} 

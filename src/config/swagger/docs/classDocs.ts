@@ -49,7 +49,7 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/PaginatedClassResponse'
+ *               $ref: '#/components/schemas/ClassListResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
@@ -64,7 +64,7 @@
  *               $ref: '#/components/schemas/ErrorResponse'
  *   post:
  *     summary: Create a new class
- *     description: Creates a new class with an optional hierarchical level and fee amount. Only accessible by ADMIN, PRINCIPAL.
+ *     description: Creates a new class with details including various fee types. Only accessible by ADMIN, PRINCIPAL.
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
@@ -78,28 +78,21 @@
  *             Basic:
  *               value:
  *                 name: "Form 2"
- *             WithLevelAndFee:
+ *             WithAllFees:
  *               value:
  *                 name: "Form 2"
  *                 level: 2
- *                 feeAmount: 85000
- *                 description: "Second year of secondary school"
+ *                 baseFee: 85000
+ *                 newStudentAddFee: 15000
+ *                 oldStudentAddFee: 7000
+ *                 miscellaneousFee: 3500
  *     responses:
  *       201:
  *         description: Class created successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Class created successfully"
- *                 data:
- *                   $ref: '#/components/schemas/Class'
+ *               $ref: '#/components/schemas/ClassCreatedResponse'
  *       400:
  *         description: Invalid request data
  *         content:
@@ -148,13 +141,7 @@
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/ClassDetail'
+ *               $ref: '#/components/schemas/ClassDetailResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
@@ -173,14 +160,9 @@
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- */
-
-/**
- * @swagger
- * /classes/{id}/sub-classes:
- *   post:
- *     summary: Add a sub-class to a class
- *     description: Adds a new sub-class to a specific class. Only accessible by ADMIN, PRINCIPAL.
+ *   put:
+ *     summary: Update class details
+ *     description: Updates details of a specific class, including fee information. Only accessible by ADMIN, PRINCIPAL.
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
@@ -196,23 +178,14 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateSubclassRequest'
+ *             $ref: '#/components/schemas/UpdateClassRequest'
  *     responses:
- *       201:
- *         description: Sub-class added successfully
+ *       200:
+ *         description: Class updated successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Subclass created successfully"
- *                 data:
- *                   $ref: '#/components/schemas/Subclass'
+ *               $ref: '#/components/schemas/ClassUpdatedResponse'
  *       400:
  *         description: Invalid request data
  *         content:
@@ -247,10 +220,10 @@
 
 /**
  * @swagger
- * /classes/{id}/sub-classes/{subClassId}:
- *   delete:
- *     summary: Delete a sub-class
- *     description: Deletes a specific sub-class from a class. Only accessible by ADMIN, PRINCIPAL.
+ * /classes/{id}/sub-classes:
+ *   get:
+ *     summary: Get all subclasses for a specific class
+ *     description: Retrieves a paginated list of all subclasses belonging to a specific class. Accessible by all authenticated users.
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
@@ -261,26 +234,80 @@
  *         schema:
  *           type: integer
  *         description: Class ID
- *       - in: path
- *         name: subClassId
- *         required: true
+ *       - in: query
+ *         name: page
  *         schema:
  *           type: integer
- *         description: Sub-class ID
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of items per page
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         description: Filter subclasses by name
  *     responses:
  *       200:
- *         description: Sub-class deleted successfully
+ *         description: List of subclasses retrieved successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Subclass deleted successfully"
+ *               $ref: '#/components/schemas/SubclassListResponse'
+ *       401:
+ *         description: Unauthorized - User is not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Class not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *   post:
+ *     summary: Add a sub-class to a class
+ *     description: Adds a new sub-class to a specific class. Only accessible by ADMIN, PRINCIPAL.
+ *     tags: [Classes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Class ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateSubclassRequest'
+ *     responses:
+ *       201:
+ *         description: Sub-class added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SubclassCreatedResponse'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
@@ -294,7 +321,7 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Class or sub-class not found
+ *         description: Class not found
  *         content:
  *           application/json:
  *             schema:
@@ -307,14 +334,12 @@
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 
-export { };
-
 /**
  * @swagger
  * /classes/sub-classes:
  *   get:
- *     summary: Get all subclasses
- *     description: Retrieves a list of all subclasses across all classes with student count information. Accessible by all authenticated users.
+ *     summary: Get all subclasses (paginated)
+ *     description: Retrieves a paginated list of all subclasses across all classes, with optional filtering. Accessible by all authenticated users.
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
@@ -337,45 +362,17 @@ export { };
  *           type: string
  *         description: Filter subclasses by name
  *       - in: query
- *         name: id
- *         schema:
- *           type: integer
- *         description: Filter subclasses by ID
- *       - in: query
  *         name: classId
  *         schema:
  *           type: integer
- *         description: Filter subclasses by class ID
+ *         description: Filter subclasses by parent Class ID
  *     responses:
  *       200:
- *         description: List of subclasses retrieved successfully. Each subclass includes a studentCount field showing the number of students in that subclass.
+ *         description: List of subclasses retrieved successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Subclass'
- *                 meta:
- *                   type: object
- *                   properties:
- *                     total:
- *                       type: integer
- *                       example: 20
- *                     page:
- *                       type: integer
- *                       example: 1
- *                     limit:
- *                       type: integer
- *                       example: 20
- *                     totalPages:
- *                       type: integer
- *                       example: 1
+ *               $ref: '#/components/schemas/SubclassListResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
@@ -388,4 +385,139 @@ export { };
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- */ 
+ */
+
+/**
+ * @swagger
+ * /classes/{id}/sub-classes/{subClassId}:
+ *   delete:
+ *     summary: Delete a sub-class
+ *     description: Deletes a specific sub-class. Only accessible by ADMIN, PRINCIPAL.
+ *     tags: [Classes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Class ID
+ *       - in: path
+ *         name: subClassId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Sub-class ID
+ *     responses:
+ *       200:
+ *         description: Sub-class deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SubclassDeletedResponse'
+ *       401:
+ *         description: Unauthorized - User is not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - User does not have required permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Sub-class not found or does not belong to the specified class
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *   put:
+ *     summary: Update a sub-class
+ *     description: Updates the name of a specific sub-class. Only accessible by ADMIN, PRINCIPAL.
+ *     tags: [Classes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Class ID
+ *       - in: path
+ *         name: subClassId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Sub-class ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: The new name for the subclass
+ *                 example: "Form 1 Alpha"
+ *     responses:
+ *       200:
+ *         description: Sub-class updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Subclass updated successfully"
+ *                 data:
+ *                   $ref: '#/components/schemas/Subclass'
+ *       400:
+ *         description: Invalid request data (e.g., missing name, invalid ID)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - User is not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - User does not have required permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Sub-class not found or does not belong to the specified class
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+
+export { }; 

@@ -10,7 +10,7 @@
  * /users:
  *   get:
  *     summary: Get all users
- *     description: Retrieves a list of all users with optional filtering. Only accessible by ADMIN, PRINCIPAL, VICE_PRINCIPAL.
+ *     description: Retrieves a list of all users with their roles. Optional filtering available. Only accessible by ADMIN, PRINCIPAL, VICE_PRINCIPAL.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -31,7 +31,7 @@
  *         name: sortBy
  *         schema:
  *           type: string
- *         description: Field to sort results by
+ *         description: Field to sort results by (e.g., name, email, createdAt)
  *       - in: query
  *         name: sortOrder
  *         schema:
@@ -59,19 +59,13 @@
  *         name: role
  *         schema:
  *           type: string
- *           enum: [ADMIN, PRINCIPAL, VICE_PRINCIPAL, TEACHER, DISCIPLINE_MASTER, BURSAR, STUDENT, PARENT]
+ *           $ref: '#/components/schemas/Role' 
  *         description: Filter users by role
  *       - in: query
  *         name: phone
  *         schema:
  *           type: string
  *         description: Filter users by phone number
- *       - in: query
- *         name: includeRoles
- *         schema:
- *           type: boolean
- *           default: false
- *         description: Whether to include user roles in the response
  *     responses:
  *       200:
  *         description: List of users retrieved successfully
@@ -86,22 +80,9 @@
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/User'
+ *                     $ref: '#/components/schemas/UserWithRoles'
  *                 meta:
- *                   type: object
- *                   properties:
- *                     total:
- *                       type: integer
- *                       description: Total number of users matching the filters
- *                     page:
- *                       type: integer
- *                       description: Current page number
- *                     limit:
- *                       type: integer
- *                       description: Number of items per page
- *                     totalPages:
- *                       type: integer
- *                       description: Total number of pages
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
@@ -122,7 +103,7 @@
  *               $ref: '#/components/schemas/ErrorResponse'
  *   post:
  *     summary: Create a new user
- *     description: Creates a new user. Only accessible by ADMIN.
+ *     description: Creates a new user without assigning roles. Only accessible by ADMIN.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -131,64 +112,70 @@
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - name
- *               - email
- *               - password
- *               - gender
- *               - dateOfBirth
- *               - phone
- *               - address
- *             properties:
- *               name:
- *                 type: string
- *                 description: Full name of the user
- *               email:
- *                 type: string
- *                 format: email
- *                 description: User's email address (must be unique)
- *               password:
- *                 type: string
- *                 format: password
- *                 description: User's password (will be hashed)
- *               gender:
- *                 type: string
- *                 enum: [Male, Female, Other]
- *                 description: User's gender
- *               dateOfBirth:
- *                 type: string
- *                 format: date
- *                 description: User's date of birth (YYYY-MM-DD)
- *               phone:
- *                 type: string
- *                 description: User's phone number
- *               address:
- *                 type: string
- *                 description: User's physical address
- *           example:
- *             name: "John Doe"
- *             email: "john.doe@example.com"
- *             password: "securepassword123"
- *             gender: "Male"
- *             dateOfBirth: "1980-01-15"
- *             phone: "+123456789"
- *             address: "123 Main St, Douala"
+ *             $ref: '#/components/schemas/CreateUserRequest'
  *     responses:
  *       201:
  *         description: User created successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/User'
+ *               $ref: '#/components/schemas/UserResponse'
  *       400:
  *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - User is not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - User does not have required permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Conflict - Email already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+
+/**
+ * @swagger
+ * /users/register-with-role:
+ *   post:
+ *     summary: Register a user and assign roles
+ *     description: Creates a new user and assigns one or more roles simultaneously. Only accessible by SUPER_MANAGER and MANAGER.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RegisterUserWithRolesRequest'
+ *     responses:
+ *       201:
+ *         description: User registered and roles assigned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserWithRolesResponse'
+ *       400:
+ *         description: Invalid request data (missing fields, invalid roles)
  *         content:
  *           application/json:
  *             schema:
@@ -224,7 +211,7 @@
  * /users/{id}:
  *   get:
  *     summary: Get user details
- *     description: Retrieves details of a specific user by ID. ADMIN, PRINCIPAL, VICE_PRINCIPAL can view any user. Users can view their own profile.
+ *     description: Retrieves details of a specific user by ID, including assigned roles. ADMIN, PRINCIPAL, VICE_PRINCIPAL can view any user. Users can view their own profile.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -241,13 +228,7 @@
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/User'
+ *               $ref: '#/components/schemas/UserWithRolesResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
@@ -255,7 +236,7 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
- *         description: Forbidden - User does not have permission to view this user
+ *         description: Forbidden - User cannot view this profile
  *         content:
  *           application/json:
  *             schema:
@@ -274,7 +255,7 @@
  *               $ref: '#/components/schemas/ErrorResponse'
  *   put:
  *     summary: Update user details
- *     description: Updates details of a specific user by ID. ADMIN can update any user. Users can update their own profile.
+ *     description: Updates details of a specific user. ADMIN can update any user. Users can update their own profile.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -290,50 +271,14 @@
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 description: Full name of the user
- *               email:
- *                 type: string
- *                 format: email
- *                 description: User's email address
- *               password:
- *                 type: string
- *                 format: password
- *                 description: User's password (will be hashed)
- *               gender:
- *                 type: string
- *                 enum: [Male, Female, Other]
- *                 description: User's gender
- *               dateOfBirth:
- *                 type: string
- *                 format: date
- *                 description: User's date of birth (YYYY-MM-DD)
- *               phone:
- *                 type: string
- *                 description: User's phone number
- *               address:
- *                 type: string
- *                 description: User's physical address
- *           example:
- *             name: "John Doe"
- *             phone: "+234567890"
- *             address: "456 New St, Douala"
+ *             $ref: '#/components/schemas/UpdateUserRequest'
  *     responses:
  *       200:
  *         description: User updated successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/User'
+ *               $ref: '#/components/schemas/UserResponse'
  *       400:
  *         description: Invalid request data
  *         content:
@@ -347,19 +292,13 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
- *         description: Forbidden - User does not have permission to update this user
+ *         description: Forbidden - User cannot update this profile
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       409:
- *         description: Conflict - Email already exists
  *         content:
  *           application/json:
  *             schema:
@@ -404,7 +343,7 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
- *         description: Forbidden - User does not have required permissions
+ *         description: Forbidden - User does not have permission
  *         content:
  *           application/json:
  *             schema:
@@ -428,7 +367,7 @@
  * /users/{id}/roles:
  *   post:
  *     summary: Assign a role to a user
- *     description: Assigns a specific role to a user. Only accessible by ADMIN.
+ *     description: Assigns a specific role to a user. Can include an academic year ID for roles that are year-specific. Only accessible by ADMIN.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -444,20 +383,7 @@
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - role
- *             properties:
- *               role:
- *                 type: string
- *                 enum: [ADMIN, PRINCIPAL, VICE_PRINCIPAL, TEACHER, DISCIPLINE_MASTER, BURSAR, STUDENT, PARENT]
- *                 description: Role to assign to the user
- *               academicYearId:
- *                 type: integer
- *                 description: Academic year ID (optional, used for roles tied to an academic year)
- *           example:
- *             role: "TEACHER"
- *             academicYearId: 1
+ *             $ref: '#/components/schemas/AssignRoleRequest'
  *     responses:
  *       201:
  *         description: Role assigned successfully
@@ -470,25 +396,9 @@
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     userId:
- *                       type: integer
- *                     role:
- *                       type: string
- *                     academicYearId:
- *                       type: integer
- *                       nullable: true
- *                     createdAt:
- *                       type: string
- *                       format: date-time
- *                     updatedAt:
- *                       type: string
- *                       format: date-time
+ *                   $ref: '#/components/schemas/UserRole'
  *       400:
- *         description: Invalid request data
+ *         description: Invalid request data (e.g., invalid role)
  *         content:
  *           application/json:
  *             schema:
@@ -500,17 +410,32 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
- *         description: Forbidden - User does not have required permissions
+ *         description: Forbidden - User does not have permission
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: User or academic year not found
+ *         description: User or Academic Year not found
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Conflict - Role assignment already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Role assignment already exists for this user and academic year.
+ *                 data:
+ *                   $ref: '#/components/schemas/UserRole'
  *       500:
  *         description: Server error
  *         content:
@@ -523,8 +448,8 @@
  * @swagger
  * /users/{id}/roles/{roleId}:
  *   delete:
- *     summary: Remove a role from a user
- *     description: Removes a specific role from a user. Only accessible by ADMIN.
+ *     summary: Remove a role assignment from a user
+ *     description: Removes a specific role assignment (identified by its unique ID) from a user. Only accessible by ADMIN.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -539,12 +464,11 @@
  *         name: roleId
  *         required: true
  *         schema:
- *           type: string
- *           enum: [ADMIN, PRINCIPAL, VICE_PRINCIPAL, TEACHER, DISCIPLINE_MASTER, BURSAR, STUDENT, PARENT]
- *         description: Role to remove (enum value)
+ *           type: integer
+ *         description: The unique ID of the role assignment (UserRole ID), not the role name.
  *     responses:
  *       200:
- *         description: Role removed successfully
+ *         description: Role assignment removed successfully
  *         content:
  *           application/json:
  *             schema:
@@ -555,11 +479,13 @@
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Role removed successfully"
- *                 removedCount:
- *                   type: integer
- *                   description: Number of role assignments removed
- *                   example: 1
+ *                   example: "Role assignment removed successfully"
+ *       400:
+ *         description: Invalid role assignment ID provided
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - User is not authenticated
  *         content:
@@ -567,13 +493,13 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
- *         description: Forbidden - User does not have required permissions
+ *         description: Forbidden - User does not have permission
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: User or role not found
+ *         description: Role assignment not found or does not belong to the user
  *         content:
  *           application/json:
  *             schema:
@@ -590,8 +516,8 @@
  * @swagger
  * /users/with-role:
  *   post:
- *     summary: Create a user with role and optional assignments
- *     description: Creates a new user with a specified role and optional assignments (parent-student or teacher-subject). Only accessible by SUPER_MANAGER.
+ *     summary: Create user with a single role and optional assignments (Legacy)
+ *     description: Creates a new user, assigns a *single* role, and handles specific assignments (Parent-Student, Teacher-Subject) based on the role. **Deprecated in favor of `/users/register-with-role` for more flexibility.** Only accessible by ADMIN.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -609,7 +535,7 @@
  *             schema:
  *               $ref: '#/components/schemas/CreateUserWithRoleResponse'
  *       400:
- *         description: Invalid request data or missing required fields
+ *         description: Invalid request data
  *         content:
  *           application/json:
  *             schema:
@@ -621,13 +547,13 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
- *         description: Forbidden - User does not have required permissions (SUPER_MANAGER)
+ *         description: Forbidden - User does not have permission
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Not Found - Referenced student or subject not found
+ *         description: Related resource (Student or Subject) not found
  *         content:
  *           application/json:
  *             schema:

@@ -1,0 +1,220 @@
+###########################################################################
+# School Management System - Fee Management API Examples
+# This file contains examples of all fee management API endpoints
+# You can run these requests directly in VS Code with the REST Client extension
+###########################################################################
+
+@baseUrl = http://localhost:3000/api/v1
+@authToken = your-auth-token-here
+
+###########################################################################
+# BASIC FEE OPERATIONS
+###########################################################################
+
+### 1. Get all fees (optionally filtered by academic year)
+# Returns a list of all fee records in the system
+# Optional filter by academic year ID
+GET {{baseUrl}}/fees?academic_year_id=4
+Authorization: Bearer {{authToken}}
+
+### 2. Get a specific fee by ID
+# Returns detailed information about a single fee record
+GET {{baseUrl}}/fees/1
+Authorization: Bearer {{authToken}}
+
+### 3. Create a new fee record
+# Creates a new fee for a student
+# Required permissions: SUPER_MANAGER, PRINCIPAL, BURSAR
+POST {{baseUrl}}/fees
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amountExpected": 100000,
+  "amountPaid": 0,
+  "dueDate": "2024-02-15",
+  "studentId": 5,
+  "academicYearId": 4
+}
+
+### 3b. Create a fee using enrollment ID instead of student ID
+# Alternative way to create a fee using direct enrollment ID
+POST {{baseUrl}}/fees
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amountExpected": 100000,
+  "amountPaid": 0,
+  "dueDate": "2024-02-15",
+  "enrollmentId": 10,
+  "academicYearId": 4
+}
+
+### 4. Update a fee record
+# Updates an existing fee (amount expected, amount paid, or due date)
+# Required permissions: SUPER_MANAGER, PRINCIPAL, BURSAR
+PUT {{baseUrl}}/fees/1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amountExpected": 120000,
+  "dueDate": "2024-03-01"
+}
+
+### 5. Delete a fee record
+# Deletes a fee record (only if it has no payment transactions)
+# Required permissions: SUPER_MANAGER, PRINCIPAL, BURSAR
+DELETE {{baseUrl}}/fees/1
+Authorization: Bearer {{authToken}}
+
+###########################################################################
+# STUDENT AND CLASS-BASED FEE OPERATIONS
+###########################################################################
+
+### 6. Get all fees for a specific student
+# Returns all fee records for a student, optionally filtered by academic year
+GET {{baseUrl}}/fees/student/5?academic_year_id=4
+Authorization: Bearer {{authToken}}
+
+### 7. Get fee summary for a subclass
+# Returns a comprehensive summary of fee payments for an entire subclass
+# Includes overall statistics and individual student payment records
+GET {{baseUrl}}/fees/subclass/1/summary?academic_year_id=4
+Authorization: Bearer {{authToken}}
+
+###########################################################################
+# PAYMENT MANAGEMENT
+###########################################################################
+
+### 8. Get all payments for a specific fee
+# Returns all payment transactions recorded for a fee
+GET {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{authToken}}
+
+### 9. Record a payment for a fee
+# Adds a new payment transaction for a fee
+# Also automatically updates the amount_paid field in the fee record
+# Required permissions: SUPER_MANAGER, PRINCIPAL, BURSAR
+POST {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amount": 50000,
+  "paymentDate": "2024-01-15",
+  "paymentMethod": "CASH",
+  "receiptNumber": "REC-001"
+}
+
+### 9b. Record a payment using a different payment method
+# Example with a card payment
+POST {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amount": 30000,
+  "paymentDate": "2024-01-20",
+  "paymentMethod": "CARD",
+  "receiptNumber": "REC-002"
+}
+
+### 9c. Record an online payment
+# Example with an online payment
+POST {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amount": 40000,
+  "paymentDate": "2024-01-25",
+  "paymentMethod": "ONLINE",
+  "receiptNumber": "REC-003"
+}
+
+###########################################################################
+# REPORTING
+###########################################################################
+
+### 10. Export fee reports (Excel format)
+# Generates a report of fee data in Excel format
+# Can be filtered by academic year and/or subclass
+# Required permissions: SUPER_MANAGER, PRINCIPAL, BURSAR
+GET {{baseUrl}}/fees/reports?academic_year_id=4&format=excel
+Authorization: Bearer {{authToken}}
+
+### 10b. Export fee reports (PDF format)
+# Generates a report of fee data in PDF format
+GET {{baseUrl}}/fees/reports?academic_year_id=4&format=pdf
+Authorization: Bearer {{authToken}}
+
+### 10c. Export fee reports for a specific subclass
+# Generates a report for only a specific subclass
+GET {{baseUrl}}/fees/reports?academic_year_id=4&format=excel&subclass_id=1
+Authorization: Bearer {{authToken}}
+
+###########################################################################
+# REAL-WORLD SCENARIOS
+###########################################################################
+
+### Scenario 1: Full Student Fee Lifecycle
+# Step 1: Create a fee for a student
+POST {{baseUrl}}/fees
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amountExpected": 100000,
+  "amountPaid": 0,
+  "dueDate": "2024-02-15",
+  "studentId": 5,
+  "academicYearId": 4
+}
+
+### Step 2: Record first payment (50% of the total)
+# @name recordFirstPayment
+POST {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amount": 50000,
+  "paymentDate": "2024-01-15",
+  "paymentMethod": "CASH",
+  "receiptNumber": "REC-001"
+}
+
+### Step 3: Check the updated fee record
+GET {{baseUrl}}/fees/1
+Authorization: Bearer {{authToken}}
+
+### Step 4: Record second payment (remaining 50%)
+POST {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amount": 50000,
+  "paymentDate": "2024-02-10",
+  "paymentMethod": "CASH",
+  "receiptNumber": "REC-004"
+}
+
+### Step 5: View all payments for the fee
+GET {{baseUrl}}/fees/1/payments
+Authorization: Bearer {{authToken}}
+
+### Scenario 2: Class-Based Fee Management
+# Step 1: Get subclass fee summary to identify students with pending payments
+GET {{baseUrl}}/fees/subclass/1/summary?academic_year_id=4
+Authorization: Bearer {{authToken}}
+
+# Step 2: Get detailed fee information for a specific student
+GET {{baseUrl}}/fees/student/5?academic_year_id=4
+Authorization: Bearer {{authToken}}
+
+# Step 3: Generate a report for the school administration
+GET {{baseUrl}}/fees/reports?academic_year_id=4&format=excel&subclass_id=1
+Authorization: Bearer {{authToken}} 

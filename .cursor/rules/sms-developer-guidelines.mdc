@@ -1,0 +1,96 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# School Management System API - Developer Guidelines
+
+This document outlines key guidelines and conventions to follow when developing the School Management System API. Adhering to these rules ensures consistency, maintainability, and reduces potential errors.
+
+## 1. Case Convention
+
+- **API (External):** Use `camelCase` for all request bodies, query parameters, and response properties. This is the convention expected by clients (e.g., Flutter app).
+  ```json
+  // Example Request/Response
+  {
+    "academicYearId": 1,
+    "studentName": "John Doe",
+    "dateOfBirth": "2005-05-15"
+  }
+  ```
+- **Internal Code & Database (Prisma):** Use `snake_case` for database fields (as defined in `prisma/schema.prisma`) and generally within service-layer logic when interacting directly with Prisma.
+  ```typescript
+  // Example Prisma Interaction
+  await prisma.student.create({
+    data: {
+      student_name: studentName,
+      date_of_birth: new Date(dateOfBirth),
+      // ... other snake_case fields
+    }
+  });
+  ```
+- **Middleware:** A dedicated middleware (`src/api/v1/middleware/caseConversion.middleware.ts`) automatically handles the conversion between `camelCase` (API) and `snake_case` (internal/Prisma). **Do not perform manual case conversions in controllers or services.**
+
+## 2. Project Structure
+
+- Follow the established Model-View-Controller (MVC)-like pattern:
+  - `src/api/v1/routes/`: Defines API endpoints and maps them to controllers. Apply necessary middleware here.
+  - `src/api/v1/controllers/`: Handles incoming requests, performs basic validation, calls appropriate services, and formats responses. Should primarily deal with `camelCase` data as received from/sent to the client.
+  - `src/api/v1/services/`: Contains the core business logic. Interacts with the database (Prisma) using `snake_case`. Receives data from controllers (can be `camelCase` in signatures for clarity) and returns data (usually `snake_case` which middleware converts).
+- `prisma/schema.prisma`: The single source of truth for database models. Use `snake_case` for all field names.
+- `src/config/`: Contains configuration files, including database connection (`db.ts`) and Swagger setup.
+- `src/utils/`: Contains reusable utility functions.
+
+## 3. Database Interaction (Prisma)
+
+- Always use the Prisma client (`import prisma from '../config/db';`) for database operations within services.
+- Adhere strictly to the models defined in `prisma/schema.prisma`.
+- Use `snake_case` field names when querying or mutating data with Prisma.
+- Run `npx prisma migrate dev --name <migration_name>` after modifying the `schema.prisma` file to update the database schema.
+- Run `npx prisma generate` after migrations or when pulling changes to ensure the Prisma Client is up-to-date (though this often runs automatically via `postinstall` or build scripts).
+
+## 4. Type Safety (TypeScript)
+
+- Utilize TypeScript for strong typing throughout the application.
+- Define interfaces or types in `src/types/` or locally within files where appropriate, especially for complex request/response structures.
+- Ensure controller function signatures and service method signatures have clear types for parameters and return values.
+- Use Prisma-generated types where possible (e.g., `import { User, AcademicYear } from '@prisma/client';`).
+
+## 5. API Documentation (Swagger)
+
+- **Mandatory:** Update the Swagger/OpenAPI documentation whenever adding or modifying API endpoints.
+- Documentation files are located in `src/config/swagger/docs/` and schema definitions in `src/config/swagger/schemas/`.
+- **Use `camelCase`** for all properties in Swagger definitions (`parameters`, `requestBody`, `responses`, `schemas`) to reflect the API's external contract.
+- Reference shared schemas defined in `src/config/swagger/schemas/` where applicable.
+
+## 6. Middleware
+
+- **Authentication/Authorization:** Use the `authenticate` and `authorize` middleware (`src/api/v1/middleware/auth.middleware.ts`) in routes to protect endpoints.
+- **Case Conversion:** The `convertCamelToSnakeCase` and `convertSnakeToCamelCase` middleware are applied globally in `app.ts`. Rely on them for automatic case handling.
+
+## 7. Error Handling & Responses
+
+- **Standard Success Response:**
+  ```json
+  { "success": true, "data": ... }
+  ```
+- **Standard Error Response:** Return appropriate HTTP status codes (400, 401, 403, 404, 500) and use the standard error format:
+  ```json
+  { "success": false, "error": "Descriptive error message" }
+  ```
+- Use `try...catch` blocks in controllers to handle errors from services and send standardized responses.
+
+## 8. Enums
+
+- Use predefined enum types defined in `src/config/swagger/schemas/enums.ts` for consistency (e.g., `Role`, `Gender`, `SubjectCategory`). Import and use these enums directly in your code and reference them in Swagger documentation.
+
+## 9. Environment Variables
+
+- Use the `.env` file for environment-specific configuration (database URL, JWT secret, etc.).
+- Access environment variables via `process.env`.
+- Ensure necessary variables are documented (e.g., in a `.env.example` file) and configured in deployment environments (like Render).
+
+## 10. Building for Production
+
+- Use `npm run build` to compile TypeScript, generate Prisma client, and copy necessary assets (`view`, `reports`) to the `dist` folder.
+- The production server runs from the `dist` directory using `npm start`. 

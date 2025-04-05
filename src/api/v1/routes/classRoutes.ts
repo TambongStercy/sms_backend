@@ -10,7 +10,7 @@ const router = Router();
 // All authenticated users can view classes
 router.get('/', authenticate, classController.getAllClasses);
 
-// GET /classes/subclasses - List all subclasses
+// GET /classes/sub-classes - List all subclasses across all classes
 // All authenticated users can view subclasses
 router.get('/sub-classes', authenticate, classController.getAllSubclasses);
 
@@ -22,12 +22,55 @@ router.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), classC
 // All authenticated users can view class details
 router.get('/:id', authenticate, classController.getClassById);
 
-// POST /classes/:id/sub-classes - Add a sub-class to a class
+// PUT /classes/:id - Update class details
+// Only SUPER_MANAGER, PRINCIPAL can update classes
+router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), classController.updateClass);
+
+// POST /classes/:id/sub-classes - Add a new sub-class to a class
 // Only SUPER_MANAGER, PRINCIPAL can add sub-classes
 router.post('/:id/sub-classes', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), classController.addSubClass);
+
+// POST /classes/sub-classes/:subclassId/class-master - Assign a class master to a subclass
+// Only SUPER_MANAGER, PRINCIPAL can assign class masters
+router.post('/sub-classes/:subclassId/class-master',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL']),
+    classController.assignClassMaster);
+
+// GET /classes/sub-classes/:subclassId/class-master - Get the class master of a subclass
+// All authenticated users can view class master information
+router.get('/sub-classes/:subclassId/class-master',
+    authenticate,
+    classController.getSubclassClassMaster);
+
+// DELETE /classes/sub-classes/:subclassId/class-master - Remove the class master from a subclass
+// Only SUPER_MANAGER, PRINCIPAL can remove class masters
+router.delete('/sub-classes/:subclassId/class-master',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL']),
+    classController.removeClassMaster);
+
+// GET /classes/:id/sub-classes - List all subclasses for a specific class
+// All authenticated users can view subclasses for a specific class
+// Note: This overlaps with GET /classes/sub-classes?classId= but provides a RESTful alternative
+router.get('/:id/sub-classes', authenticate, (req, res) => {
+    // Redirect logic or specific handler if needed, for now point to the general one
+    req.query.classId = req.params.id;
+    classController.getAllSubclasses(req, res);
+});
 
 // DELETE /classes/:id/sub-classes/:subClassId - Delete a sub-class
 // Only SUPER_MANAGER, PRINCIPAL can delete sub-classes
 router.delete('/:id/sub-classes/:subClassId', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), classController.deleteSubClass);
+
+// PUT /classes/:id/sub-classes/:subClassId - Update a sub-class
+// Only SUPER_MANAGER, PRINCIPAL can update sub-classes
+router.put('/:id/sub-classes/:subClassId', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), classController.updateSubClass);
+
+// GET /classes/sub-classes/:subClassId/subjects - Get all subjects for a specific subclass
+// All authenticated users can view subjects for a subclass
+router.get('/sub-classes/:subClassId/subjects',
+    authenticate,
+    classController.getSubclassSubjects);
 
 export default router;

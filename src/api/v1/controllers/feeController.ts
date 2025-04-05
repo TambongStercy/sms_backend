@@ -22,6 +22,31 @@ export const getAllFees = async (req: Request, res: Response) => {
     }
 };
 
+export const getFeeById = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        const fee = await feeService.getFeeById(id);
+
+        if (!fee) {
+            return res.status(404).json({
+                success: false,
+                error: 'Fee not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: fee
+        });
+    } catch (error: any) {
+        console.error('Error fetching fee:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
 export const createFee = async (req: Request, res: Response) => {
     try {
         // Use the body directly - middleware handles the conversion to snake_case
@@ -34,6 +59,114 @@ export const createFee = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         console.error('Error creating fee:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const updateFee = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        const feeData = req.body;
+
+        const updatedFee = await feeService.updateFee(id, feeData);
+
+        res.json({
+            success: true,
+            data: updatedFee
+        });
+    } catch (error: any) {
+        console.error('Error updating fee:', error);
+
+        // Check if it's a "not found" error
+        if (error.message.includes('not found')) {
+            return res.status(404).json({
+                success: false,
+                error: error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const deleteFee = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+
+        await feeService.deleteFee(id);
+
+        res.json({
+            success: true,
+            message: 'Fee deleted successfully'
+        });
+    } catch (error: any) {
+        console.error('Error deleting fee:', error);
+
+        // Check for specific error types
+        if (error.message.includes('Cannot delete fee with existing payment records')) {
+            return res.status(400).json({
+                success: false,
+                error: error.message
+            });
+        }
+
+        if (error.message.includes('Record to delete does not exist')) {
+            return res.status(404).json({
+                success: false,
+                error: 'Fee not found'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const getStudentFees = async (req: Request, res: Response) => {
+    try {
+        const studentId = parseInt(req.params.studentId);
+
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
+
+        const fees = await feeService.getStudentFees(studentId, academic_year_id);
+
+        res.json({
+            success: true,
+            data: fees
+        });
+    } catch (error: any) {
+        console.error('Error fetching student fees:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const getSubclassFeesSummary = async (req: Request, res: Response) => {
+    try {
+        const subclassId = parseInt(req.params.subclassId);
+
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
+
+        const summary = await feeService.getSubclassFeesSummary(subclassId, academic_year_id);
+
+        res.json({
+            success: true,
+            data: summary
+        });
+    } catch (error: any) {
+        console.error('Error fetching subclass fees summary:', error);
         res.status(500).json({
             success: false,
             error: error.message

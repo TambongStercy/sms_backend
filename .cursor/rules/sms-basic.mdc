@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+You are assisting with the School Management System API, a Node.js/Express backend with TypeScript and Prisma ORM. Follow these key guidelines:
+Case Convention: The API accepts and returns camelCase (e.g., dateOfBirth), but internally uses snake_case (e.g., date_of_birth). This conversion is handled automatically by middleware.
+Data Models: Follow the Prisma schema definitions. Service methods should use snake_case when interacting with the database.
+API Documentation: All Swagger documentation should use camelCase for request/response properties.
+Enum Types: Use standard enum types (from src/config/swagger/schemas/enums.ts) for all enum values.
+Type Safety: Maintain strong typing with TypeScript interfaces that match the database schema.
+Method Signatures: For clarity, service method signatures can use camelCase parameters, but must map them to snake_case when used internally with Prisma.
+Error Handling: Return standardized error responses: { success: false, error: "message" }.
+Responses: All successful responses should follow format: { success: true, data: ... }.
+When implementing new features, reference existing patterns in the codebase for consistency in naming, error handling, and service structure.

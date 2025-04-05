@@ -41,12 +41,18 @@ const convertObjectKeys = (obj: any): any => {
 
 /**
  * Recursively converts all keys in an object from snake_case to camelCase
+ * and converts Date objects to ISO 8601 strings.
  * @param obj Object to convert
- * @returns Object with camelCase keys
+ * @returns Object with camelCase keys and date strings
  */
 const convertObjectKeysToClient = (obj: any): any => {
     if (obj === null || typeof obj !== 'object') {
         return obj;
+    }
+
+    // Check if the object is a Date instance
+    if (obj instanceof Date) {
+        return obj.toISOString(); // Convert Date to ISO string
     }
 
     if (Array.isArray(obj)) {
@@ -54,12 +60,14 @@ const convertObjectKeysToClient = (obj: any): any => {
     }
 
     return Object.keys(obj).reduce((acc: any, key: string) => {
+        let newKey = key;
+        // Convert snake_case key to camelCase
         if (key.includes('_')) {
-            const camelKey = snakeToCamelCase(key);
-            acc[camelKey] = convertObjectKeysToClient(obj[key]);
-        } else {
-            acc[key] = convertObjectKeysToClient(obj[key]);
+            newKey = snakeToCamelCase(key);
         }
+
+        // Recursively convert the value
+        acc[newKey] = convertObjectKeysToClient(obj[key]);
         return acc;
     }, {});
 };
@@ -92,6 +100,7 @@ export const convertCamelToSnakeCase = (req: Request, res: Response, next: NextF
 
 /**
  * Middleware that converts all snake_case keys in response body to camelCase
+ * and converts Date objects to ISO 8601 strings.
  * This ensures the API returns camelCase format expected by clients
  */
 export const convertSnakeToCamelCase = (req: Request, res: Response, next: NextFunction) => {
@@ -100,7 +109,7 @@ export const convertSnakeToCamelCase = (req: Request, res: Response, next: NextF
 
     // Override the res.json method
     res.json = function (body: any): Response {
-        // Convert the response body from snake_case to camelCase
+        // Convert the response body
         const convertedBody = convertObjectKeysToClient(body);
 
         // Call the original json method with the converted body

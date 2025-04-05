@@ -2,6 +2,7 @@
 import prisma, { Student, ParentStudent, Gender, Enrollment } from '../../../config/db';
 import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
+import * as feeService from './feeService'; // Import feeService
 
 // Get all students with pagination and filtering
 export async function getAllStudents(
@@ -17,95 +18,87 @@ export async function getAllStudents(
 
 // Get all students with their current enrollment info with pagination and filtering
 export async function getAllStudentsWithCurrentEnrollment(
-    academicYearId?: number,
+    academicYearIdInput?: number, // Explicitly name the input
     paginationOptions?: PaginationOptions,
     filterOptions?: FilterOptions
 ): Promise<PaginatedResult<any>> {
-    // Get the academic year id
-    const yearId = await getAcademicYearId(academicYearId);
+    // Determine the target academic year ID (use input or get current)
+    const yearId = await getAcademicYearId(academicYearIdInput);
     if (!yearId) {
+        // If no specific or current academic year found, return empty
         return {
             data: [],
-            meta: {
-                total: 0,
-                page: paginationOptions?.page || 1,
-                limit: paginationOptions?.limit || 10,
-                totalPages: 0
-            }
+            meta: { total: 0, page: paginationOptions?.page || 1, limit: paginationOptions?.limit || 10, totalPages: 0 }
         };
     }
 
-    // Process complex filters that span relations
-    const where: any = {};
-    const processedFilters: any = { ...filterOptions };
+    // Base where clause for the Student model properties
+    const studentWhere: any = {};
+    // Base where clause for the criteria an Enrollment record must meet
+    const enrollmentCriteria: any = {
+        academic_year_id: yearId
+    };
 
-    // Handle special filters
+    // Apply filters
     if (filterOptions) {
-        // Filter by class
-        if (filterOptions.class_id) {
-            processedFilters.enrollments = {
-                some: {
-                    academic_year_id: yearId,
-                    subclass: {
-                        class_id: parseInt(filterOptions.class_id as string)
-                    }
+        for (const key in filterOptions) {
+            const value = filterOptions[key];
+            if (value === undefined || value === null || value === '') continue; // Skip empty/null/undefined filters
+
+            if (key === 'name' || key === 'matricule' || key === 'gender') {
+                // Apply filters directly to the Student model
+                studentWhere[key] = key === 'name' ? { contains: value, mode: 'insensitive' } : value;
+
+            } else if (key === 'id') {
+                const parsedId = parseInt(value as string);
+                if (!isNaN(parsedId)) {
+                    studentWhere.id = parsedId;
                 }
-            };
-            delete processedFilters.class_id;
-        }
-
-        // Filter by subclass
-        if (filterOptions.subclass_id) {
-            processedFilters.enrollments = {
-                ...(processedFilters.enrollments || {}),
-                some: {
-                    ...(processedFilters.enrollments?.some || {}),
-                    academic_year_id: yearId,
-                    subclass_id: parseInt(filterOptions.subclass_id as string)
+            } else if (key === 'subclass_id') {
+                // Apply subclass_id filter to the Enrollment criteria
+                const parsedSubclassId = parseInt(value as string);
+                if (!isNaN(parsedSubclassId)) {
+                    enrollmentCriteria.subclass_id = parsedSubclassId;
                 }
-            };
-            delete processedFilters.subclass_id;
+            } else if (key === 'class_id') {
+                // Apply class_id filter to the nested Subclass relation within Enrollment criteria
+                const parsedClassId = parseInt(value as string);
+                if (!isNaN(parsedClassId)) {
+                    enrollmentCriteria.subclass = {
+                        ...(enrollmentCriteria.subclass || {}),
+                        class_id: parsedClassId
+                    };
+                }
+            }
         }
-
-        // Handle name filtering
-        if (filterOptions.name) {
-            processedFilters.name = {
-                contains: filterOptions.name,
-                mode: 'insensitive'
-            };
-        }
-
-        // Apply processed filters
-        Object.assign(where, processedFilters);
     }
 
-    // Count total students matching the filter
-    const total = await prisma.student.count({ where });
+    // Combine student filters with the enrollment criteria
+    // The student must match studentWhere AND have at least one enrollment matching enrollmentCriteria
+    studentWhere.enrollments = { some: enrollmentCriteria };
 
-    // Default pagination values
+    // Count total students matching the combined filters
+    const total = await prisma.student.count({ where: studentWhere });
+
+    // Pagination setup
     const page = paginationOptions?.page || 1;
     const limit = paginationOptions?.limit || 10;
     const skip = (page - 1) * limit;
+    const totalPages = Math.ceil(total / limit);
 
     // Build orderBy
-    let orderBy: any = undefined;
-    if (paginationOptions?.sortBy) {
-        orderBy = {
-            [paginationOptions.sortBy]: paginationOptions.sortOrder || 'asc'
-        };
-    }
+    let orderBy: any = paginationOptions?.sortBy ? { [paginationOptions.sortBy]: paginationOptions.sortOrder || 'asc' } : undefined;
 
-    // Get paginated students with their enrollment for the specified academic year
+    // Fetch paginated students matching the criteria
     const students = await prisma.student.findMany({
-        where,
+        where: studentWhere,
         skip,
         take: limit,
         orderBy,
         include: {
+            // Include only the relevant enrollment record(s) matching the criteria
             enrollments: {
-                where: {
-                    academic_year_id: yearId
-                },
+                where: enrollmentCriteria, // Use the same criteria to filter included enrollments
                 include: {
                     subclass: {
                         include: {
@@ -122,8 +115,7 @@ export async function getAllStudentsWithCurrentEnrollment(
         }
     });
 
-    // Calculate total pages
-    const totalPages = Math.ceil(total / limit);
+    console.log(`Returning ${students.length} students for page ${page}`);
 
     return {
         data: students,
@@ -215,59 +207,43 @@ export async function enrollStudent(
     data: {
         subclass_id: number;
         academic_year_id?: number;
-        photo: string;
+        photo: string | null;
         repeater?: boolean;
     }
 ): Promise<Enrollment> {
     // Get current academic year if not provided
-    if (!data.academic_year_id) {
-        data.academic_year_id = await getAcademicYearId() || undefined;
-        if (!data.academic_year_id) {
-            throw new Error("No academic year found and none provided");
-        }
+    const yearId = data.academic_year_id ?? await getAcademicYearId();
+    if (!yearId) {
+        throw new Error("No academic year found and none provided");
     }
 
-    // First, get the class information to access its fee_amount
+    // Get subclass and its parent class to access fee details
     const subclass = await prisma.subclass.findUnique({
         where: { id: data.subclass_id },
         include: { class: true }
     });
 
-    if (!subclass) {
-        throw new Error("Subclass not found");
+    if (!subclass || !subclass.class) {
+        throw new Error(`Subclass with ID ${data.subclass_id} or its parent Class not found`);
     }
 
-    // Get the fee amount from the parent class
-    const feeAmount = subclass.class.fee_amount;
-
-    // Use a transaction to create both enrollment and school fee records
+    // Use a transaction to create enrollment
     return prisma.$transaction(async (tx) => {
         // Create the enrollment first
         const enrollment = await tx.enrollment.create({
             data: {
                 student_id,
                 subclass_id: data.subclass_id,
-                academic_year_id: data.academic_year_id!,
-                photo: data.photo,
-                repeater: data.repeater || false,
+                academic_year_id: yearId,
+                repeater: data.repeater ?? false,
+                photo: data.photo ?? null,
             },
         });
 
-        // Then create the school fee record with the class fee amount
-        // Set the due date to 3 months from now by default
-        const dueDate = new Date();
-        dueDate.setMonth(dueDate.getMonth() + 3);
+        // Use the dedicated fee service function to create the fee record
+        await feeService.createFeeForNewEnrollment(enrollment.id);
 
-        await tx.schoolFees.create({
-            data: {
-                amount_expected: feeAmount,
-                amount_paid: 0, // Initially no payment made
-                academic_year_id: data.academic_year_id!,
-                due_date: dueDate,
-                enrollment_id: enrollment.id,
-            }
-        });
-
+        // Return the created enrollment record
         return enrollment;
     });
 }

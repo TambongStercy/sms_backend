@@ -42,11 +42,6 @@
  *           type: string
  *           description: User's ID card number
  *           example: "ID12345678"
- *         userRoles:
- *           type: array
- *           description: Roles assigned to the user
- *           items:
- *             $ref: '#/components/schemas/UserRole'
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -73,6 +68,7 @@
  *           type: integer
  *           description: Academic year ID (if role is specific to an academic year)
  *           example: 3
+ *           nullable: true
  *         role:
  *           $ref: '#/components/schemas/Role'
  *           description: User role
@@ -88,7 +84,173 @@
  *           description: Date and time when the role assignment was last updated
  *           example: 2023-01-01T12:00:00.000Z
  *       description: Role assignment for a user
- *     
+ * 
+ *     UserWithRoles: # New schema combining User and UserRole[]
+ *       allOf:
+ *         - $ref: '#/components/schemas/User'
+ *         - type: object
+ *           properties:
+ *             userRoles:
+ *               type: array
+ *               description: Roles assigned to the user
+ *               items:
+ *                 $ref: '#/components/schemas/UserRole'
+ *       description: User object including their role assignments
+ * 
+ *     CreateUserRequest:
+ *       type: object
+ *       required:
+ *         - name
+ *         - email
+ *         - password
+ *         - gender
+ *         - dateOfBirth
+ *         - phone
+ *         - address
+ *       properties:
+ *         name:
+ *           type: string
+ *           description: Full name of the user
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User's email address (must be unique)
+ *         password:
+ *           type: string
+ *           format: password
+ *           description: User's password (will be hashed)
+ *         gender:
+ *           $ref: '#/components/schemas/Gender'
+ *         dateOfBirth:
+ *           type: string
+ *           format: date
+ *           description: User's date of birth (YYYY-MM-DD)
+ *         phone:
+ *           type: string
+ *           description: User's phone number
+ *         address:
+ *           type: string
+ *           description: User's physical address
+ *         idCardNum:
+ *           type: string
+ *           description: User's ID card number (optional)
+ *         photo:
+ *           type: string
+ *           description: URL to user's profile photo (optional)
+ *       example:
+ *         name: "Jane Doe"
+ *         email: "jane.doe@example.com"
+ *         password: "password123"
+ *         gender: "Female"
+ *         dateOfBirth: "1985-05-20"
+ *         phone: "+1987654321"
+ *         address: "456 Oak Ave, Town"
+ * 
+ *     UpdateUserRequest:
+ *       type: object
+ *       properties:
+ *         name:
+ *           type: string
+ *           description: User's full name
+ *         password:
+ *           type: string
+ *           format: password
+ *           description: New password (optional, will be hashed)
+ *         gender:
+ *           $ref: '#/components/schemas/Gender'
+ *         dateOfBirth:
+ *           type: string
+ *           format: date
+ *           description: User's date of birth (YYYY-MM-DD)
+ *         phone:
+ *           type: string
+ *           description: User's phone number
+ *         address:
+ *           type: string
+ *           description: User's physical address
+ *         idCardNum:
+ *           type: string
+ *           description: User's ID card number
+ *         photo:
+ *           type: string
+ *           description: URL to user's profile photo
+ *       example:
+ *         name: "Jane D. Updated"
+ *         phone: "+1987654322"
+ * 
+ *     AssignRoleRequest:
+ *       type: object
+ *       required:
+ *         - role
+ *       properties:
+ *         role:
+ *           $ref: '#/components/schemas/Role'
+ *           description: Role to assign
+ *         academicYearId:
+ *           type: integer
+ *           description: Academic year ID (optional, required for certain roles like TEACHER)
+ *           example: 3
+ *           nullable: true
+ * 
+ *     RegisterUserWithRolesRequest: # New Request Schema
+ *       allOf:
+ *         - $ref: '#/components/schemas/CreateUserRequest' # Inherit base user fields
+ *         - type: object
+ *           required:
+ *             - roles
+ *           properties:
+ *             roles:
+ *               type: array
+ *               description: Array of roles to assign to the user
+ *               minItems: 1
+ *               items:
+ *                 type: object
+ *                 required:
+ *                   - role
+ *                 properties:
+ *                   role:
+ *                     $ref: '#/components/schemas/Role'
+ *                     description: Role to assign
+ *                   academicYearId:
+ *                     type: integer
+ *                     description: Academic year ID (optional, required for certain roles like TEACHER)
+ *                     example: 3
+ *                     nullable: true
+ *       example:
+ *         name: "New Manager"
+ *         email: "manager.new@example.com"
+ *         password: "managerPass123"
+ *         gender: "Male"
+ *         dateOfBirth: "1982-03-10"
+ *         phone: "+1555123456"
+ *         address: "789 Mgmt Blvd, City"
+ *         roles: [
+ *           { "role": "MANAGER" },
+ *           { "role": "TEACHER", "academicYearId": 3 }
+ *         ]
+ * 
+ *     # Standardized Response Schemas
+ *     UserResponse: # Standard response for single user (without roles)
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           $ref: '#/components/schemas/User'
+ *       description: Standard response containing a single user object (roles not guaranteed)
+ * 
+ *     UserWithRolesResponse: # New standard response for single user with roles
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           $ref: '#/components/schemas/UserWithRoles'
+ *       description: Standard response containing a single user object with their roles
+ *
+ *     # --- Keeping legacy schemas for compatibility with /users/with-role endpoint --- 
  *     CreateUserWithRoleRequest:
  *       type: object
  *       required:
@@ -179,89 +341,21 @@
  *           type: string
  *           example: "User created successfully with role TEACHER"
  *         data:
- *           type: object
+ *           type: object # This structure differs from UserWithRoles, hence kept separate
  *           properties:
- *             id:
- *               type: integer
- *               description: User ID
- *               example: 1
- *             name:
- *               type: string
- *               description: User's name
- *               example: "John Doe"
- *             email:
- *               type: string
- *               description: User's email
- *               example: "teacher@school.com"
- *             gender:
- *               $ref: '#/components/schemas/Gender'
- *               example: "Male"
- *             dateOfBirth:
- *               type: string
- *               format: date
- *               example: "1990-01-01"
- *             phone:
- *               type: string
- *               example: "1234567890"
- *             address:
- *               type: string
- *               example: "123 Main St, City, Country"
- *             idCardNum:
- *               type: string
- *               example: "ID12345678"
+ *             # ... (User fields) ...
  *             userRoles:
  *               type: array
  *               description: Roles assigned to the user
  *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                     example: 1
- *                   role:
- *                     $ref: '#/components/schemas/Role'
- *                     example: "TEACHER"
- *                   academicYearId:
- *                     type: integer
- *                     example: 3
- *             subjectTeachers:
+ *                 # ... (UserRole fields) ...
+ *             subjectTeachers: # Specific to TEACHER role in this legacy response
  *               type: array
- *               description: Subjects assigned to teacher (only included if role is TEACHER)
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                     example: 1
- *                   subject:
- *                     $ref: '#/components/schemas/Subject'
- *             parentStudents:
+ *               # ...
+ *             parentStudents: # Specific to PARENT role in this legacy response
  *               type: array
- *               description: Students assigned to parent (only included if role is PARENT)
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                     example: 1
- *                   student:
- *                     $ref: '#/components/schemas/Student'
- *       description: Response for successfully creating a user with role and assignments
- *
- *     AssignRoleRequest:
- *       type: object
- *       required:
- *         - role
- *       properties:
- *         role:
- *           $ref: '#/components/schemas/Role'
- *           description: Role to assign to the user
- *           example: "TEACHER"
- *         academicYearId:
- *           type: integer
- *           description: Academic year ID (optional, but required for certain roles)
- *           example: 3
- *       description: Information required to assign a role to a user
+ *               # ...
+ *       description: Response for successfully creating a user with role and assignments (Legacy)
  */
 
 export { };

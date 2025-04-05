@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
-    "build": "npm install && npm install --save-dev @types/express@4.17.21 @types/jsonwebtoken @types/bcrypt @types/ejs @types/cors @types/morgan @types/swagger-ui-express @types/swagger-jsdoc @types/multer && rimraf dist && tsc && prisma generate && npm run postbuild",
+    "build": "npm install && rimraf dist && tsc && prisma generate && npm run postbuild",
     "postbuild": "node scripts/copy-assets.js",
     "swagger-docs": "ts-node scripts/swagger-test.ts && echo 'Swagger documentation generated successfully!'",
     "create-super-manager": "ts-node create-super-manager.ts",
@@ -42,7 +42,7 @@
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.17",
     "@types/ejs": "^3.1.5",
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.1",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/morgan": "^1.9.9",
     "@types/multer": "^1.4.12",

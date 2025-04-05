@@ -106,7 +106,6 @@ async function main() {
                     coefficient: faker.number.int({ min: 1, max: 4 }),
                     subclass_id: subClass.id,
                     subject_id: subject.id,
-                    main_teacher_id: teachers[i].id,
                 },
             })
         )
@@ -146,6 +145,17 @@ async function main() {
     for (const { enrollment } of students) {
         const subclassSubjects = await prisma.subclassSubject.findMany({
             where: { subclass_id: subClass.id },
+            include: {
+                subject: {
+                    include: {
+                        subject_teachers: {
+                            include: {
+                                teacher: true,
+                            }
+                        }
+                    }
+                }
+            }
         });
 
         for (const subclassSubject of subclassSubjects) {
@@ -153,9 +163,9 @@ async function main() {
                 data: {
                     enrollment_id: enrollment.id,
                     subclass_subject_id: subclassSubject.id,
-                    teacher_id: subclassSubject.main_teacher_id,
+                    teacher_id: subclassSubject.subject.subject_teachers[0].teacher.id,
                     exam_sequence_id: examSequence.id,
-                    score: faker.number.float({ min: 5, max: 20 }),
+                    score: Math.random() * 20,
                 },
             });
         }

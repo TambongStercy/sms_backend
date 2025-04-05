@@ -30,6 +30,24 @@ export async function createSubject(data: { name: string; category: string }): P
 }
 
 export async function assignTeacher(subject_id: number, data: { teacher_id: number }): Promise<SubjectTeacher> {
+    // Check if the assignment already exists using the composite unique key
+    const existingAssignment = await prisma.subjectTeacher.findUnique({
+        where: {
+            subject_id_teacher_id: {
+                subject_id: subject_id,
+                teacher_id: data.teacher_id
+            }
+        }
+    });
+
+    // If it exists, return it
+    if (existingAssignment) {
+        console.log(`Assignment already exists for subject ${subject_id} and teacher ${data.teacher_id}. Returning existing.`);
+        return existingAssignment;
+    }
+
+    // If not, create the new assignment
+    console.log(`Creating new assignment for subject ${subject_id} and teacher ${data.teacher_id}.`);
     return prisma.subjectTeacher.create({
         data: {
             subject_id,
@@ -43,7 +61,6 @@ export async function linkSubjectToSubClass(
     data: {
         subclass_id: number;
         coefficient: number;
-        main_teacher_id: number;
     }
 ): Promise<SubclassSubject> {
     return prisma.subclassSubject.create({
@@ -51,7 +68,6 @@ export async function linkSubjectToSubClass(
             subject_id,
             subclass_id: data.subclass_id,
             coefficient: data.coefficient,
-            main_teacher_id: data.main_teacher_id,
         },
     });
 }
@@ -62,7 +78,6 @@ export async function getSubjectsForSubclass(subclass_id: number): Promise<Subcl
         where: { subclass_id },
         include: {
             subject: true,
-            main_teacher: true
         }
     });
 }
@@ -130,8 +145,7 @@ export async function getSubjectById(id: number): Promise<Subject | null> {
                         include: {
                             class: true
                         }
-                    },
-                    main_teacher: true
+                    }
                 }
             }
         }
@@ -171,7 +185,7 @@ export async function deleteSubject(id: number): Promise<Subject> {
  * Assigns a subject to all subclasses of a class
  * @param class_id The ID of the class
  * @param subject_id The ID of the subject to assign
- * @param data Additional data for the assignment (coefficient and main_teacher_id)
+ * @param data Additional data for the assignment (coefficient)
  * @returns Array of created SubclassSubject relationships
  */
 export async function assignSubjectToClass(
@@ -179,7 +193,6 @@ export async function assignSubjectToClass(
     subject_id: number,
     data: {
         coefficient: number;
-        main_teacher_id: number;
     }
 ): Promise<SubclassSubject[]> {
     // First get all subclasses for the given class
@@ -200,57 +213,35 @@ export async function assignSubjectToClass(
         throw new Error(`Subject with ID ${subject_id} not found`);
     }
 
-    // Check if teacher exists
-    const teacher = await prisma.user.findUnique({
-        where: { id: data.main_teacher_id }
-    });
-
-    if (!teacher) {
-        throw new Error(`Teacher with ID ${data.main_teacher_id} not found`);
-    }
-
-    // Create the subject-subclass relationships for each subclass
-    const createdRelationships = await Promise.all(
+    const results = await Promise.all(
         subclasses.map(subclass =>
             prisma.subclassSubject.create({
                 data: {
                     subject_id,
                     subclass_id: subclass.id,
-                    coefficient: data.coefficient,
-                    main_teacher_id: data.main_teacher_id
+                    coefficient: data.coefficient
                 },
-                include: {
-                    subject: true,
-                    subclass: {
-                        include: {
-                            class: true
-                        }
-                    },
-                    main_teacher: true
-                }
-            }).catch(error => {
-                // Handle unique constraint violation - subject may already be assigned to this subclass
+                // No include needed here, we just need the created/found relation
+            }).catch(async (error: any) => {
                 if (error.code === 'P2002') {
-                    return prisma.subclassSubject.findFirst({
+                    console.warn(`Subject ${subject_id} already assigned to subclass ${subclass.id}. Fetching existing.`);
+                    // Fetch and return the existing record
+                    const existingRelation = await prisma.subclassSubject.findFirst({
                         where: {
                             subject_id,
                             subclass_id: subclass.id
-                        },
-                        include: {
-                            subject: true,
-                            subclass: {
-                                include: {
-                                    class: true
-                                }
-                            },
-                            main_teacher: true
                         }
+                        // No include needed here unless the return type strictly requires it
                     });
+                    return existingRelation;
                 }
+                console.error(`Error creating SubclassSubject for subclass ${subclass.id}:`, error);
                 throw error;
             })
         )
     );
 
-    return createdRelationships.filter(Boolean) as SubclassSubject[];
+    // Filter out any nulls (in case findFirst didn't find anything, though unlikely after P2002) 
+    // and assert the type based on the Promise return
+    return results.filter(result => result !== null) as SubclassSubject[];
 }

@@ -17,11 +17,26 @@
  *           type: integer
  *           description: Hierarchical level of the class (used to determine class progression)
  *           example: 1
- *         feeAmount:
+ *         baseFee:
  *           type: number
  *           format: float
- *           description: Fee amount to be paid for this class
+ *           description: Base tuition fee for the class
  *           example: 75000
+ *         newStudentAddFee:
+ *           type: number
+ *           format: float
+ *           description: Additional fee for new students enrolling in this class
+ *           example: 10000
+ *         oldStudentAddFee:
+ *           type: number
+ *           format: float
+ *           description: Additional fee for returning students enrolling in this class
+ *           example: 5000
+ *         miscellaneousFee:
+ *           type: number
+ *           format: float
+ *           description: Miscellaneous fees for the class
+ *           example: 2500
  *         description:
  *           type: string
  *           description: Class description
@@ -105,11 +120,26 @@
  *           type: integer
  *           description: Hierarchical level of the class (used to determine class progression)
  *           example: 1
- *         feeAmount:
+ *         baseFee:
  *           type: number
  *           format: float
- *           description: Fee amount to be paid for this class
+ *           description: Base tuition fee for the class
  *           example: 75000
+ *         newStudentAddFee:
+ *           type: number
+ *           format: float
+ *           description: Additional fee for new students enrolling in this class
+ *           example: 10000
+ *         oldStudentAddFee:
+ *           type: number
+ *           format: float
+ *           description: Additional fee for returning students enrolling in this class
+ *           example: 5000
+ *         miscellaneousFee:
+ *           type: number
+ *           format: float
+ *           description: Miscellaneous fees for the class
+ *           example: 2500
  *         description:
  *           type: string
  *           description: Class description
@@ -146,22 +176,65 @@
  *       properties:
  *         name:
  *           type: string
- *           description: Class name
+ *           description: Name of the new class
  *           example: "Form 2"
  *         level:
  *           type: integer
- *           description: Hierarchical level of the class (used to determine class progression)
+ *           description: Class level (optional)
  *           example: 2
- *         feeAmount:
+ *         baseFee:
  *           type: number
  *           format: float
- *           description: Fee amount to be paid for this class
- *           example: 85000
- *         description:
- *           type: string
- *           description: Class description
- *           example: "Second year of secondary school"
+ *           description: Base tuition fee (optional)
+ *           example: 80000
+ *         newStudentAddFee:
+ *           type: number
+ *           format: float
+ *           description: Additional fee for new students (optional)
+ *           example: 12000
+ *         oldStudentAddFee:
+ *           type: number
+ *           format: float
+ *           description: Additional fee for returning students (optional)
+ *           example: 6000
+ *         miscellaneousFee:
+ *           type: number
+ *           format: float
+ *           description: Miscellaneous fees (optional)
+ *           example: 3000
  *       description: Information required to create a new class
+ *     
+ *     UpdateClassRequest:
+ *       type: object
+ *       properties:
+ *         name:
+ *           type: string
+ *           description: New name for the class
+ *           example: "Form 1 Updated"
+ *         level:
+ *           type: integer
+ *           description: New class level
+ *           example: 1
+ *         baseFee:
+ *           type: number
+ *           format: float
+ *           description: New base tuition fee
+ *           example: 78000
+ *         newStudentAddFee:
+ *           type: number
+ *           format: float
+ *           description: New additional fee for new students
+ *           example: 11000
+ *         oldStudentAddFee:
+ *           type: number
+ *           format: float
+ *           description: New additional fee for returning students
+ *           example: 5500
+ *         miscellaneousFee:
+ *           type: number
+ *           format: float
+ *           description: New miscellaneous fees
+ *           example: 2800
  *     
  *     CreateSubclassRequest:
  *       type: object
@@ -170,12 +243,8 @@
  *       properties:
  *         name:
  *           type: string
- *           description: Subclass name
+ *           description: Name of the new subclass
  *           example: "Form 1B"
- *         description:
- *           type: string
- *           description: Subclass description
- *           example: "Form 1, Section B"
  *       description: Information required to create a new subclass
  *     
  *     PaginatedClassResponse:

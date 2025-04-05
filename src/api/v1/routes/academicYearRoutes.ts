@@ -22,6 +22,10 @@ router.get('/:id', authenticate, academicYearController.getAcademicYearById);
 // Only SUPER_MANAGER, PRINCIPAL can add terms
 router.post('/:id/terms', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), academicYearController.addTerm);
 
+// GET /academic-years/:id/terms - Get all terms for an academic year
+// All authenticated users can view terms
+router.get('/:id/terms', authenticate, academicYearController.getTerms);
+
 // PUT /academic-years/:id - Update an academic year
 // Only SUPER_MANAGER, PRINCIPAL can update academic years
 router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), academicYearController.updateAcademicYear);

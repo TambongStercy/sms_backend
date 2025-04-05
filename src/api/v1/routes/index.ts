@@ -49,7 +49,7 @@ router.use('/marks', marksRouter);
 router.use('/report-cards', reportCardsRouter);
 
 // Communication endpoints (announcements & notifications)
-router.use('/', communicationRoutes);
+router.use('/communications', communicationRoutes);
 
 // Mobile endpoints (prefixed with /mobile)
 router.use('/mobile', mobileRoutes);

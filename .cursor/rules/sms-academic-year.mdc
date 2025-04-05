@@ -1,0 +1,24 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Guidelines for handling Academic Year context and related data in the School Management System API:
+Defaulting to Current Academic Year:
+Requirement: Many operations that filter or create data tied to an academic year (e.g., fetching enrollments, assigning roles for the year, creating sequences) should default to the current academic year if an academicYearId is not explicitly provided in the request or function parameters.
+Implementation: Use the utility functions getCurrentAcademicYear() or getAcademicYearId() (from src/utils/academicYear.ts) to retrieve the current year's ID when needed.
+Error Handling: If an operation requires an academic year context (current or specified) and none can be determined, throw an appropriate error (e.g., "No current academic year defined and none provided").
+Filtering Data by Academic Year:
+Requirement: When fetching lists of data intrinsically linked to academic years (e.g., Enrollment, ExamSequence, Mark, SchoolFees, StudentSequenceAverage, year-specific UserRoles), ensure the results are filtered by the relevant academic_year_id (either explicitly provided or defaulted to the current year).
+Implementation: Apply the appropriate where clause in Prisma queries (e.g., where: { academic_year_id: yearId }).
+Handling Global vs. Year-Specific Roles:
+Context: UserRole records can be global (academic_year_id is null) or tied to a specific academic year.
+Requirement: When fetching a user's roles (e.g., in getAllUsers or getUserById), often the desired behavior is to retrieve both their global roles and the roles relevant to the current (or specified) academic year.
+Implementation: Use a Prisma where clause like where: { academic_year_id: { in: [currentAcademicYearId, null] } } on the included user_roles relation. If no specific year context exists, filter for academic_year_id: null.
+Unique Constraints (createMany):
+Context: The UserRole model has a unique constraint on user_id, role, and academic_year_id.
+Requirement: When using prisma.userRole.createMany(), ensure the input data array does not contain duplicate entries that would violate this constraint.
+Implementation: Before calling createMany, deduplicate the input array based on the unique fields (e.g., using [...new Set(rolesArray)] if only the role itself needs deduplication within the same user/year context).
+Foreign Key Constraints (Deletion):
+Requirement: Before deleting records that are referenced by foreign keys in other tables (e.g., deleting a Subclass referenced by Enrollment), check if dependent records exist.
+Implementation: Perform a count (prisma.dependentModel.count()) or find (findFirst()) operation first. If dependent records exist, prevent deletion and return an appropriate error (e.g., 409 Conflict) with a user-friendly message (e.g., "Cannot delete subclass, students are enrolled").

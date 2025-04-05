@@ -5,6 +5,22 @@ import { extractPaginationAndFilters } from '../../../utils/pagination';
 import path from 'path';
 import fs from 'fs';
 
+// Helper function to transform mark data
+const transformMark = (mark: any) => {
+    const transformed: any = { ...mark }; // Clone mark
+
+    // Add studentId directly if enrollment exists
+    if (transformed.enrollment && transformed.enrollment.student_id) {
+        transformed.studentId = transformed.enrollment.student_id;
+    }
+
+    // Optionally remove the nested enrollment if includeStudent was false
+    // Or restructure enrollment data if needed
+    // For now, we just add studentId
+
+    return transformed;
+};
+
 export const getAllMarks = async (req: Request, res: Response) => {
     try {
         // Define allowed filters for marks
@@ -12,6 +28,7 @@ export const getAllMarks = async (req: Request, res: Response) => {
             'student_id',
             'class_id',
             'subclass_id',
+            'sub_class_id',
             'subject_id',
             'exam_sequence_id',
             'min_score',
@@ -19,25 +36,37 @@ export const getAllMarks = async (req: Request, res: Response) => {
             'include_student',
             'include_subject',
             'include_teacher',
-            'include_exam_sequence'
+            'include_exam_sequence',
+            'academic_year_id' // Added academicYearId to allowed filters
         ];
+
+        console.log('Original query params:', req.query);
 
         // Extract pagination and filter parameters from the request
         const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
 
-        // Get academic year from query if provided - middleware handles conversion
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        console.log('Extracted filterOptions:', filterOptions);
+
+        // Get academic year from query if provided - will be used by service
+        const academic_year_id = filterOptions.academic_year_id ?
+            parseInt(filterOptions.academic_year_id as string) : undefined;
+        // Remove academic_year_id from filterOptions if service expects it as separate arg
+        // delete filterOptions.academic_year_id; 
 
         const result = await examService.getAllMarks(
             paginationOptions,
-            filterOptions,
+            filterOptions, // Pass remaining filters
             academic_year_id
         );
 
+        // Transform the data array to add studentId
+        const transformedData = result.data.map(transformMark);
+        console.log('Transformed data:', transformedData.length > 0 ? 'Data present' : 'Empty data array');
+
         res.json({
             success: true,
-            ...result
+            ...result, // Spread pagination meta
+            data: transformedData // Use transformed data
         });
     } catch (error: any) {
         console.error('Error fetching marks:', error);
@@ -363,6 +392,7 @@ export const getAllExams = async (req: Request, res: Response) => {
         // Extract pagination and filter parameters from the request
         const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
 
+
         const exams = await examService.getAllExams(paginationOptions, filterOptions);
         res.json({
             success: true,
@@ -434,8 +464,9 @@ export const deleteExam = async (req: Request, res: Response): Promise<any> => {
 export const createMark = async (req: Request, res: Response): Promise<any> => {
     try {
         // Use snake_case directly - middleware handles conversion
-        const { exam_id, student_id, subject_id, mark, comment } = req.body;
+        const { exam_id, student_id, subject_id, mark } = req.body;
 
+        console.log(req.body)
         // Get teacher ID from authenticated user
         // TypeScript requires us to check if req.user exists
         if (!req.user || !req.user.id) {
@@ -460,8 +491,7 @@ export const createMark = async (req: Request, res: Response): Promise<any> => {
             student_id,
             subject_id,
             teacher_id,
-            mark,
-            comment
+            mark
         });
 
         res.status(201).json({

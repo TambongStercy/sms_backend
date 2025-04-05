@@ -23,6 +23,11 @@
  *           format: date
  *           description: Term end date
  *           example: 2023-12-15
+ *         feeDeadline:
+ *           type: string
+ *           format: date
+ *           description: Deadline for fee payment
+ *           example: 2023-10-15
  *         academicYearId:
  *           type: integer
  *           description: ID of the academic year this term belongs to
@@ -105,6 +110,11 @@
  *           format: date
  *           description: Academic year end date
  *           example: 2025-06-30
+ *         terms:
+ *           type: array
+ *           description: Terms to create with this academic year
+ *           items:
+ *             $ref: '#/components/schemas/TermRequest'
  *
  *     UpdateAcademicYearRequest:
  *       type: object
@@ -145,6 +155,11 @@
  *           format: date
  *           description: Term end date
  *           example: 2024-04-15
+ *         feeDeadline:
+ *           type: string
+ *           format: date
+ *           description: Deadline for fee payment
+ *           example: 2024-02-15
  *
  *     # Standardized Response Schemas
  *     AcademicYearListResponse:

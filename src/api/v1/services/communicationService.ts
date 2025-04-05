@@ -1,11 +1,54 @@
 // src/api/v1/services/communicationService.ts
 import prisma, { Announcement, MobileNotification, Audience } from '../../../config/db';
+import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination'; // Import pagination utilities
+import { getAcademicYearId } from '../../../utils/academicYear'; // Import academic year utility
 
-export async function getAnnouncements(query: any): Promise<Announcement[]> {
-    const { audience } = query;
-    return prisma.announcement.findMany({
-        where: audience ? { audience } : {},
-    });
+export async function getAnnouncements(
+    paginationOptions?: PaginationOptions,
+    filterOptions?: FilterOptions
+): Promise<PaginatedResult<Announcement>> {
+
+    const where: any = {};
+    const processedFilters: any = { ...filterOptions };
+
+    // Determine Academic Year ID
+    let yearId: number | null | undefined = undefined;
+    if (processedFilters.academicYearId) {
+        const parsedId = parseInt(processedFilters.academicYearId as string);
+        yearId = isNaN(parsedId) ? undefined : parsedId;
+        delete processedFilters.academicYearId; // Remove from filters passed to paginate
+    }
+
+    // If no valid ID provided, get the current default
+    if (yearId === undefined) {
+        yearId = await getAcademicYearId();
+        // Note: getAcademicYearId() might return null if no current year exists
+    }
+
+    // Apply academic year filter (handles number or null)
+    // Announcements might be global (null) or year-specific
+    where.academic_year_id = yearId;
+
+    // Apply other filters (e.g., audience, title)
+    if (processedFilters.audience) {
+        where.audience = processedFilters.audience;
+    }
+    if (processedFilters.title) {
+        where.title = { contains: processedFilters.title, mode: 'insensitive' };
+    }
+
+    // Define includes if needed (e.g., created_by user)
+    const include: any = {
+        created_by: true // Example: include the user who created it
+    };
+
+    // Use the paginate utility
+    return paginate<Announcement>(
+        prisma.announcement,
+        paginationOptions,
+        where, // Pass the constructed where clause
+        include // Pass includes
+    );
 }
 
 export async function createAnnouncement(data: {
@@ -18,6 +61,42 @@ export async function createAnnouncement(data: {
     return prisma.announcement.create({
         data,
     });
+}
+
+export async function updateAnnouncement(
+    id: number,
+    data: Partial<{ title: string; message: string; audience: Audience; academic_year_id: number | null; }>
+): Promise<Announcement | null> {
+    try {
+        return await prisma.announcement.update({
+            where: { id },
+            data: {
+                title: data.title,
+                message: data.message,
+                audience: data.audience,
+                // Handle possibility of setting academic_year_id to null or a specific ID
+                academic_year_id: data.academic_year_id === null ? null : data.academic_year_id
+            },
+        });
+    } catch (error: any) {
+        if (error.code === 'P2025') { // Record to update not found
+            return null;
+        }
+        throw error; // Re-throw other errors
+    }
+}
+
+export async function deleteAnnouncement(id: number): Promise<Announcement | null> {
+    try {
+        return await prisma.announcement.delete({
+            where: { id },
+        });
+    } catch (error: any) {
+        if (error.code === 'P2025') { // Record to delete not found
+            return null;
+        }
+        throw error; // Re-throw other errors
+    }
 }
 
 export async function sendNotification(data: {
