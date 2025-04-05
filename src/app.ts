@@ -1,5 +1,5 @@
 // src/app.ts
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -56,7 +56,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 }));
 
 // Get Swagger JSON
-app.get('/api-docs.json', (req, res) => {
+app.get('/api-docs.json', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
 });
@@ -69,12 +69,17 @@ app.use('/api/v1', convertCamelToSnakeCase, convertSnakeToCamelCase);
 app.use('/api/v1', routes);
 
 // Health-check or root endpoint
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
     res.send('School Management System API is up and running!');
 });
 
-// Health check endpoint for monitoring
-app.get('/api/health', (req, res) => {
+// Health check endpoint for monitoring - multiple paths to ensure compatibility
+app.get('/api/health', (req: Request, res: Response) => {
+    res.status(200).json({ status: 'ok', message: 'Service is running', version: process.env.npm_package_version || '1.0.0' });
+});
+
+// Additional health check at the path shown in the screenshot
+app.get('/api/v1/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'Service is running', version: process.env.npm_package_version || '1.0.0' });
 });
 

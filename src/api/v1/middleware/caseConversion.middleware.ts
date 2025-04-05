@@ -113,7 +113,7 @@ export const convertSnakeToCamelCase = (req: Request, res: Response, next: NextF
         const convertedBody = convertObjectKeysToClient(body);
 
         // Call the original json method with the converted body
-        return originalJson.call(this, convertedBody);
+        return originalJson.call(this, convertedBody) as unknown as Response;
     };
 
     next();

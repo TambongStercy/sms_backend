@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import * as classController from '../controllers/classController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -53,7 +53,7 @@ router.delete('/sub-classes/:subclassId/class-master',
 // GET /classes/:id/sub-classes - List all subclasses for a specific class
 // All authenticated users can view subclasses for a specific class
 // Note: This overlaps with GET /classes/sub-classes?classId= but provides a RESTful alternative
-router.get('/:id/sub-classes', authenticate, (req, res) => {
+router.get('/:id/sub-classes', authenticate, (req: Request, res: Response) => {
     // Redirect logic or specific handler if needed, for now point to the general one
     req.query.classId = req.params.id;
     classController.getAllSubclasses(req, res);
