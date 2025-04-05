@@ -4,14 +4,14 @@
     "outputDirectory": "dist",
     "builds": [
         {
-            "src": "src/server.ts",
+            "src": "dist/server.js",
             "use": "@vercel/node"
         }
     ],
     "rewrites": [
         {
             "source": "/(.*)",
-            "destination": "src/server.ts"
+            "destination": "dist/server.js"
         }
     ]
 }
