@@ -10,8 +10,8 @@
     ],
     "rewrites": [
         {
-            "src": "/(.*)",
-            "dest": "src/server.ts"
+            "source": "/(.*)",
+            "destination": "src/server.ts"
         }
     ]
 }
