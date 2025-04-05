@@ -1,7 +1,6 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { Request } from 'express';
 
 // Define the upload directory
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
@@ -12,7 +11,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 }
 
 // Configure storage
-const storage = multer.diskStorage({
+const storage = (multer as any).diskStorage({
     destination: (req: any, file: any, cb: any) => {
         cb(null, UPLOAD_DIR);
     },
