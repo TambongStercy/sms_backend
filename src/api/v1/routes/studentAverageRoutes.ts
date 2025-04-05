@@ -23,7 +23,7 @@ router.get(
     studentAverageController.getStudentAverage
 );
 
-router.patch(
+router.put(
     '/:id/decision',
     authorize([Role.SUPER_MANAGER, Role.PRINCIPAL, Role.VICE_PRINCIPAL]),
     studentAverageController.updateDecision,

@@ -1,11 +1,15 @@
 import { Request, Response } from 'express';
 import { saveFileMetadata, deleteFile } from '../services/fileService';
 
+interface CustomRequest extends Request {
+    file: Express.Multer.File;
+}
+
 /**
  * Upload a single file
  * @route POST /api/v1/uploads
  */
-export const uploadFile = async (req: Request, res: Response): Promise<void> => {
+export const uploadFile = async (req: CustomRequest, res: Response): Promise<void> => {
     try {
         if (!req.file) {
             res.status(400).json({
