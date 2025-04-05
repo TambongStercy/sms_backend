@@ -83,4 +83,26 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'Service is running', version: process.env.npm_package_version || '1.0.0' });
 });
 
+// Endpoint to download the 1-1-1 report PDF from the root directory
+app.get('/download/report/1-1-1', (req: Request, res: Response) => {
+    const filePath = path.join(process.cwd(), '1-1-1report.pdf');
+    // Use res.download to send the file as an attachment
+    (res as any).download(filePath, '1-1-1report.pdf', (err: any) => {
+        if (err) {
+            // Handle errors, e.g., file not found
+            console.error("Error sending file:", err);
+            if (!res.headersSent) {
+                // Check if headers were already sent (e.g., by internal Express error handling)
+                // Type assertion needed as Express types might not fully cover this scenario
+                const nodeError = err as NodeJS.ErrnoException;
+                if (nodeError.code === 'ENOENT') {
+                    res.status(404).send({ success: false, error: 'Report file not found.' });
+                } else {
+                    res.status(500).send({ success: false, error: 'Could not download the file.' });
+                }
+            }
+        }
+    });
+});
+
 export default app;
