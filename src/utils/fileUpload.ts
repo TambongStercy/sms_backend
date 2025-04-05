@@ -13,10 +13,10 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 
 // Configure storage
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
+    destination: (req: any, file: any, cb: any) => {
         cb(null, UPLOAD_DIR);
     },
-    filename: (req, file, cb) => {
+    filename: (req: any, file: any, cb: any) => {
         // Create a unique filename with original extension
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname);
@@ -25,7 +25,7 @@ const storage = multer.diskStorage({
 });
 
 // File filter to only allow image files
-const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (req: any, file: any, cb: any) => {
     // Accept only image files
     if (file.mimetype.startsWith('image/')) {
         cb(null, true);
@@ -44,7 +44,7 @@ const upload = multer({
 });
 
 // Function to get the public URL for a file
-export const getFileUrl = (req: Request, filename: string): string => {
+export const getFileUrl = (req: any, filename: string): string => {
     const protocol = req.protocol;
     const host = req.get('host');
     return `${protocol}://${host}/uploads/${filename}`;

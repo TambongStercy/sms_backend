@@ -136,12 +136,12 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 
         // Continue to the next middleware or route handler
         next();
-    } catch (error) {
+    } catch (error: any) {
         console.error('Authentication error:', error);
 
-        if (error instanceof jwt.JsonWebTokenError) {
+        if (error.name === 'JsonWebTokenError') {
             res.status(401).json({ error: 'Invalid token' });
-        } else if (error instanceof jwt.TokenExpiredError) {
+        } else if (error.name === 'TokenExpiredError') {
             res.status(401).json({ error: 'Token expired' });
         } else {
             res.status(500).json({ error: 'Server error during authentication' });
