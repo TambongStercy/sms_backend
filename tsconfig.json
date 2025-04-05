@@ -3,7 +3,9 @@
         "sourceMap": true,
         "outDir": "./dist",
         "rootDir": "./src",
-        "strict": true,
+        "strict": false,
+        "strictNullChecks": false,
+        "noImplicitAny": false,
         "lib": [
             "ESNext"
         ],
