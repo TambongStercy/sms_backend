@@ -1,14 +1,14 @@
 {
   "name": "school-management-system",
   "version": "1.0.0",
-  "main": "dist/server.js",
+  "main": "src/server.ts",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "node src/server.ts",
     "dev": "nodemon src/server.ts",
-    "build": "rimraf dist && tsc && prisma generate && npm run postbuild",
+    "build": "tsc",
     "vercel-build": "echo hello",
     "postbuild": "node scripts/copy-assets.js",
     "swagger-docs": "ts-node scripts/swagger-test.ts && echo 'Swagger documentation generated successfully!'",
