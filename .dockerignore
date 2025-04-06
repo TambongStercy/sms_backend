@@ -11,7 +11,7 @@ Dockerfile
 docker-compose.yml
 
 # Build output (recreated inside the container)
-dist
+# dist
 build
 
 # Environment files (should be injected, not baked in)
