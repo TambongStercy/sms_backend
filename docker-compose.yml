@@ -21,6 +21,7 @@
           FIRST_SM_EMAIL: "supermanager@school.com"
           FIRST_SM_PASSWORD: "SuperManager@123"
           FIRST_SM_USER_ID: "1"
+          
           # DIRECT_URL: "YOUR_NEON_DB_URL" # Placeholder - Uncomment if needed
         networks:
           - sms-network
