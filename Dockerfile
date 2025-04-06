@@ -3,15 +3,15 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files and install dependencies (including devDependencies for build)
+# Copy package files AND Prisma schema first
 COPY package*.json ./
-RUN npm ci
-
-# Copy Prisma schema first
 COPY prisma ./prisma
 
-# Generate Prisma Client (needed for build step if using generated types)
-RUN npx prisma generate
+# Install dependencies (postinstall script will run prisma generate now)
+RUN npm ci
+
+# Explicit generate still here (optional, but harmless)
+# RUN npx prisma generate
 
 # Copy the rest of the application source code
 COPY . .
@@ -32,15 +32,15 @@ WORKDIR /app
 # Set NODE_ENV to production
 ENV NODE_ENV=production
 
-# Copy package files and install *only* production dependencies
+# Copy package files AND Prisma schema first
 COPY package*.json ./
+COPY --from=builder /app/prisma ./prisma
+
+# Install *only* production dependencies (postinstall script will run prisma generate)
 RUN npm ci --omit=dev
 
 # Copy built application code from the builder stage
 COPY --from=builder /app/dist ./dist
-
-# Copy Prisma schema (needed for runtime migrations and client)
-COPY --from=builder /app/prisma ./prisma
 
 # Copy node_modules (needed for prisma runtime) from builder to ensure Prisma CLI works if needed at runtime
 # Adjust if your start script doesn't rely on npx prisma etc. directly
