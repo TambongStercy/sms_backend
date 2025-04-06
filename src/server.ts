@@ -33,6 +33,6 @@ function startServer(port: number) {
             }
         });
 }
-
+console.log("Starting server on port", PORT);
 // Start the server
 startServer(PORT);
