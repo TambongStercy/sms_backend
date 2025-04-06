@@ -2,49 +2,27 @@
 
     services:
       sms-backend:
-        # If you build and push the image to a registry first:
-        # image: your-dockerhub-username/sms-backend:latest
-        # If Portainer should build the image from the context:
-        build: .
-        container_name: sms-backend-app # Optional: Specify a container name
+        # --- Use the pre-built image from Docker Hub ---
+        image: sladeghost/sms-backend:latest # Tells Docker to pull this image
+        # build: .  <-- REMOVE or COMMENT OUT this line
+        container_name: sms-backend-app
         restart: unless-stopped
         ports:
-          # Map host port 4000 to container port 4000 (matching .env and Dockerfile)
+          # Map host port 4000 to container port 4000
           - "4000:4000"
         environment:
-          # --- CRITICAL: Set these environment variables in Portainer ---
-          # NODE_ENV should be set to production for deployment
+          # --- CRITICAL: Set these environment variables in Portainer's UI ---
+          # Values here are placeholders; Portainer UI values take precedence
           NODE_ENV: production
-          # PORT matches the value in your .env and the EXPOSE in Dockerfile
           PORT: 4000
-          # Use the specific DATABASE_URL for production from your .env
-          DATABASE_URL: "postgresql://neondb_owner:npg_7pSu1ODEvjwL@ep-tight-morning-a56ez346-pooler.us-east-2.aws.neon.tech/sms?sslmode=require"
-          # Use the JWT_SECRET from your .env - consider changing to a stronger secret!
-          JWT_SECRET: "thisschoolsappisbest"
-          # Include other variables from your .env file
+          DATABASE_URL: "postgresql://neondb_owner:npg_7pSu1ODEvjwL@ep-tight-morning-a56ez346-pooler.us-east-2.aws.neon.tech/sms?sslmode=require" # Placeholder
+          JWT_SECRET: "thisschoolsappisbest" # Placeholder
           FIRST_SM_EMAIL: "supermanager@school.com"
           FIRST_SM_PASSWORD: "SuperManager@123"
           FIRST_SM_USER_ID: "1"
-          # You might need DIRECT_URL if prisma migrate deploy specifically needs it,
-          # though DATABASE_URL should usually suffice if it's the direct connection.
-          # If you encounter migration issues, uncomment and add this:
-          # DIRECT_URL: "postgresql://neondb_owner:npg_7pSu1ODEvjwL@ep-tight-morning-a56ez346-pooler.us-east-2.aws.neon.tech/sms?sslmode=require"
+          # DIRECT_URL: "YOUR_NEON_DB_URL" # Placeholder - Uncomment if needed
         networks:
-          - sms-network # Define a network for potential DB connection
-
-      # --- Optional: Add a Database Service (Example: PostgreSQL) ---
-      # db:
-      #   image: postgres:15-alpine # Use a specific version
-      #   container_name: sms-postgres-db
-      #   restart: unless-stopped
-      #   environment:
-      #     POSTGRES_USER: YOUR_DB_USER # Use the same user as in DATABASE_URL
-      #     POSTGRES_PASSWORD: YOUR_DB_PASSWORD # Use the same password as in DATABASE_URL
-      #     POSTGRES_DB: YOUR_DB_NAME # Use the same DB name as in DATABASE_URL
-      #   volumes:
-      #     - sms-db-data:/var/lib/postgresql/data # Persist database data
-      #   networks:
-      #     - sms-network
+          - sms-network
 
     networks:
       sms-network:
