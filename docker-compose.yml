@@ -16,6 +16,7 @@
           NODE_ENV: production
           PORT: 4000
           DATABASE_URL: "postgresql://neondb_owner:npg_7pSu1ODEvjwL@ep-tight-morning-a56ez346-pooler.us-east-2.aws.neon.tech/sms?sslmode=require" # Placeholder
+          DIRECT_URL="postgresql://neondb_owner:npg_7pSu1ODEvjwL@ep-tight-morning-a56ez346-pooler.us-east-2.aws.neon.tech/sms?sslmode=require"
           JWT_SECRET: "thisschoolsappisbest" # Placeholder
           FIRST_SM_EMAIL: "supermanager@school.com"
           FIRST_SM_PASSWORD: "SuperManager@123"
