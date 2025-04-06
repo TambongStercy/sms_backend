@@ -84,15 +84,17 @@ export const convertCamelToSnakeCase = (req: Request, res: Response, next: NextF
 
     // Convert query parameters if they exist
     if (req.query && Object.keys(req.query).length > 0) {
-        const convertedQuery: any = {};
+        const originalQueryKeys = Object.keys(req.query);
 
-        // Convert each query parameter
-        for (const [key, value] of Object.entries(req.query)) {
+        originalQueryKeys.forEach(key => {
             const snakeKey = camelToSnakeCase(key);
-            convertedQuery[snakeKey] = value;
-        }
-
-        req.query = convertedQuery;
+            if (snakeKey !== key) {
+                // Add the new snake_case key with the value
+                (req.query as any)[snakeKey] = (req.query as any)[key];
+                // Delete the original camelCase key
+                delete (req.query as any)[key];
+            }
+        });
     }
 
     next();
