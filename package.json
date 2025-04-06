@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "nodemon src/server.ts",
-    "build": "npm install && npm install --save-dev @types/express@4.17.21 @types/jsonwebtoken @types/bcrypt @types/ejs @types/cors @types/morgan @types/swagger-ui-express @types/swagger-jsdoc @types/multer && rimraf dist && prisma generate && npm run postbuild",
+    "build": "rimraf dist && tsc && prisma generate && npm run postbuild",
     "start": "node dist/server.js",
     "vercel-build": "tsc --skipLibCheck --noEmit false --skipDefaultLibCheck true",
     "postbuild": "node scripts/copy-assets.js",
