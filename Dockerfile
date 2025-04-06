@@ -1,5 +1,5 @@
 # Stage 1: Builder Stage - Install dependencies, generate Prisma client, and build TypeScript
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN npm run build
 
 
 # Stage 2: Production Stage - Install production dependencies and run the app
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
