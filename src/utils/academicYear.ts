@@ -54,10 +54,10 @@ export async function getStudentSubclassByStudentAndYear(
 }
 
 /**
- * Gets all students in a subclass for a specific academic year
+ * Gets all students in a sub_class for a specific academic year
  */
 export async function getStudentsBySubclassAndYear(
-    subclass_id: number,
+    sub_class_id: number,
     academic_year_id?: number
 ): Promise<Enrollment[]> {
     // If academic year not provided, get current
@@ -69,7 +69,7 @@ export async function getStudentsBySubclassAndYear(
 
     return prisma.enrollment.findMany({
         where: {
-            subclass_id,
+            sub_class_id,
             academic_year_id
         },
         include: {

@@ -465,16 +465,16 @@
  *               $ref: '#/components/schemas/ErrorResponse'
  *
  * @swagger
- * /exams/report-cards/subclass/{subclassId}:
+ * /exams/report-cards/sub_class/{sub_classId}:
  *   get:
- *     summary: Generate report cards for a subclass
- *     description: Generate report cards for all students in a subclass
+ *     summary: Generate report cards for a sub_class
+ *     description: Generate report cards for all students in a sub_class
  *     tags: [Report Cards]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: subclassId
+ *         name: sub_classId
  *         required: true
  *         schema:
  *           type: integer
@@ -549,10 +549,10 @@
  *           type: integer
  *         description: Filter marks by class ID
  *       - in: query
- *         name: subclassId
+ *         name: sub_classId
  *         schema:
  *           type: integer
- *         description: Filter marks by subclass ID  
+ *         description: Filter marks by sub_class ID  
  *       - in: query
  *         name: subjectId
  *         schema:

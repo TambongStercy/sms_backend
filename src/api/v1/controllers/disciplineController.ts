@@ -9,7 +9,7 @@ export const getAllDisciplineIssues = async (req: Request, res: Response) => {
         const allowedFilters = [
             'student_id',
             'class_id',
-            'subclass_id',
+            'sub_class_id',
             'start_date',
             'end_date',
             'description',
@@ -19,11 +19,11 @@ export const getAllDisciplineIssues = async (req: Request, res: Response) => {
         ];
 
         // Extract pagination and filter parameters from the request
-        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
-        // Get academic year from query if provided
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        // Get academic year from finalQuery if provided
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const result = await disciplineService.getAllDisciplineIssues(
             paginationOptions,

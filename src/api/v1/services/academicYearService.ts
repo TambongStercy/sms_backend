@@ -5,7 +5,8 @@ import { getCurrentAcademicYear } from '../../../utils/academicYear';
 export async function getAllAcademicYears(): Promise<AcademicYear[]> {
     return prisma.academicYear.findMany({
         include: {
-            terms: true
+            terms: true,
+            exam_sequences: true,
         }
     });
 }
@@ -102,6 +103,9 @@ export async function getTermsByAcademicYearId(academicYearId: number): Promise<
     return prisma.term.findMany({
         where: {
             academic_year_id: academicYearId
+        },
+        include: {
+            exam_sequences: true
         },
         orderBy: {
             start_date: 'asc'

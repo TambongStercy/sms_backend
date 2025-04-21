@@ -8,13 +8,13 @@ import * as StudentAverageService from '../services/studentAverageService';
 export const calculateStudentAverages = async (req: Request, res: Response): Promise<any> => {
     try {
         const examSequenceId = parseInt(req.params.examSequenceId);
-        const { subclassId } = req.query;
+        const { sub_classId } = req.finalQuery;
 
-        const subclassIdNum = subclassId ? parseInt(subclassId as string) : undefined;
+        const sub_classIdNum = sub_classId ? parseInt(sub_classId as string) : undefined;
 
         const averages = await StudentAverageService.calculateAndSaveStudentAverages(
             examSequenceId,
-            subclassIdNum
+            sub_classIdNum
         );
 
         return res.status(200).json({
@@ -40,11 +40,11 @@ export const calculateStudentAverages = async (req: Request, res: Response): Pro
 export const getSequenceAverages = async (req: Request, res: Response): Promise<any> => {
     try {
         const examSequenceId = parseInt(req.params.examSequenceId);
-        const { subclassId } = req.query;
+        const { sub_classId } = req.finalQuery;
 
-        const subclassIdNum = subclassId ? parseInt(subclassId as string) : undefined;
+        const sub_classIdNum = sub_classId ? parseInt(sub_classId as string) : undefined;
 
-        const averages = await StudentAverageService.getStudentAverages(examSequenceId, subclassIdNum);
+        const averages = await StudentAverageService.getStudentAverages(examSequenceId, sub_classIdNum);
 
         return res.status(200).json({
             status: 'success',

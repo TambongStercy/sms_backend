@@ -45,8 +45,8 @@ export const reportCardsRouter = Router();
 // GET /report-cards/student/:studentId - Generate report card for a student
 reportCardsRouter.get('/student/:studentId', authenticate, examController.generateStudentReportCard);
 
-// GET /report-cards/subclass/:subclassId - Generate report cards for a subclass
-reportCardsRouter.get('/subclass/:subclassId', authenticate, examController.generateSubclassReportCards);
+// GET /report-cards/sub_class/:sub_classId - Generate report cards for a sub_class
+reportCardsRouter.get('/sub_class/:sub_classId', authenticate, examController.generateSubclassReportCards);
 
 // Marks router (will be mounted at /marks)
 export const marksRouter = Router();

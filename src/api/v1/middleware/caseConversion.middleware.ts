@@ -82,23 +82,65 @@ export const convertCamelToSnakeCase = (req: Request, res: Response, next: NextF
         req.body = convertObjectKeys(req.body);
     }
 
+    // Initialize req.finalQuery as an empty object
+    (req as any).finalQuery = {};
+
     // Convert query parameters if they exist
     if (req.query && Object.keys(req.query).length > 0) {
-        const originalQueryKeys = Object.keys(req.query);
+        // console.log("Inside camelcaseConverter (Original): ", req.query);
 
-        originalQueryKeys.forEach(key => {
+        // Create a custom property to store the snake_case version
+        const convertedQuery: Record<string, any> = {};
+
+        Object.keys(req.query).forEach(key => {
             const snakeKey = camelToSnakeCase(key);
-            if (snakeKey !== key) {
-                // Add the new snake_case key with the value
-                (req.query as any)[snakeKey] = (req.query as any)[key];
-                // Delete the original camelCase key
-                delete (req.query as any)[key];
-            }
+            convertedQuery[snakeKey] = req.query[key];
+            convertedQuery[key] = req.query[key]; // Keep original key too
         });
+
+        // Assign the populated object to req.finalQuery
+        (req as any).finalQuery = convertedQuery;
+
+        // console.log("Snake case query: ", (req as any).finalQuery);
     }
+    // else {
+    //     // Log if req.query was empty or non-existent
+    //     console.log("No query parameters found to convert.");
+    // }
 
     next();
 };
+
+
+// export const convertCamelToSnakeCase = (req: Request, res: Response, next: NextFunction) => {
+//     // Convert request body if it exists
+//     if (req.body && Object.keys(req.body).length > 0) {
+//         req.body = convertObjectKeys(req.body);
+//     }
+
+//     // Convert query parameters if they exist
+//     if (req.query && Object.keys(req.query).length > 0) {
+//         const query = req.query as any; // Cast to allow index access/modification
+//         console.log("Inside camelcaseConverter (Original): ", query);
+
+//         const keysToConvert: string[] = Object.keys(query); // Get all original keys
+
+//         keysToConvert.forEach(key => {
+//             const snakeKey = camelToSnakeCase(key);
+//             if (snakeKey !== key) {
+//                 // Assign the value to the new snake_case key
+//                 query[snakeKey] = query[key];
+//                 // Delete the original camelCase key
+//                 delete query[key];
+//             }
+//         });
+
+//         console.log("After camelcaseConverter (Mutated query): ", query); // Log the mutated object
+//     }
+
+
+//     next();
+// };
 
 /**
  * Middleware that converts all snake_case keys in response body to camelCase

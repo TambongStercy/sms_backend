@@ -14,7 +14,7 @@ async function testServices() {
             console.log(`- ${student.name} (ID: ${student.id})`);
             if (student.enrollments.length > 0) {
                 const enrollment = student.enrollments[0];
-                console.log(`  Enrolled in ${enrollment.subclass.class.name} ${enrollment.subclass.name}`);
+                console.log(`  Enrolled in ${enrollment.sub_class.class.name} ${enrollment.sub_class.name}`);
             } else {
                 console.log("  Not currently enrolled");
             }

@@ -44,9 +44,9 @@
  *           type: integer
  *           description: ID of the student enrollment
  *           example: 5
- *         subclassSubjectId:
+ *         sub_classSubjectId:
  *           type: integer
- *           description: ID of the subclass subject
+ *           description: ID of the sub_class subject
  *           example: 3
  *         teacherId:
  *           type: integer

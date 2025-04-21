@@ -13,8 +13,8 @@ const options = {
             description: 'API for School Management System including authentication, academic year, subjects, exams, and mobile integrations.\n\n' +
                 '## Case Conversion\n' +
                 'This API automatically handles case conversion between client and server:\n' +
-                '- **Client-side format**: All parameters should be sent in camelCase (e.g., `subclassId`, `academicYearId`)\n' +
-                '- **Server-side format**: The server internally uses snake_case (e.g., `subclass_id`, `academic_year_id`)\n' +
+                '- **Client-side format**: All parameters should be sent in camelCase (e.g., `sub_classId`, `academicYearId`)\n' +
+                '- **Server-side format**: The server internally uses snake_case (e.g., `sub_class_id`, `academic_year_id`)\n' +
                 '- **Response format**: All responses are automatically converted from snake_case to camelCase\n\n' +
                 'This conversion is handled by middleware, so you don\'t need to worry about it in your client code.\n' +
                 'Just use camelCase everywhere in your requests and expect camelCase in all responses.\n\n' +

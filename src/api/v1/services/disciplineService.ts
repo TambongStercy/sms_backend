@@ -124,20 +124,20 @@ export async function getAllDisciplineIssues(
     if (filterOptions?.class_id) {
         processedFilters.enrollment = {
             ...(processedFilters.enrollment || {}),
-            subclass: {
+            sub_class: {
                 class_id: parseInt(filterOptions.class_id as string)
             }
         };
         delete processedFilters.class_id;
     }
 
-    // Filter by subclass
-    if (filterOptions?.subclass_id) {
+    // Filter by sub_class
+    if (filterOptions?.sub_class_id) {
         processedFilters.enrollment = {
             ...(processedFilters.enrollment || {}),
-            subclass_id: parseInt(filterOptions.subclass_id as string)
+            sub_class_id: parseInt(filterOptions.sub_class_id as string)
         };
-        delete processedFilters.subclass_id;
+        delete processedFilters.sub_class_id;
     }
 
     // Filter by date range
@@ -170,7 +170,7 @@ export async function getAllDisciplineIssues(
         include.enrollment = {
             include: {
                 student: true,
-                subclass: {
+                sub_class: {
                     include: {
                         class: true
                     }

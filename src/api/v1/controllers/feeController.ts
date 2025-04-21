@@ -5,8 +5,8 @@ import * as feeService from '../services/feeService';
 export const getAllFees = async (req: Request, res: Response) => {
     try {
         // Use snake_case directly - middleware handles the conversion
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const fees = await feeService.getAllFees(academic_year_id);
         res.json({
@@ -134,8 +134,8 @@ export const getStudentFees = async (req: Request, res: Response) => {
     try {
         const studentId = parseInt(req.params.studentId);
 
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const fees = await feeService.getStudentFees(studentId, academic_year_id);
 
@@ -154,19 +154,19 @@ export const getStudentFees = async (req: Request, res: Response) => {
 
 export const getSubclassFeesSummary = async (req: Request, res: Response) => {
     try {
-        const subclassId = parseInt(req.params.subclassId);
+        const sub_classId = parseInt(req.params.sub_classId);
 
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
-        const summary = await feeService.getSubclassFeesSummary(subclassId, academic_year_id);
+        const summary = await feeService.getSubclassFeesSummary(sub_classId, academic_year_id);
 
         res.json({
             success: true,
             data: summary
         });
     } catch (error: any) {
-        console.error('Error fetching subclass fees summary:', error);
+        console.error('Error fetching sub_class fees summary:', error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -224,13 +224,13 @@ export const getFeePayments = async (req: Request, res: Response): Promise<any> 
 export const exportFeeReports = async (req: Request, res: Response) => {
     try {
         // Use snake_case directly - middleware handles the conversion
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
-        const format = req.query.format as string || 'excel';
+        const format = req.finalQuery.format as string || 'excel';
 
-        const subclass_id = req.query.subclass_id ?
-            parseInt(req.query.subclass_id as string) : undefined;
+        const sub_class_id = req.finalQuery.sub_class_id ?
+            parseInt(req.finalQuery.sub_class_id as string) : undefined;
 
         const report = await feeService.exportFeeReports(academic_year_id);
 

@@ -73,10 +73,10 @@ export const getNotifications = async (req: AuthenticatedRequest, res: Response)
             return;
         }
 
-        // Parse query parameters
-        const page = req.query.page ? parseInt(req.query.page as string) : 1;
-        const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
-        const status = req.query.status as string || 'all';
+        // Parse finalQuery parameters
+        const page = req.finalQuery.page ? parseInt(req.finalQuery.page as string) : 1;
+        const limit = req.finalQuery.limit ? parseInt(req.finalQuery.limit as string) : 20;
+        const status = req.finalQuery.status as string || 'all';
 
         // Use empty array as fallback if user has no notifications
         let notifications: any[] = [];

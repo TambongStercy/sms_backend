@@ -27,7 +27,7 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
         const allowedFilters = ['name', 'email', 'gender', 'role', 'include_roles', 'phone'];
 
         // Extract pagination and filter parameters from the request
-        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
         const result = await userService.getAllUsers(paginationOptions, filterOptions);
 
@@ -375,16 +375,16 @@ export const removeVicePrincipal = async (req: Request, res: Response): Promise<
     try {
         const userId = parseInt(req.params.userId);
         const subClassId = parseInt(req.params.subClassId); // Param name from route
-        // Expect snake_case from req.query due to middleware
-        const academic_year_id = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        // Expect snake_case from req.finalQuery due to middleware
+        const academic_year_id = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         if (isNaN(userId) || isNaN(subClassId)) {
             res.status(400).json({ success: false, error: 'Invalid User ID or Subclass ID in URL.' });
             return;
         }
-        // Check the original query param existence before validating the parsed number
-        if (req.query.academic_year_id && academic_year_id === undefined) {
-            res.status(400).json({ success: false, error: 'Invalid Academic Year ID format in query parameter.' });
+        // Check the original finalQuery param existence before validating the parsed number
+        if (req.finalQuery.academic_year_id && academic_year_id === undefined) {
+            res.status(400).json({ success: false, error: 'Invalid Academic Year ID format in finalQuery parameter.' });
             return;
         }
 
@@ -438,16 +438,16 @@ export const removeDisciplineMaster = async (req: Request, res: Response): Promi
     try {
         const userId = parseInt(req.params.userId);
         const subClassId = parseInt(req.params.subClassId); // Param name from route
-        // Expect snake_case from req.query due to middleware
-        const academic_year_id = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        // Expect snake_case from req.finalQuery due to middleware
+        const academic_year_id = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         if (isNaN(userId) || isNaN(subClassId)) {
             res.status(400).json({ success: false, error: 'Invalid User ID or Subclass ID in URL.' });
             return;
         }
-        // Check the original query param existence before validating the parsed number
-        if (req.query.academic_year_id && academic_year_id === undefined) {
-            res.status(400).json({ success: false, error: 'Invalid Academic Year ID format in query parameter.' });
+        // Check the original finalQuery param existence before validating the parsed number
+        if (req.finalQuery.academic_year_id && academic_year_id === undefined) {
+            res.status(400).json({ success: false, error: 'Invalid Academic Year ID format in finalQuery parameter.' });
             return;
         }
 
@@ -462,5 +462,36 @@ export const removeDisciplineMaster = async (req: Request, res: Response): Promi
         } else {
             res.status(200).json({ success: true, message: 'Discipline Master assignment removed successfully (or did not exist).' });
         }
+    }
+};
+
+// Get all teachers with their subjects
+export const getAllTeachers = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Get subject_id filter if provided
+        const subject_id = req.finalQuery.subject_id ? parseInt(req.finalQuery.subject_id as string) : undefined;
+
+        // Make sure the subject_id is a valid number if provided
+        if (req.finalQuery.subject_id && isNaN(subject_id as number)) {
+            res.status(400).json({
+                success: false,
+                error: "Invalid subject ID format"
+            });
+            return;
+        }
+
+        // Use the service function to get teachers
+        const formattedTeachers = await userService.getAllTeachers(subject_id);
+
+        res.json({
+            success: true,
+            data: formattedTeachers
+        });
+    } catch (error: any) {
+        console.error('Error fetching teachers:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };

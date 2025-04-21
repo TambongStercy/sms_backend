@@ -10,7 +10,7 @@ export const getAnnouncements = async (req: Request, res: Response) => {
         const allowedFilters = ['audience', 'academicYearId', 'title']; // Add other filters as needed
 
         // Extract pagination and filter parameters
-        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
         // Call the service function, passing pagination and filters
         // The service function now handles pagination and returns the standard PaginatedResult

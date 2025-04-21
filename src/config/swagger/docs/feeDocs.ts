@@ -305,10 +305,10 @@
  *           type: integer
  *         description: Filter by academic year ID (optional)
  *       - in: query
- *         name: subclassId
+ *         name: sub_classId
  *         schema:
  *           type: integer
- *         description: Filter by subclass ID (optional)
+ *         description: Filter by sub_class ID (optional)
  *       - in: query
  *         name: format
  *         schema:

@@ -29,7 +29,7 @@ export async function getFeeById(id: number): Promise<SchoolFees | null> {
             enrollment: {
                 include: {
                     student: true,
-                    subclass: {
+                    sub_class: {
                         include: {
                             class: true
                         }
@@ -175,7 +175,7 @@ export async function getStudentFees(studentId: number, academicYearId?: number)
             enrollment: {
                 include: {
                     student: true,
-                    subclass: true
+                    sub_class: true
                 }
             },
             academic_year: true,
@@ -188,18 +188,18 @@ export async function getStudentFees(studentId: number, academicYearId?: number)
 }
 
 /**
- * Get fee summary for a subclass
- * @param subclassId The ID of the subclass
+ * Get fee summary for a sub_class
+ * @param sub_classId The ID of the sub_class
  * @param academicYearId Optional academic year filter
- * @returns Fee summary statistics for the subclass
+ * @returns Fee summary statistics for the sub_class
  */
-export async function getSubclassFeesSummary(subclassId: number, academicYearId?: number): Promise<any> {
+export async function getSubclassFeesSummary(sub_classId: number, academicYearId?: number): Promise<any> {
     const yearId = await getAcademicYearId(academicYearId);
 
-    // Get all enrollments for the subclass in the academic year
+    // Get all enrollments for the sub_class in the academic year
     const enrollments = await prisma.enrollment.findMany({
         where: {
-            subclass_id: subclassId,
+            sub_class_id: sub_classId,
             ...(yearId && { academic_year_id: yearId })
         },
         include: {
@@ -209,7 +209,7 @@ export async function getSubclassFeesSummary(subclassId: number, academicYearId?
 
     if (enrollments.length === 0) {
         return {
-            subclass_id: subclassId,
+            sub_class_id: sub_classId,
             academic_year_id: yearId,
             total_students: 0,
             total_expected: 0,
@@ -265,7 +265,7 @@ export async function getSubclassFeesSummary(subclassId: number, academicYearId?
     });
 
     return {
-        subclass_id: subclassId,
+        sub_class_id: sub_classId,
         academic_year_id: yearId,
         total_students: enrollments.length,
         total_expected: totalExpected,
@@ -390,13 +390,13 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
     const enrollments = await prisma.enrollment.findMany({
         where: {
             academic_year_id: yearId,
-            subclass: {
+            sub_class: {
                 class_id: classId
             }
         },
         include: {
             student: true,
-            subclass: true,
+            sub_class: true,
             school_fees: {
                 where: {
                     academic_year_id: yearId // Ensure we only get fees for this academic year
@@ -489,7 +489,7 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
     const enrollment = await prisma.enrollment.findUnique({
         where: { id: enrollmentId },
         include: {
-            subclass: {
+            sub_class: {
                 include: {
                     class: true
                 }
@@ -503,7 +503,7 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
     }
 
     // Get the class fee structure
-    const classInfo = enrollment.subclass.class;
+    const classInfo = enrollment.sub_class.class;
 
     // Calculate the expected fee amount
     let feeAmount = classInfo.base_fee;
@@ -517,15 +517,14 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
         }
     });
 
-    if (currentTerm) {
-        if (currentTerm.name.toLowerCase().includes('first')) {
-            feeAmount += classInfo.first_term_fee;
-        } else if (currentTerm.name.toLowerCase().includes('second')) {
-            feeAmount += classInfo.second_term_fee;
-        } else if (currentTerm.name.toLowerCase().includes('third')) {
-            feeAmount += classInfo.third_term_fee;
-        }
-    }
+    // if (currentTerm) {
+    //     if (currentTerm.name.toLowerCase().includes('first')) {
+    //     } else if (currentTerm.name.toLowerCase().includes('second')) {
+    //     } else if (currentTerm.name.toLowerCase().includes('third')) {
+    //     }
+    // }
+    
+    feeAmount += classInfo.first_term_fee + classInfo.second_term_fee + classInfo.third_term_fee;
 
     // Add miscellaneous fees
     feeAmount += classInfo.miscellaneous_fee;

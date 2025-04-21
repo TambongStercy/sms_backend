@@ -7,6 +7,7 @@ declare module 'express' {
     export interface Request extends http.IncomingMessage {
         body: any;
         query: any;
+        finalQuery: any;
         params: any;
         user?: any;
     }
@@ -25,6 +26,7 @@ declare module 'express' {
         get: any;
         post: any;
         put: any;
+        patch: any;
         delete: any;
         use: any;
     }

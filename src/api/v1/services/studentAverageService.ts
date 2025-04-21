@@ -3,11 +3,11 @@ import prisma, { AverageStatus } from '../../../config/db';
 /**
  * Calculate and save student averages for a specific exam sequence
  * @param examSequenceId The ID of the exam sequence
- * @param subclassId Optional subclass ID to filter students
+ * @param sub_classId Optional sub_class ID to filter students
  */
 export const calculateAndSaveStudentAverages = async (
     examSequenceId: number,
-    subclassId?: number
+    sub_classId?: number
 ) => {
     try {
         // Get the exam sequence to verify it exists
@@ -23,20 +23,20 @@ export const calculateAndSaveStudentAverages = async (
             throw new Error(`Exam sequence with ID ${examSequenceId} not found`);
         }
 
-        // Get all enrollments for the academic year, optionally filtered by subclass
+        // Get all enrollments for the academic year, optionally filtered by sub_class
         const enrollmentQuery: any = {
             academic_year_id: examSequence.academic_year_id,
         };
 
-        if (subclassId) {
-            enrollmentQuery.subclass_id = subclassId;
+        if (sub_classId) {
+            enrollmentQuery.sub_class_id = sub_classId;
         }
 
         const enrollments = await prisma.enrollment.findMany({
             where: enrollmentQuery,
             include: {
                 student: true,
-                subclass: true,
+                sub_class: true,
             },
         });
 
@@ -53,7 +53,7 @@ export const calculateAndSaveStudentAverages = async (
                     exam_sequence_id: examSequenceId,
                 },
                 include: {
-                    subclass_subject: true,
+                    sub_class_subject: true,
                 },
             });
 
@@ -66,8 +66,8 @@ export const calculateAndSaveStudentAverages = async (
             let totalCoefficient = 0;
 
             marks.forEach((mark) => {
-                totalWeightedScore += mark.score * mark.subclass_subject.coefficient;
-                totalCoefficient += mark.subclass_subject.coefficient;
+                totalWeightedScore += mark.score * mark.sub_class_subject.coefficient;
+                totalCoefficient += mark.sub_class_subject.coefficient;
             });
 
             // If no coefficients, skip
@@ -114,7 +114,7 @@ export const calculateAndSaveStudentAverages = async (
 
         // Calculate and update rankings
         if (averageResults.length > 0) {
-            await updateRankings(examSequenceId, subclassId);
+            await updateRankings(examSequenceId, sub_classId);
         }
 
         return averageResults;
@@ -125,19 +125,19 @@ export const calculateAndSaveStudentAverages = async (
 };
 
 /**
- * Update rankings for all students in a sequence (optionally filtered by subclass)
+ * Update rankings for all students in a sequence (optionally filtered by sub_class)
  * @param examSequenceId The ID of the exam sequence
- * @param subclassId Optional subclass ID to filter students
+ * @param sub_classId Optional sub_class ID to filter students
  */
-export const updateRankings = async (examSequenceId: number, subclassId?: number) => {
+export const updateRankings = async (examSequenceId: number, sub_classId?: number) => {
     try {
-        // Get all enrollments for the subclass (if specified)
+        // Get all enrollments for the sub_class (if specified)
         let enrollmentFilter: any = {};
 
-        if (subclassId) {
-            // Get all averages for students in this subclass
+        if (sub_classId) {
+            // Get all averages for students in this sub_class
             const enrollments = await prisma.enrollment.findMany({
-                where: { subclass_id: subclassId },
+                where: { sub_class_id: sub_classId },
                 select: { id: true },
             });
 
@@ -195,7 +195,7 @@ export const getStudentAverage = async (enrollmentId: number, examSequenceId: nu
             enrollment: {
                 include: {
                     student: true,
-                    subclass: {
+                    sub_class: {
                         include: {
                             class: true,
                         },
@@ -215,17 +215,17 @@ export const getStudentAverage = async (enrollmentId: number, examSequenceId: nu
 /**
  * Get all student averages for a specific exam sequence
  * @param examSequenceId The ID of the exam sequence
- * @param subclassId Optional subclass ID to filter students
+ * @param sub_classId Optional sub_class ID to filter students
  */
-export const getStudentAverages = async (examSequenceId: number, subclassId?: number) => {
+export const getStudentAverages = async (examSequenceId: number, sub_classId?: number) => {
     let whereClause: any = {
         exam_sequence_id: examSequenceId,
     };
 
-    if (subclassId) {
-        // Get enrollments for this subclass
+    if (sub_classId) {
+        // Get enrollments for this sub_class
         const enrollments = await prisma.enrollment.findMany({
-            where: { subclass_id: subclassId },
+            where: { sub_class_id: sub_classId },
             select: { id: true },
         });
 
@@ -243,7 +243,7 @@ export const getStudentAverages = async (examSequenceId: number, subclassId?: nu
             enrollment: {
                 include: {
                     student: true,
-                    subclass: {
+                    sub_class: {
                         include: {
                             class: true,
                         },

@@ -51,14 +51,14 @@ export async function getAllUsers(
         vice_principal_assignments: {
             where: { academic_year_id: currentAcademicYearId },
             include: {
-                subclass: true // Include subclass details
+                sub_class: true // Include sub_class details
             }
         },
         // Include DM assignments filtered by current year
         discipline_master_assignments: {
             where: { academic_year_id: currentAcademicYearId },
             include: {
-                subclass: true // Include subclass details
+                sub_class: true // Include sub_class details
             }
         },
         // Conditionally include subject assignments if the user is a teacher
@@ -83,8 +83,6 @@ export async function getAllUsers(
     // Remove the includeRoles filter if present, as it's no longer needed
     delete processedFilters.includeRoles;
 
-    console.log("Processed Filters for getAllUsers:", processedFilters);
-    console.log("Include options for getAllUsers:", include);
 
     return paginate<User>(
         prisma.user,
@@ -377,7 +375,7 @@ export async function createUserWithRole(userData: {
 }
 
 /**
- * Assigns a user as Vice Principal for a specific subclass, defaulting to the current academic year.
+ * Assigns a user as Vice Principal for a specific sub_class, defaulting to the current academic year.
  * Ensures the user has the VICE_PRINCIPAL role for the target year.
  */
 export async function assignVicePrincipalToSubclass(
@@ -409,32 +407,32 @@ export async function assignVicePrincipalToSubclass(
         throw new Error(`User with ID ${userId} not found or does not have the VICE_PRINCIPAL role for the academic year ${yearId}.`);
     }
 
-    // Verify subclass exists
-    const subclass = await prisma.subclass.findUnique({ where: { id: subClassId } });
-    if (!subclass) {
+    // Verify sub_class exists
+    const sub_class = await prisma.subClass.findUnique({ where: { id: subClassId } });
+    if (!sub_class) {
         throw new Error(`Subclass with ID ${subClassId} not found.`);
     }
 
     // Create or update the assignment (using upsert to handle potential duplicates cleanly)
     return prisma.vicePrincipalAssignment.upsert({
         where: {
-            user_id_subclass_id_academic_year_id: {
+            user_id_sub_class_id_academic_year_id: {
                 user_id: userId,
-                subclass_id: subClassId,
+                sub_class_id: subClassId,
                 academic_year_id: yearId
             }
         },
         update: {},
         create: {
             user_id: userId,
-            subclass_id: subClassId,
+            sub_class_id: subClassId,
             academic_year_id: yearId,
         }
     });
 }
 
 /**
- * Removes a Vice Principal assignment from a subclass for a specific academic year.
+ * Removes a Vice Principal assignment from a sub_class for a specific academic year.
  */
 export async function removeVicePrincipalFromSubclass(
     userId: number,
@@ -449,14 +447,14 @@ export async function removeVicePrincipalFromSubclass(
     await prisma.vicePrincipalAssignment.deleteMany({
         where: {
             user_id: userId,
-            subclass_id: subClassId,
+            sub_class_id: subClassId,
             academic_year_id: yearId
         }
     });
 }
 
 /**
- * Assigns a user as Discipline Master for a specific subclass, defaulting to the current academic year.
+ * Assigns a user as Discipline Master for a specific sub_class, defaulting to the current academic year.
  * Ensures the user has the DISCIPLINE_MASTER role for the target year.
  */
 export async function assignDisciplineMasterToSubclass(
@@ -488,32 +486,32 @@ export async function assignDisciplineMasterToSubclass(
         throw new Error(`User with ID ${userId} not found or does not have the DISCIPLINE_MASTER role for the academic year ${yearId}.`);
     }
 
-    // Verify subclass exists
-    const subclass = await prisma.subclass.findUnique({ where: { id: subClassId } });
-    if (!subclass) {
+    // Verify sub_class exists
+    const sub_class = await prisma.subClass.findUnique({ where: { id: subClassId } });
+    if (!sub_class) {
         throw new Error(`Subclass with ID ${subClassId} not found.`);
     }
 
     // Create or update the assignment
     return prisma.disciplineMasterAssignment.upsert({
         where: {
-            user_id_subclass_id_academic_year_id: {
+            user_id_sub_class_id_academic_year_id: {
                 user_id: userId,
-                subclass_id: subClassId,
+                sub_class_id: subClassId,
                 academic_year_id: yearId
             }
         },
         update: {},
         create: {
             user_id: userId,
-            subclass_id: subClassId,
+            sub_class_id: subClassId,
             academic_year_id: yearId,
         }
     });
 }
 
 /**
- * Removes a Discipline Master assignment from a subclass for a specific academic year.
+ * Removes a Discipline Master assignment from a sub_class for a specific academic year.
  */
 export async function removeDisciplineMasterFromSubclass(
     userId: number,
@@ -528,8 +526,61 @@ export async function removeDisciplineMasterFromSubclass(
     await prisma.disciplineMasterAssignment.deleteMany({
         where: {
             user_id: userId,
-            subclass_id: subClassId,
+            sub_class_id: subClassId,
             academic_year_id: yearId
         }
     });
+}
+
+export interface Teacher {
+    id: number;
+    name: string;
+    email: string;
+    gender: Gender;
+    subjects: {
+        id: number;
+        name: string;
+        category: string;
+    }[];
+}
+
+export async function getAllTeachers(subjectId?: number): Promise<Teacher[]> {
+    // Find users with TEACHER role
+    const teachers = await prisma.user.findMany({
+        where: {
+            user_roles: {
+                some: {
+                    role: 'TEACHER'
+                }
+            },
+            // If subject_id is provided, filter teachers who teach that subject
+            ...(subjectId && {
+                subject_teachers: {
+                    some: {
+                        subject_id: subjectId
+                    }
+                }
+            })
+        },
+        include: {
+            subject_teachers: {
+                include: {
+                    subject: true
+                }
+            }
+        }
+    });
+
+    // Transform data to desired format
+    return teachers.map(teacher => ({
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+        gender: teacher.gender,
+        subjects: teacher.subject_teachers.map(st => ({
+            id: st.subject.id,
+            name: st.subject.name,
+            category: st.subject.category
+        }))
+    }));
 }

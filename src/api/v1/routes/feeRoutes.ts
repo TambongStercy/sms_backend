@@ -27,8 +27,8 @@ router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'BU
 // GET /fees/student/:studentId - Get all fees for a specific student
 router.get('/student/:studentId', authenticate, feeController.getStudentFees);
 
-// GET /fees/subclass/:subclassId/summary - Get fee summary for a subclass
-router.get('/subclass/:subclassId/summary', authenticate, feeController.getSubclassFeesSummary);
+// GET /fees/sub_class/:sub_classId/summary - Get fee summary for a sub_class
+router.get('/sub_class/:sub_classId/summary', authenticate, feeController.getSubclassFeesSummary);
 
 // GET /fees/:feeId/payments - List all payments for a fee
 router.get('/:feeId/payments', authenticate, feeController.getFeePayments);

@@ -38,10 +38,10 @@
  *           type: integer
  *         description: Filter discipline records by class ID
  *       - in: query
- *         name: subclassId
+ *         name: sub_classId
  *         schema:
  *           type: integer
- *         description: Filter discipline records by subclass ID
+ *         description: Filter discipline records by sub_class ID
  *       - in: query
  *         name: startDate
  *         schema:

@@ -1,10 +1,10 @@
 import {
     PrismaClient, User, SchoolFees, AcademicYear, Gender, SubjectCategory, Role, Student, ParentStudent,
-    PaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, Subclass,
-    Mark, ExamSequence, Term, Subject, SubjectTeacher, SubclassSubject, StudentAbsence, TeacherAbsence,
+    PaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, SubClass,
+    Mark, ExamSequence, Term, Subject, SubjectTeacher, SubClassSubject, StudentAbsence, TeacherAbsence,
     DisciplineIssue, VicePrincipalAssignment, DisciplineMasterAssignment, PrincipalAssignment, BursarAssignment,
     Period, TeacherPeriod, ExamPaper, ExamPaperQuestion, Question, QuestionType, NotificationStatus,
-    DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole
+    DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole, ExamSequenceStatus
 } from '@prisma/client';
 import * as dotenv from 'dotenv';
 
@@ -24,11 +24,11 @@ const prisma = new PrismaClient();
 
 export {
     User, SchoolFees, AcademicYear, Gender, SubjectCategory, Role, Student, ParentStudent,
-    PaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, Subclass,
-    Mark, ExamSequence, Term, Subject, SubjectTeacher, SubclassSubject, StudentAbsence, TeacherAbsence,
+    PaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, SubClass,
+    Mark, ExamSequence, Term, Subject, SubjectTeacher, SubClassSubject, StudentAbsence, TeacherAbsence,
     DisciplineIssue, VicePrincipalAssignment, DisciplineMasterAssignment, PrincipalAssignment, BursarAssignment,
     Period, TeacherPeriod, ExamPaper, ExamPaperQuestion, Question, QuestionType, NotificationStatus,
-    DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole
+    DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole, ExamSequenceStatus
 };
 
 export default prisma; 

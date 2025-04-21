@@ -122,24 +122,37 @@ export function extractPaginationAndFilters(
 ): { paginationOptions: PaginationOptions, filterOptions: FilterOptions } {
     // Extract pagination params
     const page = query.page ? parseInt(query.page) : undefined;
-    const limit = query.limit ? parseInt(query.limit) : undefined;
-    const sortBy = query.sortBy;
-    const sortOrder = query.sortOrder === 'desc' ? 'desc' : 'asc';
+    const limit = query.limit ? parseInt(query.limit) : 20;
+    const sortBy = query.sort_by || query.sortBy; // Allow both snake and camel case for sorting
+    const sortOrder = query.sort_order || query.sortOrder; // Allow both snake and camel case
 
     const paginationOptions: PaginationOptions = {
         page,
         limit,
         sortBy,
-        sortOrder: sortOrder as 'asc' | 'desc'
+        sortOrder: sortOrder === 'desc' ? 'desc' : 'asc' // Default to asc
     };
 
     // Extract filter params
     const filterOptions: FilterOptions = {};
     allowedFilters.forEach(filter => {
+        // Check if the allowed filter key exists in the query
         if (query[filter] !== undefined) {
             filterOptions[filter] = query[filter];
         }
     });
+
+    // Specific handling for sub_class_id / sub_class_id
+    const subClassIdValue = query.sub_class_id || query.sub_class_id;
+    if (subClassIdValue !== undefined) {
+        // Ensure both keys exist in filterOptions if they are allowed
+        if (allowedFilters.includes('sub_class_id')) {
+            filterOptions.sub_class_id = subClassIdValue;
+        }
+        if (allowedFilters.includes('sub_class_id')) {
+            filterOptions.sub_class_id = subClassIdValue;
+        }
+    }
 
     return { paginationOptions, filterOptions };
 } 

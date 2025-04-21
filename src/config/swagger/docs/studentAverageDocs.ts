@@ -22,10 +22,10 @@
  *           type: integer
  *         description: ID of the exam sequence
  *       - in: query
- *         name: subclassId
+ *         name: sub_classId
  *         schema:
  *           type: integer
- *         description: Optional subclass ID to filter students
+ *         description: Optional sub_class ID to filter students
  *     responses:
  *       200:
  *         description: Student averages calculated successfully
@@ -84,10 +84,10 @@
  *           type: integer
  *         description: ID of the exam sequence
  *       - in: query
- *         name: subclassId
+ *         name: sub_classId
  *         schema:
  *           type: integer
- *         description: Optional subclass ID to filter students
+ *         description: Optional sub_class ID to filter students
  *     responses:
  *       200:
  *         description: Student averages retrieved successfully

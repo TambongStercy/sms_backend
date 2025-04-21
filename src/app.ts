@@ -61,9 +61,9 @@ app.get('/api-docs.json', (req: Request, res: Response) => {
     res.send(swaggerSpec);
 });
 
-// Apply case conversion middlewares for API routes
-// These will convert between camelCase (client-side) and snake_case (server-side)
-app.use('/api/v1', convertCamelToSnakeCase, convertSnakeToCamelCase);
+// Apply case conversion middlewares GLOBALLY before API routes
+app.use(convertCamelToSnakeCase); // Converts incoming camelCase query/body to snake_case
+app.use(convertSnakeToCamelCase); // Converts outgoing snake_case responses to camelCase
 
 // Mount API routes under /api/v1
 app.use('/api/v1', routes);

@@ -45,7 +45,7 @@
  *         description: Use legacy format (non-paginated) if set to true
  *     responses:
  *       200:
- *         description: List of classes retrieved successfully. Each class includes a studentCount field showing the total number of students across all subclasses.
+ *         description: List of classes retrieved successfully. Each class includes a studentCount field showing the total number of students across all sub_classes.
  *         content:
  *           application/json:
  *             schema:
@@ -137,7 +137,7 @@
  *         description: Class ID
  *     responses:
  *       200:
- *         description: Class details retrieved successfully. Includes a total studentCount for the class and individual studentCount for each subclass.
+ *         description: Class details retrieved successfully. Includes a total studentCount for the class and individual studentCount for each sub_class.
  *         content:
  *           application/json:
  *             schema:
@@ -222,8 +222,8 @@
  * @swagger
  * /classes/{id}/sub-classes:
  *   get:
- *     summary: Get all subclasses for a specific class
- *     description: Retrieves a paginated list of all subclasses belonging to a specific class. Accessible by all authenticated users.
+ *     summary: Get all sub_classes for a specific class
+ *     description: Retrieves a paginated list of all sub_classes belonging to a specific class. Accessible by all authenticated users.
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
@@ -250,10 +250,10 @@
  *         name: name
  *         schema:
  *           type: string
- *         description: Filter subclasses by name
+ *         description: Filter sub_classes by name
  *     responses:
  *       200:
- *         description: List of subclasses retrieved successfully
+ *         description: List of sub_classes retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -338,8 +338,8 @@
  * @swagger
  * /classes/sub-classes:
  *   get:
- *     summary: Get all subclasses (paginated)
- *     description: Retrieves a paginated list of all subclasses across all classes, with optional filtering. Accessible by all authenticated users.
+ *     summary: Get all sub_classes (paginated)
+ *     description: Retrieves a paginated list of all sub_classes across all classes, with optional filtering. Accessible by all authenticated users.
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
@@ -360,15 +360,15 @@
  *         name: name
  *         schema:
  *           type: string
- *         description: Filter subclasses by name
+ *         description: Filter sub_classes by name
  *       - in: query
  *         name: classId
  *         schema:
  *           type: integer
- *         description: Filter subclasses by parent Class ID
+ *         description: Filter sub_classes by parent Class ID
  *     responses:
  *       200:
- *         description: List of subclasses retrieved successfully
+ *         description: List of sub_classes retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -470,7 +470,7 @@
  *             properties:
  *               name:
  *                 type: string
- *                 description: The new name for the subclass
+ *                 description: The new name for the sub_class
  *                 example: "Form 1 Alpha"
  *     responses:
  *       200:

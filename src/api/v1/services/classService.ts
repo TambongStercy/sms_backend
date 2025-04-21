@@ -1,5 +1,5 @@
 // src/api/v1/services/classService.ts
-import prisma, { Class, Subclass, User } from '../../../config/db';
+import prisma, { Class, SubClass, User } from '../../../config/db';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 import { getCurrentAcademicYear, getAcademicYearId } from '../../../utils/academicYear';
 
@@ -24,7 +24,7 @@ export async function getAllClasses(
         prisma.class,
         paginationOptions,
         filterOptions,
-        { subclasses: true }
+        { sub_classes: true }
     );
 
     // Get current academic year
@@ -34,14 +34,14 @@ export async function getAllClasses(
     // Enhance classes with student counts
     const classesWithCounts = await Promise.all(
         result.data.map(async (classItem: any) => {
-            // Get all subclass IDs for this class
-            const subclassIds = classItem.subclasses.map((subclass: any) => subclass.id);
+            // Get all sub_class IDs for this class
+            const sub_classIds = classItem.sub_classes.map((sub_class: any) => sub_class.id);
 
-            // Count students enrolled in any subclass of this class in the current academic year
+            // Count students enrolled in any sub_class of this class in the current academic year
             const studentCount = await prisma.enrollment.count({
                 where: {
-                    subclass_id: {
-                        in: subclassIds
+                    sub_class_id: {
+                        in: sub_classIds
                     },
                     ...(academicYearId && { academic_year_id: academicYearId })
                 }
@@ -65,7 +65,7 @@ export async function getAllClasses(
 export async function getAllSubclasses(
     paginationOptions?: PaginationOptions,
     filterOptions?: FilterOptions
-): Promise<PaginatedResult<Subclass>> {
+): Promise<PaginatedResult<SubClass>> {
     const processedFilters: any = { ...filterOptions };
     const include: any = { class: true, class_master: true }; // Start with default includes
 
@@ -77,7 +77,7 @@ export async function getAllSubclasses(
 
     // Check if subjects should be included
     if (filterOptions?.includeSubjects === 'true') {
-        include.subclass_subjects = {
+        include.sub_class_subjects = {
             include: {
                 subject: true // Include the subject details
             }
@@ -86,8 +86,8 @@ export async function getAllSubclasses(
         delete processedFilters.includeSubjects;
     }
 
-    const result = await paginate<Subclass>(
-        prisma.subclass,
+    const result = await paginate<SubClass>(
+        prisma.subClass,
         paginationOptions,
         processedFilters, // Filters excluding the include flag
         include // Pass the dynamically built include object
@@ -97,20 +97,20 @@ export async function getAllSubclasses(
     const currentYear = await getCurrentAcademicYear();
     const academicYearId = currentYear?.id;
 
-    // Enhance subclasses with student counts
-    const subclassesWithCounts = await Promise.all(
-        result.data.map(async (subclass: any) => {
-            // Count students enrolled in this subclass in the current academic year
+    // Enhance sub_classes with student counts
+    const sub_classesWithCounts = await Promise.all(
+        result.data.map(async (sub_class: any) => {
+            // Count students enrolled in this sub_class in the current academic year
             const studentCount = await prisma.enrollment.count({
                 where: {
-                    subclass_id: subclass.id,
+                    sub_class_id: sub_class.id,
                     ...(academicYearId && { academic_year_id: academicYearId })
                 }
             });
 
-            // Add the count to the subclass object
+            // Add the count to the sub_class object
             return {
-                ...subclass,
+                ...sub_class,
                 studentCount,
                 academicYearId  // Include the academic year ID for reference
             };
@@ -119,7 +119,7 @@ export async function getAllSubclasses(
 
     return {
         ...result,
-        data: subclassesWithCounts
+        data: sub_classesWithCounts
     };
 }
 
@@ -127,7 +127,15 @@ export async function getAllSubclasses(
 export async function getAllClassesWithSubclasses(): Promise<any[]> {
     const classes = await prisma.class.findMany({
         include: {
-            subclasses: true,
+            sub_classes: {
+                include:{
+                    sub_class_subjects: {
+                        select: {
+                            subject_id: true
+                        }
+                    }
+                }
+            },
         },
     });
 
@@ -135,33 +143,33 @@ export async function getAllClassesWithSubclasses(): Promise<any[]> {
     const currentYear = await getCurrentAcademicYear();
     const academicYearId = currentYear?.id;
 
-    // Enhance classes and subclasses with student counts
+    // Enhance classes and sub_classes with student counts
     return Promise.all(
         classes.map(async (classItem: any) => {
-            // Add student counts to each subclass
-            const subclassesWithCounts = await Promise.all(
-                classItem.subclasses.map(async (subclass: any) => {
+            // Add student counts to each sub_class
+            const sub_classesWithCounts = await Promise.all(
+                classItem.sub_classes.map(async (sub_class: any) => {
                     const studentCount = await prisma.enrollment.count({
                         where: {
-                            subclass_id: subclass.id,
+                            sub_class_id: sub_class.id,
                             ...(academicYearId && { academic_year_id: academicYearId })
                         }
                     });
                     return {
-                        ...subclass,
+                        ...sub_class,
                         studentCount
                     };
                 })
             );
 
             // Calculate total student count for class
-            const totalStudentCount = subclassesWithCounts.reduce(
-                (total, subclass) => total + subclass.studentCount, 0
+            const totalStudentCount = sub_classesWithCounts.reduce(
+                (total, sub_class) => total + sub_class.studentCount, 0
             );
 
             return {
                 ...classItem,
-                subclasses: subclassesWithCounts,
+                sub_classes: sub_classesWithCounts,
                 studentCount: totalStudentCount,
                 academicYearId // Include the academic year ID for reference
             };
@@ -189,7 +197,7 @@ export async function getClassById(id: number): Promise<any> {
     const classData = await prisma.class.findUnique({
         where: { id },
         include: {
-            subclasses: {
+            sub_classes: {
                 include: {
                     class_master: true // Include class master information
                 }
@@ -203,30 +211,30 @@ export async function getClassById(id: number): Promise<any> {
     const currentYear = await getCurrentAcademicYear();
     const academicYearId = currentYear?.id;
 
-    // Add student counts to each subclass
-    const subclassesWithCounts = await Promise.all(
-        classData.subclasses.map(async (subclass: any) => {
+    // Add student counts to each sub_class
+    const sub_classesWithCounts = await Promise.all(
+        classData.sub_classes.map(async (sub_class: any) => {
             const studentCount = await prisma.enrollment.count({
                 where: {
-                    subclass_id: subclass.id,
+                    sub_class_id: sub_class.id,
                     ...(academicYearId && { academic_year_id: academicYearId })
                 }
             });
             return {
-                ...subclass,
+                ...sub_class,
                 studentCount
             };
         })
     );
 
     // Calculate total student count for class
-    const totalStudentCount = subclassesWithCounts.reduce(
-        (total, subclass) => total + subclass.studentCount, 0
+    const totalStudentCount = sub_classesWithCounts.reduce(
+        (total, sub_class) => total + sub_class.studentCount, 0
     );
 
     return {
         ...classData,
-        subclasses: subclassesWithCounts,
+        sub_classes: sub_classesWithCounts,
         studentCount: totalStudentCount,
         academicYearId // Include the academic year ID for reference
     };
@@ -249,8 +257,8 @@ export async function updateClass(id: number, data: Partial<ClassData>): Promise
     });
 }
 
-export async function addSubClass(class_id: number, data: { name: string }): Promise<Subclass> {
-    return prisma.subclass.create({
+export async function addSubClass(class_id: number, data: { name: string }): Promise<SubClass> {
+    return prisma.subClass.create({
         data: {
             name: data.name,
             class_id,
@@ -258,19 +266,19 @@ export async function addSubClass(class_id: number, data: { name: string }): Pro
     });
 }
 
-export async function checkSubClassExists(subclassId: number, classId: number): Promise<Subclass | null> {
-    return prisma.subclass.findFirst({
+export async function checkSubClassExists(sub_classId: number, classId: number): Promise<SubClass | null> {
+    return prisma.subClass.findFirst({
         where: {
-            id: subclassId,
+            id: sub_classId,
             class_id: classId
         }
     });
 }
 
-export async function deleteSubClass(subClassId: number): Promise<Subclass> {
-    // Check if there are any enrollments associated with this subclass
+export async function deleteSubClass(subClassId: number): Promise<SubClass> {
+    // Check if there are any enrollments associated with this sub_class
     const enrollmentCount = await prisma.enrollment.count({
-        where: { subclass_id: subClassId },
+        where: { sub_class_id: subClassId },
     });
 
     if (enrollmentCount > 0) {
@@ -279,13 +287,13 @@ export async function deleteSubClass(subClassId: number): Promise<Subclass> {
     }
 
     // If no enrollments, proceed with deletion
-    return prisma.subclass.delete({
+    return prisma.subClass.delete({
         where: { id: subClassId },
     });
 }
 
-export async function updateSubClass(subClassId: number, data: { name?: string }): Promise<Subclass> {
-    return prisma.subclass.update({
+export async function updateSubClass(subClassId: number, data: { name?: string }): Promise<SubClass> {
+    return prisma.subClass.update({
         where: { id: subClassId },
         data: {
             name: data.name,
@@ -294,12 +302,12 @@ export async function updateSubClass(subClassId: number, data: { name?: string }
 }
 
 /**
- * Assign a class master to a subclass
- * @param subclassId The ID of the subclass
+ * Assign a class master to a sub_class
+ * @param sub_classId The ID of the sub_class
  * @param userId The ID of the user to be assigned as class master
- * @returns The updated subclass with class master information
+ * @returns The updated sub_class with class master information
  */
-export async function assignClassMaster(subclassId: number, userId: number): Promise<Subclass> {
+export async function assignClassMaster(sub_classId: number, userId: number): Promise<SubClass> {
     // Check if the user exists
     const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -326,18 +334,18 @@ export async function assignClassMaster(subclassId: number, userId: number): Pro
         throw new Error(`User with ID ${userId} does not have a teacher role in the current academic year`);
     }
 
-    // Check if the subclass exists
-    const subclass = await prisma.subclass.findUnique({
-        where: { id: subclassId }
+    // Check if the sub_class exists
+    const sub_class = await prisma.subClass.findUnique({
+        where: { id: sub_classId }
     });
 
-    if (!subclass) {
-        throw new Error(`Subclass with ID ${subclassId} not found`);
+    if (!sub_class) {
+        throw new Error(`Subclass with ID ${sub_classId} not found`);
     }
 
     // Assign the user as class master
-    return prisma.subclass.update({
-        where: { id: subclassId },
+    return prisma.subClass.update({
+        where: { id: sub_classId },
         data: {
             class_master_id: userId
         },
@@ -349,41 +357,41 @@ export async function assignClassMaster(subclassId: number, userId: number): Pro
 }
 
 /**
- * Get the class master of a subclass
- * @param subclassId The ID of the subclass
- * @returns The class master of the subclass or null if none
+ * Get the class master of a sub_class
+ * @param sub_classId The ID of the sub_class
+ * @returns The class master of the sub_class or null if none
  */
-export async function getSubclassClassMaster(subclassId: number): Promise<User | null> {
-    const subclass = await prisma.subclass.findUnique({
-        where: { id: subclassId },
+export async function getSubclassClassMaster(sub_classId: number): Promise<User | null> {
+    const sub_class = await prisma.subClass.findUnique({
+        where: { id: sub_classId },
         include: {
             class_master: true
         }
     });
 
-    if (!subclass) {
-        throw new Error(`Subclass with ID ${subclassId} not found`);
+    if (!sub_class) {
+        throw new Error(`Subclass with ID ${sub_classId} not found`);
     }
 
-    return subclass.class_master;
+    return sub_class.class_master;
 }
 
 /**
- * Remove the class master from a subclass
- * @param subclassId The ID of the subclass
- * @returns The updated subclass
+ * Remove the class master from a sub_class
+ * @param sub_classId The ID of the sub_class
+ * @returns The updated sub_class
  */
-export async function removeClassMaster(subclassId: number): Promise<Subclass> {
-    const subclass = await prisma.subclass.findUnique({
-        where: { id: subclassId }
+export async function removeClassMaster(sub_classId: number): Promise<SubClass> {
+    const sub_class = await prisma.subClass.findUnique({
+        where: { id: sub_classId }
     });
 
-    if (!subclass) {
-        throw new Error(`Subclass with ID ${subclassId} not found`);
+    if (!sub_class) {
+        throw new Error(`Subclass with ID ${sub_classId} not found`);
     }
 
-    return prisma.subclass.update({
-        where: { id: subclassId },
+    return prisma.subClass.update({
+        where: { id: sub_classId },
         data: {
             class_master_id: null
         },
@@ -394,20 +402,20 @@ export async function removeClassMaster(subclassId: number): Promise<Subclass> {
 }
 
 /**
- * Get all subjects associated with a specific subclass, including their coefficients.
- * @param subclassId The ID of the subclass
- * @returns Array of subject objects, each augmented with the coefficient for that subclass.
+ * Get all subjects associated with a specific sub_class, including their coefficients.
+ * @param sub_classId The ID of the sub_class
+ * @returns Array of subject objects, each augmented with the coefficient for that sub_class.
  */
-export async function getSubjectsForSubclass(subclassId: number): Promise<any[]> {
-    // Optional: Check if subclass exists first
-    const subclassExists = await prisma.subclass.findUnique({ where: { id: subclassId } });
-    if (!subclassExists) {
-        throw new Error(`Subclass with ID ${subclassId} not found`);
+export async function getSubjectsForSubclass(sub_classId: number): Promise<any[]> {
+    // Optional: Check if sub_class exists first
+    const sub_classExists = await prisma.subClass.findUnique({ where: { id: sub_classId } });
+    if (!sub_classExists) {
+        throw new Error(`Subclass with ID ${sub_classId} not found`);
     }
 
     // Fetch the SubclassSubject join records including the related Subject
-    const subclassSubjects = await prisma.subclassSubject.findMany({
-        where: { subclass_id: subclassId },
+    const sub_classSubjects = await prisma.subClassSubject.findMany({
+        where: { sub_class_id: sub_classId },
         include: {
             subject: true, // Include the full subject details
         },
@@ -417,11 +425,11 @@ export async function getSubjectsForSubclass(subclassId: number): Promise<any[]>
     });
 
     // Transform the result to return an array of subjects, each with its coefficient
-    return subclassSubjects.map(ss => {
+    return sub_classSubjects.map(ss => {
         if (!ss.subject) return null; // Handle potential edge case where subject might be missing
         return {
             ...ss.subject, // Spread all subject fields (id, name, category, etc.)
-            coefficient: ss.coefficient, // Add the coefficient specific to this subclass-subject link
+            coefficient: ss.coefficient, // Add the coefficient specific to this sub_class-subject link
         };
     }).filter(Boolean); // Filter out any null results
 }

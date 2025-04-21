@@ -43,13 +43,13 @@
  *           example: "First year of secondary school"
  *         studentCount:
  *           type: integer
- *           description: Total number of students enrolled in all subclasses of this class for the current academic year
+ *           description: Total number of students enrolled in all sub_classes of this class for the current academic year
  *           example: 45
  *         academicYearId:
  *           type: integer
  *           description: ID of the current academic year used for student count
  *           example: 3
- *         subclasses:
+ *         sub_classes:
  *           type: array
  *           description: Subclasses belonging to this class
  *           items:
@@ -83,7 +83,7 @@
  *           example: "Form 1, Section A"
  *         studentCount:
  *           type: integer
- *           description: Number of students enrolled in this subclass for the current academic year
+ *           description: Number of students enrolled in this sub_class for the current academic year
  *           example: 25
  *         academicYearId:
  *           type: integer
@@ -96,12 +96,12 @@
  *         createdAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the subclass was created
+ *           description: Date and time when the sub_class was created
  *           example: 2023-01-01T12:00:00.000Z
  *         updatedAt:
  *           type: string
  *           format: date-time
- *           description: Date and time when the subclass was last updated
+ *           description: Date and time when the sub_class was last updated
  *           example: 2023-01-01T12:00:00.000Z
  *       description: Subclass information
  *     
@@ -146,13 +146,13 @@
  *           example: "First year of secondary school"
  *         studentCount:
  *           type: integer
- *           description: Total number of students enrolled in all subclasses of this class for the current academic year
+ *           description: Total number of students enrolled in all sub_classes of this class for the current academic year
  *           example: 45
  *         academicYearId:
  *           type: integer
  *           description: ID of the current academic year used for student count
  *           example: 3
- *         subclasses:
+ *         sub_classes:
  *           type: array
  *           description: Subclasses belonging to this class
  *           items:
@@ -167,7 +167,7 @@
  *           format: date-time
  *           description: Date and time when the class was last updated
  *           example: 2023-01-01T12:00:00.000Z
- *       description: Detailed class information including subclasses
+ *       description: Detailed class information including sub_classes
  *     
  *     CreateClassRequest:
  *       type: object
@@ -243,9 +243,9 @@
  *       properties:
  *         name:
  *           type: string
- *           description: Name of the new subclass
+ *           description: Name of the new sub_class
  *           example: "Form 1B"
- *       description: Information required to create a new subclass
+ *       description: Information required to create a new sub_class
  *     
  *     PaginatedClassResponse:
  *       type: object
@@ -298,7 +298,7 @@
  *           example: "Subclass created successfully"
  *         data:
  *           $ref: '#/components/schemas/Subclass'
- *       description: Response after successfully creating a subclass
+ *       description: Response after successfully creating a sub_class
  *     
  *     SubclassDeletedResponse:
  *       type: object
@@ -309,7 +309,7 @@
  *         message:
  *           type: string
  *           example: "Subclass deleted successfully"
- *       description: Response after successfully deleting a subclass
+ *       description: Response after successfully deleting a sub_class
  *     
  *     ClassFilterOptions:
  *       type: object

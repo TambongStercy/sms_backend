@@ -7,8 +7,7 @@ import { extractPaginationAndFilters } from '../../../utils/pagination';
 export const getAllClasses = async (req: Request, res: Response): Promise<void> => {
     try {
         // Check if the legacy mode is requested (for backward compatibility)
-        if (req.query.legacy !== 'true') {
-            console.log(req.query, req.body);
+        if (req.finalQuery.legacy !== 'true') {
             console.log('Legacy mode requested');
             const classes = await classService.getAllClassesWithSubclasses();
             res.json({
@@ -18,13 +17,16 @@ export const getAllClasses = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
+
         // Define allowed filters for classes
         const allowedFilters = ['name', 'id', 'level'];
 
         // Extract pagination and filter parameters from the request
-        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
         const result = await classService.getAllClasses(paginationOptions, filterOptions);
+
+
         res.json({
             success: true,
             data: result.data,
@@ -39,13 +41,13 @@ export const getAllClasses = async (req: Request, res: Response): Promise<void> 
     }
 };
 
-// Helper function to transform subclass data (similar to subjectController)
-const transformSubclass = (subclass: any) => {
-    const transformed: any = { ...subclass }; // Clone the subclass object
+// Helper function to transform sub_class data (similar to subjectController)
+const transformSubclass = (sub_class: any) => {
+    const transformed: any = { ...sub_class }; // Clone the sub_class object
 
-    // Rename subclass_subjects to subjects
-    if (transformed.subclass_subjects && Array.isArray(transformed.subclass_subjects)) {
-        transformed.subjects = transformed.subclass_subjects.map((ss: any) => {
+    // Rename sub_class_subjects to subjects
+    if (transformed.sub_class_subjects && Array.isArray(transformed.sub_class_subjects)) {
+        transformed.subjects = transformed.sub_class_subjects.map((ss: any) => {
             // Combine subject details with the coefficient from the join table
             if (!ss.subject) return null;
             return {
@@ -53,7 +55,7 @@ const transformSubclass = (subclass: any) => {
                 coefficient: ss.coefficient // Add coefficient here
             };
         }).filter(Boolean); // Filter out nulls if subject was missing
-        delete transformed.subclass_subjects; // Remove original key
+        delete transformed.sub_class_subjects; // Remove original key
     }
 
     // Ensure class_master is included if present, otherwise null
@@ -64,11 +66,11 @@ const transformSubclass = (subclass: any) => {
 
 export const getAllSubclasses = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Define allowed filters for subclasses, adding the include flag
+        // Define allowed filters for sub_classes, adding the include flag
         const allowedFilters = ['name', 'id', 'classId', 'includeSubjects'];
 
         // Extract pagination and filter parameters from the request
-        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
         // Service function now handles the include logic based on filterOptions
         const result = await classService.getAllSubclasses(paginationOptions, filterOptions);
@@ -83,7 +85,7 @@ export const getAllSubclasses = async (req: Request, res: Response): Promise<voi
             data: transformedData // Use transformed data
         });
     } catch (error: any) {
-        console.error('Error fetching subclasses:', error);
+        console.error('Error fetching sub_classes:', error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -306,9 +308,9 @@ export const addSubClass = async (req: Request, res: Response): Promise<void> =>
 export const deleteSubClass = async (req: Request, res: Response): Promise<void> => {
     try {
         const classId = parseInt(req.params.id);
-        const subclassId = parseInt(req.params.subClassId);
+        const sub_classId = parseInt(req.params.subClassId);
 
-        if (isNaN(classId) || isNaN(subclassId)) {
+        if (isNaN(classId) || isNaN(sub_classId)) {
             res.status(400).json({
                 success: false,
                 error: 'Invalid ID format'
@@ -316,8 +318,8 @@ export const deleteSubClass = async (req: Request, res: Response): Promise<void>
             return;
         }
 
-        // Ensure the subclass belongs to the specified class before attempting deletion
-        const subClassExists = await classService.checkSubClassExists(subclassId, classId);
+        // Ensure the sub_class belongs to the specified class before attempting deletion
+        const subClassExists = await classService.checkSubClassExists(sub_classId, classId);
         if (!subClassExists) {
             res.status(404).json({
                 success: false,
@@ -326,7 +328,7 @@ export const deleteSubClass = async (req: Request, res: Response): Promise<void>
             return;
         }
 
-        await classService.deleteSubClass(subclassId);
+        await classService.deleteSubClass(sub_classId);
         res.json({ success: true, message: 'Subclass deleted successfully' });
     } catch (error: any) {
         console.error('Error deleting sub-class:', error);
@@ -334,7 +336,7 @@ export const deleteSubClass = async (req: Request, res: Response): Promise<void>
         if (error.message === 'SUBCLASS_HAS_ENROLLMENTS') {
             res.status(409).json({
                 success: false,
-                error: 'Cannot be deleted, subclass already has students'
+                error: 'Cannot be deleted, sub_class already has students'
             });
         } else if (error.code === 'P2025') { // Prisma error: Record to delete not found
             res.status(404).json({
@@ -344,7 +346,7 @@ export const deleteSubClass = async (req: Request, res: Response): Promise<void>
         } else {
             res.status(500).json({
                 success: false,
-                error: 'Failed to delete subclass due to an internal error'
+                error: 'Failed to delete sub_class due to an internal error'
             });
         }
     }
@@ -366,7 +368,7 @@ export const updateSubClass = async (req: Request, res: Response): Promise<void>
             return;
         }
 
-        // Check if the subclass exists and belongs to the class
+        // Check if the sub_class exists and belongs to the class
         const existingSubclass = await classService.checkSubClassExists(subClassId, classId);
         if (!existingSubclass) {
             res.status(404).json({
@@ -394,20 +396,20 @@ export const updateSubClass = async (req: Request, res: Response): Promise<void>
 };
 
 /**
- * Assign a class master to a subclass
- * @param req Request with subclass ID and user ID
+ * Assign a class master to a sub_class
+ * @param req Request with sub_class ID and user ID
  * @param res Response object
  */
 export const assignClassMaster = async (req: Request, res: Response): Promise<void> => {
     try {
-        const subclassId = parseInt(req.params.subclassId);
+        const sub_classId = parseInt(req.params.sub_classId);
         const { user_id } = req.body;
 
 
-        if (isNaN(subclassId)) {
+        if (isNaN(sub_classId)) {
             res.status(400).json({
                 success: false,
-                error: 'Invalid subclass ID format'
+                error: 'Invalid sub_class ID format'
             });
             return;
         }
@@ -420,7 +422,7 @@ export const assignClassMaster = async (req: Request, res: Response): Promise<vo
             return;
         }
 
-        const updatedSubclass = await classService.assignClassMaster(subclassId, parseInt(user_id));
+        const updatedSubclass = await classService.assignClassMaster(sub_classId, parseInt(user_id));
 
         res.json({
             success: true,
@@ -440,23 +442,23 @@ export const assignClassMaster = async (req: Request, res: Response): Promise<vo
 };
 
 /**
- * Get the class master of a subclass
- * @param req Request with subclass ID
+ * Get the class master of a sub_class
+ * @param req Request with sub_class ID
  * @param res Response object
  */
 export const getSubclassClassMaster = async (req: Request, res: Response): Promise<void> => {
     try {
-        const subclassId = parseInt(req.params.subclassId);
+        const sub_classId = parseInt(req.params.sub_classId);
 
-        if (isNaN(subclassId)) {
+        if (isNaN(sub_classId)) {
             res.status(400).json({
                 success: false,
-                error: 'Invalid subclass ID format'
+                error: 'Invalid sub_class ID format'
             });
             return;
         }
 
-        const classMaster = await classService.getSubclassClassMaster(subclassId);
+        const classMaster = await classService.getSubclassClassMaster(sub_classId);
 
         res.json({
             success: true,
@@ -475,23 +477,23 @@ export const getSubclassClassMaster = async (req: Request, res: Response): Promi
 };
 
 /**
- * Remove the class master from a subclass
- * @param req Request with subclass ID
+ * Remove the class master from a sub_class
+ * @param req Request with sub_class ID
  * @param res Response object
  */
 export const removeClassMaster = async (req: Request, res: Response): Promise<void> => {
     try {
-        const subclassId = parseInt(req.params.subclassId);
+        const sub_classId = parseInt(req.params.sub_classId);
 
-        if (isNaN(subclassId)) {
+        if (isNaN(sub_classId)) {
             res.status(400).json({
                 success: false,
-                error: 'Invalid subclass ID format'
+                error: 'Invalid sub_class ID format'
             });
             return;
         }
 
-        const updatedSubclass = await classService.removeClassMaster(subclassId);
+        const updatedSubclass = await classService.removeClassMaster(sub_classId);
 
         res.json({
             success: true,
@@ -510,8 +512,8 @@ export const removeClassMaster = async (req: Request, res: Response): Promise<vo
 };
 
 /**
- * Get all subjects for a specific subclass
- * @param req Request with subclassId parameter
+ * Get all subjects for a specific sub_class
+ * @param req Request with sub_classId parameter
  * @param res Response object
  */
 export const getSubclassSubjects = async (req: Request, res: Response): Promise<void> => {
@@ -521,7 +523,7 @@ export const getSubclassSubjects = async (req: Request, res: Response): Promise<
         if (isNaN(subClassId)) {
             res.status(400).json({
                 success: false,
-                error: 'Invalid subclass ID format'
+                error: 'Invalid sub_class ID format'
             });
             return;
         }
@@ -534,7 +536,7 @@ export const getSubclassSubjects = async (req: Request, res: Response): Promise<
             data: subjects
         });
     } catch (error: any) {
-        console.error(`Error fetching subjects for subclass ${req.params.subClassId}:`, error);
+        console.error(`Error fetching subjects for sub_class ${req.params.subClassId}:`, error);
         const statusCode = error.message.includes('not found') ? 404 : 500;
         res.status(statusCode).json({
             success: false,

@@ -72,10 +72,10 @@
  *           type: integer
  *         description: Filter students by class ID (only works when withEnrollment=true)
  *       - in: query
- *         name: subclassId
+ *         name: sub_classId
  *         schema:
  *           type: integer
- *         description: Filter students by subclass ID (only works when withEnrollment=true)
+ *         description: Filter students by sub_class ID (only works when withEnrollment=true)
  *       - in: query
  *         name: academicYearId
  *         schema:
@@ -358,7 +358,7 @@
  *           schema:
  *             $ref: '#/components/schemas/EnrollStudentRequest'
  *           example:
- *             subclassId: 123
+ *             sub_classId: 123
  *             academicYearId: 2
  *             photo: "student_photo_url.jpg"
  *             repeater: false
@@ -394,13 +394,13 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Student, subclass, or academic year not found
+ *         description: Student, sub_class, or academic year not found
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
- *         description: Student is already enrolled in this subclass for this academic year
+ *         description: Student is already enrolled in this sub_class for this academic year
  *         content:
  *           application/json:
  *             schema:

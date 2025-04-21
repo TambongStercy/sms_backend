@@ -27,7 +27,7 @@ export const getAllMarks = async (req: Request, res: Response) => {
         const allowedFilters = [
             'student_id',
             'class_id',
-            'subclass_id',
+            'sub_class_id',
             'sub_class_id',
             'subject_id',
             'exam_sequence_id',
@@ -40,14 +40,14 @@ export const getAllMarks = async (req: Request, res: Response) => {
             'academic_year_id' // Added academicYearId to allowed filters
         ];
 
-        console.log('Original query params:', req.query);
+        console.log('Original finalQuery params:', req.finalQuery);
 
         // Extract pagination and filter parameters from the request
-        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
         console.log('Extracted filterOptions:', filterOptions);
 
-        // Get academic year from query if provided - will be used by service
+        // Get academic year from finalQuery if provided - will be used by service
         const academic_year_id = filterOptions.academic_year_id ?
             parseInt(filterOptions.academic_year_id as string) : undefined;
         // Remove academic_year_id from filterOptions if service expects it as separate arg
@@ -61,7 +61,7 @@ export const getAllMarks = async (req: Request, res: Response) => {
 
         // Transform the data array to add studentId
         const transformedData = result.data.map(transformMark);
-        console.log('Transformed data:', transformedData.length > 0 ? 'Data present' : 'Empty data array');
+        console.log('Transformed data: ', transformedData.length > 0 ? 'Data present' : 'Empty data array');
 
         res.json({
             success: true,
@@ -88,11 +88,11 @@ export const getAllExamPapers = async (req: Request, res: Response) => {
         ];
 
         // Extract pagination and filter parameters from the request
-        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
-        // Get academic year from query if provided
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        // Get academic year from finalQuery if provided
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const result = await examService.getAllExamPapers(
             paginationOptions,
@@ -282,8 +282,8 @@ export const generateReportCards = async (req: Request, res: Response): Promise<
 export const generateStudentReportCard = async (req: Request, res: Response): Promise<void> => {
     try {
         const studentId = parseInt(req.params.studentId);
-        const academic_year_id = parseInt(req.query.academic_year_id as string);
-        const exam_sequence_id = parseInt(req.query.exam_sequence_id as string);
+        const academic_year_id = parseInt(req.finalQuery.academic_year_id as string);
+        const exam_sequence_id = parseInt(req.finalQuery.exam_sequence_id as string);
 
         // Validate parameters
         if (isNaN(studentId) || isNaN(academic_year_id) || isNaN(exam_sequence_id)) {
@@ -330,20 +330,20 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
 };
 
 /**
- * Generate report cards for all students in a subclass
- * @route GET /exams/report-cards/subclass/:subclassId
+ * Generate report cards for all students in a sub_class
+ * @route GET /exams/report-cards/sub_class/:sub_classId
  */
 export const generateSubclassReportCards = async (req: Request, res: Response): Promise<void> => {
     try {
-        const subclassId = parseInt(req.params.subclassId);
-        const academic_year_id = parseInt(req.query.academic_year_id as string);
-        const exam_sequence_id = parseInt(req.query.exam_sequence_id as string);
+        const sub_classId = parseInt(req.params.sub_classId);
+        const academic_year_id = parseInt(req.finalQuery.academic_year_id as string);
+        const exam_sequence_id = parseInt(req.finalQuery.exam_sequence_id as string);
 
         // Validate parameters
-        if (isNaN(subclassId) || isNaN(academic_year_id) || isNaN(exam_sequence_id)) {
+        if (isNaN(sub_classId) || isNaN(academic_year_id) || isNaN(exam_sequence_id)) {
             res.status(400).json({
                 success: false,
-                error: 'Invalid parameters: subclassId, academic_year_id and exam_sequence_id must be valid numbers'
+                error: 'Invalid parameters: sub_classId, academic_year_id and exam_sequence_id must be valid numbers'
             });
             return;
         }
@@ -352,12 +352,12 @@ export const generateSubclassReportCards = async (req: Request, res: Response): 
         const reportCardPath = await examService.generateReportCard({
             academicYearId: academic_year_id,
             examSequenceId: exam_sequence_id,
-            subclassId
+            sub_classId
         });
 
         // Send the file
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="subclass-${subclassId}-reports.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="sub_class-${sub_classId}-reports.pdf"`);
 
         const fileStream = fs.createReadStream(reportCardPath);
 
@@ -376,7 +376,7 @@ export const generateSubclassReportCards = async (req: Request, res: Response): 
 
         fileStream.pipe(res);
     } catch (error: any) {
-        console.error('Error generating subclass report cards:', error);
+        console.error('Error generating sub_class report cards:', error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -387,10 +387,10 @@ export const generateSubclassReportCards = async (req: Request, res: Response): 
 export const getAllExams = async (req: Request, res: Response) => {
     try {
         // Define allowed filters in snake_case - middleware handles conversion
-        const allowedFilters = ['name', 'academic_year_id', 'term_id', 'subclass_id'];
+        const allowedFilters = ['name', 'academic_year_id', 'term_id', 'sub_class_id'];
 
         // Extract pagination and filter parameters from the request
-        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.query, allowedFilters);
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
 
         const exams = await examService.getAllExams(paginationOptions, filterOptions);

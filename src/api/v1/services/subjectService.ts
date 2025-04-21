@@ -1,6 +1,6 @@
 // src/api/v1/services/subjectService.ts
-import { Subject, SubjectTeacher, SubclassSubject, SubjectCategory } from '@prisma/client';
-import prisma from '../../../config/db';
+// import from '@prisma/client';
+import prisma, { Subject, SubjectTeacher, SubClassSubject, SubjectCategory } from '../../../config/db';
 import { getAcademicYearId } from '../../../utils/academicYear';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 
@@ -59,23 +59,23 @@ export async function assignTeacher(subject_id: number, data: { teacher_id: numb
 export async function linkSubjectToSubClass(
     subject_id: number,
     data: {
-        subclass_id: number;
+        sub_class_id: number;
         coefficient: number;
     }
-): Promise<SubclassSubject> {
-    return prisma.subclassSubject.create({
+): Promise<SubClassSubject> {
+    return prisma.subClassSubject.create({
         data: {
             subject_id,
-            subclass_id: data.subclass_id,
+            sub_class_id: data.sub_class_id,
             coefficient: data.coefficient,
         },
     });
 }
 
-// Get subjects for a specific subclass
-export async function getSubjectsForSubclass(subclass_id: number): Promise<SubclassSubject[]> {
-    return prisma.subclassSubject.findMany({
-        where: { subclass_id },
+// Get subjects for a specific sub_class
+export async function getSubjectsForSubclass(sub_class_id: number): Promise<SubClassSubject[]> {
+    return prisma.subClassSubject.findMany({
+        where: { sub_class_id },
         include: {
             subject: true,
         }
@@ -116,7 +116,7 @@ export async function getTeacherSchedule(teacher_id: number, academicYearId?: nu
         },
         include: {
             period: true,
-            subclass: {
+            sub_class: {
                 include: {
                     class: true
                 }
@@ -139,9 +139,9 @@ export async function getSubjectById(id: number): Promise<Subject | null> {
                     teacher: true
                 }
             },
-            subclass_subjects: {
+            sub_class_subjects: {
                 include: {
-                    subclass: {
+                    sub_class: {
                         include: {
                             class: true
                         }
@@ -166,12 +166,12 @@ export async function updateSubject(
 }
 
 export async function deleteSubject(id: number): Promise<Subject> {
-    // First delete related subject_teachers and subclass_subjects
+    // First delete related subject_teachers and sub_class_subjects
     await prisma.subjectTeacher.deleteMany({
         where: { subject_id: id }
     });
 
-    await prisma.subclassSubject.deleteMany({
+    await prisma.subClassSubject.deleteMany({
         where: { subject_id: id }
     });
 
@@ -182,7 +182,7 @@ export async function deleteSubject(id: number): Promise<Subject> {
 }
 
 /**
- * Assigns a subject to all subclasses of a class
+ * Assigns a subject to all sub_classes of a class
  * @param class_id The ID of the class
  * @param subject_id The ID of the subject to assign
  * @param data Additional data for the assignment (coefficient)
@@ -194,14 +194,14 @@ export async function assignSubjectToClass(
     data: {
         coefficient: number;
     }
-): Promise<SubclassSubject[]> {
-    // First get all subclasses for the given class
-    const subclasses = await prisma.subclass.findMany({
+): Promise<SubClassSubject[]> {
+    // First get all sub_classes for the given class
+    const sub_classes = await prisma.subClass.findMany({
         where: { class_id }
     });
 
-    if (subclasses.length === 0) {
-        throw new Error(`No subclasses found for class with ID ${class_id}`);
+    if (sub_classes.length === 0) {
+        throw new Error(`No sub_classes found for class with ID ${class_id}`);
     }
 
     // Check if subject exists
@@ -214,28 +214,28 @@ export async function assignSubjectToClass(
     }
 
     const results = await Promise.all(
-        subclasses.map(subclass =>
-            prisma.subclassSubject.create({
+        sub_classes.map(sub_class =>
+            prisma.subClassSubject.create({
                 data: {
                     subject_id,
-                    subclass_id: subclass.id,
+                    sub_class_id: sub_class.id,
                     coefficient: data.coefficient
                 },
                 // No include needed here, we just need the created/found relation
             }).catch(async (error: any) => {
                 if (error.code === 'P2002') {
-                    console.warn(`Subject ${subject_id} already assigned to subclass ${subclass.id}. Fetching existing.`);
+                    console.warn(`Subject ${subject_id} already assigned to sub_class ${sub_class.id}. Fetching existing.`);
                     // Fetch and return the existing record
-                    const existingRelation = await prisma.subclassSubject.findFirst({
+                    const existingRelation = await prisma.subClassSubject.findFirst({
                         where: {
                             subject_id,
-                            subclass_id: subclass.id
+                            sub_class_id: sub_class.id
                         }
                         // No include needed here unless the return type strictly requires it
                     });
                     return existingRelation;
                 }
-                console.error(`Error creating SubclassSubject for subclass ${subclass.id}:`, error);
+                console.error(`Error creating SubclassSubject for sub_class ${sub_class.id}:`, error);
                 throw error;
             })
         )
@@ -243,5 +243,5 @@ export async function assignSubjectToClass(
 
     // Filter out any nulls (in case findFirst didn't find anything, though unlikely after P2002) 
     // and assert the type based on the Promise return
-    return results.filter(result => result !== null) as SubclassSubject[];
+    return results.filter(result => result !== null) as SubClassSubject[];
 }

@@ -31,7 +31,7 @@
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/SubjectTeacher'
- *         subclassSubjects:
+ *         sub_classSubjects:
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/SubclassSubject'
@@ -71,7 +71,7 @@
  *           type: integer
  *           description: ID of the main teacher for this subject
  *           example: 3
- *       description: Information required to assign a subject to all subclasses of a class
+ *       description: Information required to assign a subject to all sub_classes of a class
  *     
  *     SubclassSubjectResponse:
  *       type: object
@@ -84,7 +84,7 @@
  *           type: integer
  *           description: Subject ID
  *           example: 1
- *         subclassId:
+ *         sub_classId:
  *           type: integer
  *           description: Subclass ID
  *           example: 2
@@ -108,7 +108,7 @@
  *           example: 2023-01-01T12:00:00.000Z
  *         subject:
  *           $ref: '#/components/schemas/Subject'
- *         subclass:
+ *         sub_class:
  *           $ref: '#/components/schemas/Subclass'
  *         mainTeacher:
  *           $ref: '#/components/schemas/User'
@@ -122,12 +122,12 @@
  *           example: true
  *         message:
  *           type: string
- *           example: "Subject successfully assigned to all subclasses of class ID 1"
+ *           example: "Subject successfully assigned to all sub_classes of class ID 1"
  *         data:
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/SubclassSubjectResponse'
- *       description: Response for successfully assigning a subject to all subclasses of a class
+ *       description: Response for successfully assigning a subject to all sub_classes of a class
  */
 
 export { }; 

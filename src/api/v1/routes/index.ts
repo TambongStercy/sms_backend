@@ -11,6 +11,8 @@ import examRoutes, { marksRouter, reportCardsRouter } from './examRoutes';
 import communicationRoutes from './communicationRoutes';
 import mobileRoutes from './mobileRoutes';
 import fileRoutes from './fileRoutes';
+import periodRoutes from './periodRoutes';
+import timetableRoutes from './timetableRoutes';
 import express from 'express';
 import path from 'path';
 import * as disciplineController from '../controllers/disciplineController';
@@ -32,6 +34,8 @@ router.use('/classes', classRoutes);
 router.use('/students', studentRoutes);
 router.use('/fees', feeRoutes);
 router.use('/subjects', subjectRoutes);
+router.use('/periods', periodRoutes);
+router.use('/timetables', timetableRoutes);
 
 // Mount discipline routes at /discipline
 router.use('/discipline', disciplineRoutes);

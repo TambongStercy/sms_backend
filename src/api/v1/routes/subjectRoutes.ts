@@ -33,7 +33,7 @@ router.post('/:id/teachers', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPA
 // Only SUPER_MANAGER, PRINCIPAL can link subjects to sub-classes
 router.post('/:id/sub-classes', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), subjectController.linkSubjectToSubClass);
 
-// POST /subjects/:subjectId/classes/:classId - Assign a subject to all subclasses of a class
+// POST /subjects/:subjectId/classes/:classId - Assign a subject to all sub_classes of a class
 // Only SUPER_MANAGER, PRINCIPAL can assign subjects to classes
 router.post('/:subjectId/classes/:classId', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), subjectController.assignSubjectToClass);
 

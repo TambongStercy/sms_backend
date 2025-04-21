@@ -90,16 +90,16 @@ interface ReportData {
 interface ReportCardParams {
     academicYearId: number;
     examSequenceId: number;
-    subclassId?: number;
+    sub_classId?: number;
     studentId?: number;
 }
 
 export async function generateReportCard(params: ReportCardParams): Promise<string> {
-    const { academicYearId, examSequenceId, subclassId, studentId } = params;
+    const { academicYearId, examSequenceId, sub_classId, studentId } = params;
 
-    // Validate that either subclassId or studentId is provided
-    if (!subclassId && !studentId) {
-        throw new Error('Either subclassId or studentId must be provided');
+    // Validate that either sub_classId or studentId is provided
+    if (!sub_classId && !studentId) {
+        throw new Error('Either sub_classId or studentId must be provided');
     }
 
     // Get the exam sequence information
@@ -117,9 +117,9 @@ export async function generateReportCard(params: ReportCardParams): Promise<stri
         return generateSingleReportCard(studentId, academicYearId, examSequenceId, examSequence);
     }
 
-    // If subclassId is provided, generate report cards for all students in the subclass
-    if (subclassId) {
-        return generateSubclassReportCards(subclassId, academicYearId, examSequenceId, examSequence);
+    // If sub_classId is provided, generate report cards for all students in the sub_class
+    if (sub_classId) {
+        return generateSubclassReportCards(sub_classId, academicYearId, examSequenceId, examSequence);
     }
 
     throw new Error('Failed to generate report card');
@@ -146,15 +146,15 @@ async function generateSingleReportCard(
 }
 
 async function generateSubclassReportCards(
-    subclassId: number,
+    sub_classId: number,
     academicYearId: number,
     examSequenceId: number,
     examSequence: any
 ): Promise<string> {
-    // Find all enrollments for the subclass in the given academic year
+    // Find all enrollments for the sub_class in the given academic year
     const enrollments = await prisma.enrollment.findMany({
         where: {
-            subclass_id: subclassId,
+            sub_class_id: sub_classId,
             academic_year_id: academicYearId
         },
         include: {
@@ -168,12 +168,12 @@ async function generateSubclassReportCards(
     });
 
     if (enrollments.length === 0) {
-        throw new Error('No students found in the specified subclass for the given academic year');
+        throw new Error('No students found in the specified sub_class for the given academic year');
     }
 
-    // Get subclass name for the file name
-    const subclass = await prisma.subclass.findUnique({
-        where: { id: subclassId },
+    // Get sub_class name for the file name
+    const sub_class = await prisma.subClass.findUnique({
+        where: { id: sub_classId },
         include: { class: true }
     });
 
@@ -195,7 +195,7 @@ async function generateSubclassReportCards(
     }
 
     if (reportDataArray.length === 0) {
-        throw new Error('No report data generated for any student in the subclass');
+        throw new Error('No report data generated for any student in the sub_class');
     }
 
     console.log(reportDataArray.length);
@@ -204,11 +204,11 @@ async function generateSubclassReportCards(
     const htmlPages = await Promise.all(reportDataArray.map(data => renderReportCardHtml(data)));
 
     // Combine all HTML pages and generate a single PDF
-    const className = subclass?.class.name || 'Unknown';
-    const subclassName = subclass?.name || 'Unknown';
+    const className = sub_class?.class.name || 'Unknown';
+    const sub_className = sub_class?.name || 'Unknown';
     const filePath = path.join(
         __dirname,
-        `reports/${className}-${subclassName}-${academicYearId}-${examSequenceId}-reports.pdf`
+        `reports/${className}-${sub_className}-${academicYearId}-${examSequenceId}-reports.pdf`
     );
 
     await generateMultiPagePdf(htmlPages, filePath);
@@ -231,10 +231,10 @@ async function generateStudentReportData(
         },
         include: {
             student: true,
-            subclass: {
+            sub_class: {
                 include: {
                     class: true,
-                    subclass_subjects: {
+                    sub_class_subjects: {
                         include: {
                             subject: true
                         },
@@ -246,7 +246,7 @@ async function generateStudentReportData(
                     exam_sequence_id: examSequenceId
                 },
                 include: {
-                    subclass_subject: {
+                    sub_class_subject: {
                         include: {
                             subject: true
                         },
@@ -262,14 +262,14 @@ async function generateStudentReportData(
 
     // 2. Calculate statistics
     const allStudents = await prisma.enrollment.findMany({
-        where: { subclass_id: enrollment.subclass_id },
+        where: { sub_class_id: enrollment.sub_class_id },
         include: {
             marks: {
                 where: {
                     exam_sequence_id: examSequenceId
                 },
                 include: {
-                    subclass_subject: {
+                    sub_class_subject: {
                         include: {
                             subject: true
                         }
@@ -284,11 +284,11 @@ async function generateStudentReportData(
         .filter(student => student.marks.length > 0) // Only include students with marks
         .map(student => {
             const totalWeighted = student.marks.reduce(
-                (sum, mark) => sum + mark.score * mark.subclass_subject.coefficient,
+                (sum, mark) => sum + mark.score * mark.sub_class_subject.coefficient,
                 0
             );
             const totalCoefficients = student.marks.reduce(
-                (sum, mark) => sum + mark.subclass_subject.coefficient,
+                (sum, mark) => sum + mark.sub_class_subject.coefficient,
                 0
             );
             return {
@@ -304,8 +304,8 @@ async function generateStudentReportData(
 
     // Initialize subject stats
     enrollment.marks.forEach(mark => {
-        if (!subjectStats.has(mark.subclass_subject_id)) {
-            subjectStats.set(mark.subclass_subject_id, {
+        if (!subjectStats.has(mark.sub_class_subject_id)) {
+            subjectStats.set(mark.sub_class_subject_id, {
                 scores: [],
                 min: Infinity,
                 max: -Infinity,
@@ -318,7 +318,7 @@ async function generateStudentReportData(
     // Collect all scores for each subject across all students
     allStudents.forEach(student => {
         student.marks.forEach(mark => {
-            const stats = subjectStats.get(mark.subclass_subject_id);
+            const stats = subjectStats.get(mark.sub_class_subject_id);
             if (stats) {
                 stats.scores.push(mark.score);
                 stats.min = Math.min(stats.min, mark.score);
@@ -344,19 +344,19 @@ async function generateStudentReportData(
 
     // Process subjects data with stats
     const subjects: SubjectData[] = enrollment.marks.map(mark => {
-        const subjectStat = subjectStats.get(mark.subclass_subject_id) || {
+        const subjectStat = subjectStats.get(mark.sub_class_subject_id) || {
             min: 0, max: 0, avg: 0, successRate: 0
         };
 
         return {
-            category: mark.subclass_subject.subject.category,
-            name: mark.subclass_subject.subject.name,
-            coefficient: mark.subclass_subject.coefficient,
+            category: mark.sub_class_subject.subject.category,
+            name: mark.sub_class_subject.subject.name,
+            coefficient: mark.sub_class_subject.coefficient,
             mark: mark.score,
-            weightedMark: mark.score * mark.subclass_subject.coefficient,
-            rank: (allStudents.map((student) => student.marks.find(m => m.subclass_subject_id === mark.subclass_subject_id)).sort((a, b) => b!.score - a!.score).findIndex((m) => m?.enrollment.student_id === studentId) + 1) + 'th',
+            weightedMark: mark.score * mark.sub_class_subject.coefficient,
+            rank: (allStudents.map((student) => student.marks.find(m => m.sub_class_subject_id === mark.sub_class_subject_id)).sort((a, b) => b!.score - a!.score).findIndex((m) => m?.enrollment.student_id === studentId) + 1) + 'th',
             // @ts-ignore - Ignoring main_teacher property type issue
-            teacher: mark.subclass_subject.main_teacher?.name || mark.teacher?.name || "Not Assigned",
+            teacher: mark.sub_class_subject.main_teacher?.name || mark.teacher?.name || "Not Assigned",
             min: subjectStat.min,
             avg: parseFloat(subjectStat.avg.toFixed(2)),
             max: subjectStat.max,
@@ -390,18 +390,18 @@ async function generateStudentReportData(
         const studentCategoryAverages = allStudents.map(student => {
             const studentCatSubjects = student.marks.filter(m => {
                 // Check if this mark's subject belongs to the current category
-                return m.subclass_subject.subject &&
-                    m.subclass_subject.subject.category === category;
+                return m.sub_class_subject.subject &&
+                    m.sub_class_subject.subject.category === category;
             });
 
             if (studentCatSubjects.length === 0) return { studentId: student.student_id, average: 0 };
 
             const catTotalWeighted = studentCatSubjects.reduce(
-                (sum, mark) => sum + mark.score * mark.subclass_subject.coefficient,
+                (sum, mark) => sum + mark.score * mark.sub_class_subject.coefficient,
                 0
             );
             const catTotalCoef = studentCatSubjects.reduce(
-                (sum, mark) => sum + mark.subclass_subject.coefficient,
+                (sum, mark) => sum + mark.sub_class_subject.coefficient,
                 0
             );
 
@@ -450,10 +450,10 @@ async function generateStudentReportData(
             photo: enrollment.photo || 'default-photo.jpg',
         },
         classInfo: {
-            className: enrollment.subclass.class.name,
+            className: enrollment.sub_class.class.name,
             enrolledStudents: allStudents.length,
             // @ts-ignore - Ignoring class_master/main_teacher property type issues
-            classMaster: enrollment.subclass.class_master?.name || enrollment.subclass.subclass_subjects[0]?.main_teacher?.name || 'Not Assigned',
+            classMaster: enrollment.sub_class.class_master?.name || enrollment.sub_class.sub_class_subjects[0]?.main_teacher?.name || 'Not Assigned',
             academicYear: `${enrollment.academic_year.start_date.getFullYear()}-${enrollment.academic_year.end_date.getFullYear()}`,
         },
         subjects,
@@ -678,9 +678,9 @@ function calculateStandardDeviation(numbers: number[]): number {
 //     studentId: 1
 // }).then(console.log).catch(console.error);
 
-// For all students in a subclass
+// For all students in a sub_class
 generateReportCard({
     academicYearId: 1,
     examSequenceId: 1,
-    subclassId: 1
+    sub_classId: 1
 }).then(console.log).catch(console.error);

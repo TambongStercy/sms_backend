@@ -13,7 +13,8 @@ import {
     assignVicePrincipal,
     removeVicePrincipal,
     assignDisciplineMaster,
-    removeDisciplineMaster
+    removeDisciplineMaster,
+    getAllTeachers
 } from '../controllers/userController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -26,6 +27,11 @@ router.post('/create-with-role', authenticate, authorize(['MANAGER', 'SUPER_MANA
 // User CRUD operations (requires authentication, some require specific roles)
 router.get('/', authenticate, authorize(['MANAGER', 'SUPER_MANAGER', 'PRINCIPAL']), getAllUsers);
 router.post('/', authenticate, authorize(['MANAGER', 'SUPER_MANAGER']), createUser);
+
+// Get all teachers (optionally filtered by subject)
+// Important: This route must be defined BEFORE the /:id route to avoid conflicts
+router.get('/teachers', authenticate, getAllTeachers);
+
 router.get('/:id', authenticate, authorize(['MANAGER', 'SUPER_MANAGER', 'PRINCIPAL']), getUserById);
 router.put('/:id', authenticate, authorize(['MANAGER', 'SUPER_MANAGER', 'PRINCIPAL']), updateUser);
 router.delete('/:id', authenticate, authorize(['MANAGER', 'SUPER_MANAGER']), deleteUser);

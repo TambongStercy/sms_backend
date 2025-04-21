@@ -35,12 +35,12 @@
  *     EnrollStudentRequest:
  *       type: object
  *       required:
- *         - subclassId
+ *         - sub_classId
  *         - photo
  *       properties:
- *         subclassId:
+ *         sub_classId:
  *           type: integer
- *           description: ID of the subclass to enroll the student in
+ *           description: ID of the sub_class to enroll the student in
  *           example: 5
  *         academicYearId:
  *           type: integer
@@ -55,7 +55,7 @@
  *           description: Whether the student is repeating the class
  *           default: false
  *           example: false
- *       description: Information required to enroll a student in a subclass. Upon enrollment, a school fee record will be automatically created based on the fee_amount set in the parent class.
+ *       description: Information required to enroll a student in a sub_class. Upon enrollment, a school fee record will be automatically created based on the fee_amount set in the parent class.
  */
 
 // Export empty object as this file is only used for Swagger documentation

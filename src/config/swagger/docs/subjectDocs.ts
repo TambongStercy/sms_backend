@@ -54,7 +54,7 @@
  *         schema:
  *           type: string
  *           enum: [true, false]
- *         description: Include subclass information with subject data
+ *         description: Include sub_class information with subject data
  *     responses:
  *       200:
  *         description: List of subjects retrieved successfully
@@ -412,22 +412,22 @@
  *           schema:
  *             type: object
  *             required:
- *               - subclassId
+ *               - sub_classId
  *               - coefficient
  *               - mainTeacherId
  *             properties:
- *               subclassId:
+ *               sub_classId:
  *                 type: integer
- *                 description: ID of the subclass to link the subject to
+ *                 description: ID of the sub_class to link the subject to
  *               coefficient:
  *                 type: number
- *                 description: Coefficient for the subject in this subclass
+ *                 description: Coefficient for the subject in this sub_class
  *               mainTeacherId:
  *                 type: integer
- *                 description: ID of the main teacher for this subject-subclass combination
+ *                 description: ID of the main teacher for this subject-sub_class combination
  *     responses:
  *       201:
- *         description: Subject linked to subclass successfully
+ *         description: Subject linked to sub_class successfully
  *         content:
  *           application/json:
  *             schema:
@@ -443,7 +443,7 @@
  *                       type: integer
  *                     subjectId:
  *                       type: integer
- *                     subclassId:
+ *                     sub_classId:
  *                       type: integer
  *                     coefficient:
  *                       type: number
@@ -468,7 +468,7 @@
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Subject, subclass, or teacher not found
+ *         description: Subject, sub_class, or teacher not found
  *         content:
  *           application/json:
  *             schema:
@@ -485,8 +485,8 @@
  * @swagger
  * /subjects/{subjectId}/classes/{classId}:
  *   post:
- *     summary: Assign a subject to all subclasses of a class
- *     description: Assigns a subject to all subclasses of a specified class. Only accessible by SUPER_MANAGER, PRINCIPAL.
+ *     summary: Assign a subject to all sub_classes of a class
+ *     description: Assigns a subject to all sub_classes of a specified class. Only accessible by SUPER_MANAGER, PRINCIPAL.
  *     tags: [Subjects]
  *     security:
  *       - bearerAuth: []
@@ -511,7 +511,7 @@
  *             $ref: '#/components/schemas/AssignSubjectToClassRequest'
  *     responses:
  *       201:
- *         description: Subject successfully assigned to all subclasses of the class
+ *         description: Subject successfully assigned to all sub_classes of the class
  *         content:
  *           application/json:
  *             schema:
