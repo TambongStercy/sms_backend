@@ -16,7 +16,8 @@
     "import-students": "ts-node import-students.ts",
     "prisma:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate",
-    "seed-periods": "ts-node ./scripts/seed-periods.ts"
+    "seed-periods": "ts-node ./scripts/seed-periods.ts",
+    "start:worker": "ts-node src/workers/reportGenerator.ts"
   },
   "dependencies": {
     "@faker-js/faker": "^9.5.0",

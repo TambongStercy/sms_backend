@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as examController from '../controllers/examController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { Role } from '@prisma/client';
 
 // Swagger documentation can be found in src/config/swagger/docs/examDocs.ts
 
@@ -27,9 +28,18 @@ router.post('/papers', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'V
 // All authenticated users can view exam details
 router.get('/:id', authenticate, examController.getExamById);
 
+// PATCH /exams/:id/status - Update exam sequence status (New Route)
+// Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can finalize
+router.patch(
+    '/:id/status',
+    authenticate,
+    authorize([Role.SUPER_MANAGER, Role.PRINCIPAL, Role.VICE_PRINCIPAL]),
+    examController.updateExamSequenceStatusController
+);
+
 // DELETE /exams/:id - Delete an exam
 // Only SUPER_MANAGER, PRINCIPAL can delete exams
-router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL']), examController.deleteExam);
+router.delete('/:id', authenticate, authorize([Role.SUPER_MANAGER, Role.PRINCIPAL]), examController.deleteExam);
 
 // GET /exams/papers/:examId/with-questions - Get a specific exam paper with its questions
 router.get('/papers/:examId/with-questions', authenticate, examController.getExamPaperWithQuestions);

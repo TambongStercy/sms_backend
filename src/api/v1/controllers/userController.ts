@@ -115,9 +115,55 @@ export const registerAndAssignRoles = async (req: Request, res: Response): Promi
     }
 };
 
+// Extends the Express Request type to include the user property
+interface AuthenticatedRequest extends Request {
+    user?: {
+        id: number;
+        userId: number;
+        // Include other user properties if available and needed
+    };
+}
+
+export const getCurrentUserProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        if (!req.user || typeof req.user.id !== 'number') {
+            res.status(401).json({ success: false, error: 'Unauthorized or user ID not found in token' });
+            return;
+        }
+
+        const userId = req.user.id;
+        const user = await userService.getUserById(userId);
+
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                error: 'User not found'
+            });
+            return;
+        }
+        res.json({
+            success: true,
+            data: transformUser(user) // Apply transformation if desired
+        });
+    } catch (error: any) {
+        console.error('Error fetching current user profile:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
 export const getUserById = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid user ID format. User ID must be a number.'
+            });
+            return;
+        }
         const user = await userService.getUserById(id);
         if (!user) {
             res.status(404).json({
@@ -128,7 +174,7 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
         }
         res.json({
             success: true,
-            data: user
+            data: transformUser(user) // Apply transformation if desired
         });
     } catch (error: any) {
         console.error('Error fetching user:', error);

@@ -27,6 +27,7 @@ model AcademicYear {
   terms                         Term[]
   user_roles                    UserRole[]
   vice_principal_assignments    VicePrincipalAssignment[]
+  GeneratedReport               GeneratedReport[]
 }
 
 model User {
@@ -117,21 +118,23 @@ model SubClass {
   sub_class_subjects            SubClassSubject[]
   teacher_periods               TeacherPeriod[]
   vice_principal_assignments    VicePrincipalAssignment[]
+  GeneratedReport               GeneratedReport[]
 }
 
 model Student {
-  id             Int             @id @unique @default(autoincrement())
-  matricule      String
-  name           String
-  date_of_birth  DateTime
-  place_of_birth String
-  gender         Gender
-  residence      String
-  former_school  String
-  created_at     DateTime        @default(now())
-  updated_at     DateTime        @updatedAt
-  enrollments    Enrollment[]
-  parents        ParentStudent[] @relation("StudentParents")
+  id              Int               @id @unique @default(autoincrement())
+  matricule       String
+  name            String
+  date_of_birth   DateTime
+  place_of_birth  String
+  gender          Gender
+  residence       String
+  former_school   String
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  enrollments     Enrollment[]
+  parents         ParentStudent[]   @relation("StudentParents")
+  GeneratedReport GeneratedReport[]
 }
 
 model Enrollment {
@@ -266,6 +269,7 @@ model ExamSequence {
   term                      Term                     @relation(fields: [term_id], references: [id])
   marks                     Mark[]
   student_sequence_averages StudentSequenceAverage[]
+  GeneratedReport           GeneratedReport[]
 
   @@unique([sequence_number, term_id, academic_year_id])
 }
@@ -476,6 +480,29 @@ model StudentSequenceAverage {
   @@unique([enrollment_id, exam_sequence_id])
 }
 
+model GeneratedReport {
+  id               Int          @id @default(autoincrement())
+  report_type      ReportType // SINGLE_STUDENT or SUBCLASS
+  exam_sequence_id Int
+  academic_year_id Int
+  student_id       Int? // Null for SUBCLASS type
+  sub_class_id     Int? // Null for SINGLE_STUDENT type (though student implies subclass)
+  status           ReportStatus @default(PENDING) // PENDING, PROCESSING, COMPLETED, FAILED
+  file_path        String? // Path to the generated PDF
+  error_message    String? // Store error if status is FAILED
+  page_number      Int? // Page number within the combined subclass PDF (for SINGLE_STUDENT type)
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  exam_sequence ExamSequence @relation(fields: [exam_sequence_id], references: [id], onDelete: Cascade)
+  academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
+  student       Student?     @relation(fields: [student_id], references: [id])
+  sub_class     SubClass?    @relation(fields: [sub_class_id], references: [id])
+
+  @@unique([report_type, exam_sequence_id, academic_year_id, student_id], map: "student_report_unique") // Unique for single student reports
+  @@index([status])
+}
+
 enum PaymentMethod {
   CASH
   CARD
@@ -546,4 +573,16 @@ enum ExamSequenceStatus {
   REPORTS_GENERATING
   REPORTS_AVAILABLE
   REPORTS_FAILED
+}
+
+enum ReportType {
+  SINGLE_STUDENT
+  SUBCLASS
+}
+
+enum ReportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }

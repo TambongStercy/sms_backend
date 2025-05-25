@@ -4,7 +4,8 @@ import {
     Mark, ExamSequence, Term, Subject, SubjectTeacher, SubClassSubject, StudentAbsence, TeacherAbsence,
     DisciplineIssue, VicePrincipalAssignment, DisciplineMasterAssignment, PrincipalAssignment, BursarAssignment,
     Period, TeacherPeriod, ExamPaper, ExamPaperQuestion, Question, QuestionType, NotificationStatus,
-    DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole, ExamSequenceStatus
+    DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole, ExamSequenceStatus, ReportStatus,
+    ReportType
 } from '@prisma/client';
 import * as dotenv from 'dotenv';
 
@@ -28,7 +29,8 @@ export {
     Mark, ExamSequence, Term, Subject, SubjectTeacher, SubClassSubject, StudentAbsence, TeacherAbsence,
     DisciplineIssue, VicePrincipalAssignment, DisciplineMasterAssignment, PrincipalAssignment, BursarAssignment,
     Period, TeacherPeriod, ExamPaper, ExamPaperQuestion, Question, QuestionType, NotificationStatus,
-    DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole, ExamSequenceStatus
+    DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole, ExamSequenceStatus, ReportStatus,
+    ReportType
 };
 
 export default prisma; 

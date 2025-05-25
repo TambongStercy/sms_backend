@@ -4,6 +4,10 @@ import * as examService from '../services/examService';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
 import path from 'path';
 import fs from 'fs';
+// import { ReportStatus, ReportType } from '@prisma/client';
+import prisma, { ReportStatus, ReportType } from '../../../config/db';
+import { ExamSequenceStatus } from '@prisma/client'; // Import enum
+import { PDFDocument } from 'pdf-lib'; // Added import
 
 // Helper function to transform mark data
 const transformMark = (mark: any) => {
@@ -40,12 +44,12 @@ export const getAllMarks = async (req: Request, res: Response) => {
             'academic_year_id' // Added academicYearId to allowed filters
         ];
 
-        console.log('Original finalQuery params:', req.finalQuery);
+        // console.log('Original finalQuery params:', req.finalQuery);
 
         // Extract pagination and filter parameters from the request
         const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
 
-        console.log('Extracted filterOptions:', filterOptions);
+        // console.log('Extracted filterOptions:', filterOptions);
 
         // Get academic year from finalQuery if provided - will be used by service
         const academic_year_id = filterOptions.academic_year_id ?
@@ -61,7 +65,7 @@ export const getAllMarks = async (req: Request, res: Response) => {
 
         // Transform the data array to add studentId
         const transformedData = result.data.map(transformMark);
-        console.log('Transformed data: ', transformedData.length > 0 ? 'Data present' : 'Empty data array');
+        // console.log('Transformed data: ', transformedData.length > 0 ? 'Data present' : 'Empty data array');
 
         res.json({
             success: true,
@@ -259,24 +263,8 @@ export const enterExamMarks = async (req: Request, res: Response) => {
     }
 };
 
-export const generateReportCards = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const report = await examService.generateReportCards();
-        res.json({
-            success: true,
-            data: report
-        });
-    } catch (error: any) {
-        console.error('Error generating report cards:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-};
-
 /**
- * Generate a report card for a specific student
+ * Serves a specific page (student report card) extracted from a pre-generated combined subclass PDF.
  * @route GET /exams/report-cards/student/:studentId
  */
 export const generateStudentReportCard = async (req: Request, res: Response): Promise<void> => {
@@ -294,43 +282,119 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
             return;
         }
 
-        const reportCardPath = await examService.generateReportCard({
-            academicYearId: academic_year_id,
-            examSequenceId: exam_sequence_id,
-            studentId
+        // Find the GeneratedReport record for the SINGLE_STUDENT
+        const reportRecord = await prisma.generatedReport.findUnique({
+            where: {
+                report_type_exam_sequence_id_academic_year_id_student_id: {
+                    report_type: ReportType.SINGLE_STUDENT,
+                    exam_sequence_id: exam_sequence_id,
+                    academic_year_id: academic_year_id,
+                    student_id: studentId,
+                }
+            },
         });
 
-        // Send the file
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="student-${studentId}-report.pdf"`);
+        if (!reportRecord) {
+            // Check sequence status as fallback
+            const sequence = await prisma.examSequence.findUnique({ where: { id: exam_sequence_id }, select: { status: true } });
+            if (sequence?.status === 'REPORTS_GENERATING' || sequence?.status === 'FINALIZED') {
+                return res.status(202).json({ success: true, message: 'Reports are still being generated. Please check back later.', status: 'PROCESSING' });
+            } else if (sequence?.status === 'REPORTS_FAILED') {
+                return res.status(500).json({ success: false, error: 'Report generation failed for this sequence.', status: 'FAILED' });
+            }
+            res.status(404).json({
+                success: false,
+                error: 'Report record not found for this student. Generation might be pending, failed, or parameters incorrect.'
+            });
+            return;
+        }
 
-        const fileStream = fs.createReadStream(reportCardPath);
+        // Check the status
+        switch (reportRecord.status) {
+            case ReportStatus.COMPLETED:
+                if (!reportRecord.file_path || !reportRecord.page_number) {
+                    res.status(500).json({
+                        success: false,
+                        error: 'Report generation completed, but file path or page number is missing.'
+                    });
+                    return;
+                }
+                const absolutePath = path.join(process.cwd(), reportRecord.file_path);
+                if (!fs.existsSync(absolutePath)) {
+                    console.error(`File not found for COMPLETED report: ${absolutePath}`);
+                    res.status(404).json({
+                        success: false,
+                        error: `Source report file (${reportRecord.file_path}) not found. Please try again later or contact support.`
+                    });
+                    return;
+                }
 
-        // Delete the file after it's been sent to the client
-        fileStream.on('end', () => {
-            setTimeout(() => {
-                fs.unlink(reportCardPath, (err) => {
-                    if (err) {
-                        console.error(`Error deleting file ${reportCardPath}:`, err);
-                    } else {
-                        console.log(`Successfully deleted temporary PDF file: ${reportCardPath}`);
+                try {
+                    // Extract the specific page using pdf-lib
+                    const pdfBytes = fs.readFileSync(absolutePath);
+                    const pdfDoc = await PDFDocument.load(pdfBytes);
+                    const totalPages = pdfDoc.getPageCount();
+                    const pageNumZeroBased = reportRecord.page_number - 1; // pdf-lib uses 0-based index
+
+                    if (pageNumZeroBased < 0 || pageNumZeroBased >= totalPages) {
+                        throw new Error(`Invalid page number (${reportRecord.page_number}) for PDF with ${totalPages} pages.`);
                     }
-                });
-            }, 1000); // Small delay to ensure the file is fully sent
-        });
 
-        fileStream.pipe(res);
+                    const newPdfDoc = await PDFDocument.create();
+                    const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNumZeroBased]);
+                    newPdfDoc.addPage(copiedPage);
+
+                    const newPdfBytes = await newPdfDoc.save();
+
+                    // Send the extracted page
+                    const student = await prisma.student.findUnique({ where: { id: studentId }, select: { matricule: true } });
+                    const filename = `report-student-${student?.matricule || studentId}-seq-${exam_sequence_id}.pdf`;
+                    res.setHeader('Content-Type', 'application/pdf');
+                    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                    res.send(Buffer.from(newPdfBytes)); // Send the extracted page bytes
+
+                } catch (pdfError: any) {
+                    console.error(`Error extracting page ${reportRecord.page_number} from ${absolutePath}:`, pdfError);
+                    res.status(500).json({ success: false, error: "Failed to extract student report page from combined PDF.", details: pdfError.message });
+                }
+                break;
+
+            case ReportStatus.PENDING:
+            case ReportStatus.PROCESSING:
+                res.status(202).json({ // Accepted, but not ready
+                    success: true,
+                    message: `Report generation is currently ${reportRecord.status.toLowerCase()}. Please try again later.`,
+                    status: reportRecord.status,
+                });
+                break;
+
+            case ReportStatus.FAILED:
+                res.status(500).json({
+                    success: false,
+                    error: 'Report generation failed for this student.',
+                    message: reportRecord.error_message || 'An unknown error occurred during generation.',
+                    status: reportRecord.status,
+                });
+                break;
+
+            default:
+                res.status(500).json({
+                    success: false,
+                    error: `Unknown report status: ${reportRecord.status}`
+                });
+        }
+
     } catch (error: any) {
-        console.error('Error generating student report card:', error);
+        console.error('Error serving student report card:', error);
         res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Internal server error while serving report card.'
         });
     }
 };
 
 /**
- * Generate report cards for all students in a sub_class
+ * Serves a pre-generated combined PDF report card for an entire sub_class.
  * @route GET /exams/report-cards/sub_class/:sub_classId
  */
 export const generateSubclassReportCards = async (req: Request, res: Response): Promise<void> => {
@@ -348,38 +412,92 @@ export const generateSubclassReportCards = async (req: Request, res: Response): 
             return;
         }
 
-        // Generate the report cards
-        const reportCardPath = await examService.generateReportCard({
-            academicYearId: academic_year_id,
-            examSequenceId: exam_sequence_id,
-            sub_classId
+        // Find the GeneratedReport record for the SUBCLASS using findFirst
+        const reportRecord = await prisma.generatedReport.findFirst({
+            where: {
+                // List fields directly instead of using the removed unique constraint name
+                report_type: ReportType.SUBCLASS,
+                exam_sequence_id: exam_sequence_id,
+                academic_year_id: academic_year_id,
+                sub_class_id: sub_classId,
+            },
+            // Optional: Order by updated_at if multiple records could somehow exist (shouldn't with upsert logic)
+            // orderBy: { updated_at: 'desc' }
         });
 
-        // Send the file
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="sub_class-${sub_classId}-reports.pdf"`);
+        if (!reportRecord) {
+            // Check sequence status as a fallback for user feedback
+            const sequence = await prisma.examSequence.findUnique({ where: { id: exam_sequence_id }, select: { status: true } });
+            if (sequence?.status === 'REPORTS_GENERATING' || sequence?.status === 'FINALIZED') {
+                return res.status(202).json({ success: true, message: 'Subclass report is being generated or queued. Please try again later.', status: 'PROCESSING' });
+            } else if (sequence?.status === 'REPORTS_FAILED') {
+                return res.status(500).json({ success: false, error: 'Report generation failed for this sequence.', status: 'FAILED' });
+            }
+            res.status(404).json({
+                success: false,
+                error: 'Combined subclass report record not found. It might not have been generated yet or the parameters are incorrect.'
+            });
+            return;
+        }
 
-        const fileStream = fs.createReadStream(reportCardPath);
+        // Check the status of the SUBCLASS report record
+        switch (reportRecord.status) {
+            case ReportStatus.COMPLETED:
+                if (!reportRecord.file_path) {
+                    res.status(500).json({
+                        success: false,
+                        error: 'Subclass report generation completed, but file path is missing.'
+                    });
+                    return;
+                }
+                const absolutePath = path.join(process.cwd(), reportRecord.file_path);
+                if (!fs.existsSync(absolutePath)) {
+                    console.error(`File not found for COMPLETED subclass report: ${absolutePath}`);
+                    res.status(404).json({
+                        success: false,
+                        error: `Generated subclass report file not found at path: ${reportRecord.file_path}. Please try again later or contact support.`
+                    });
+                    return;
+                }
 
-        // Delete the file after it's been sent to the client
-        fileStream.on('end', () => {
-            setTimeout(() => {
-                fs.unlink(reportCardPath, (err) => {
-                    if (err) {
-                        console.error(`Error deleting file ${reportCardPath}:`, err);
-                    } else {
-                        console.log(`Successfully deleted temporary PDF file: ${reportCardPath}`);
-                    }
+                // Send the file
+                const subClassInfo = await prisma.subClass.findUnique({ where: { id: sub_classId }, select: { name: true, class: { select: { name: true } } } });
+                const filename = `report-subclass-${subClassInfo?.class?.name || ''}-${subClassInfo?.name || sub_classId}-seq-${exam_sequence_id}.pdf`;
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                fs.createReadStream(absolutePath).pipe(res);
+                break;
+
+            case ReportStatus.PENDING:
+            case ReportStatus.PROCESSING:
+                res.status(202).json({ // Accepted, but not ready
+                    success: true,
+                    message: `Combined subclass report generation is currently ${reportRecord.status.toLowerCase()}. Please try again later.`,
+                    status: reportRecord.status,
                 });
-            }, 1000); // Small delay to ensure the file is fully sent
-        });
+                break;
 
-        fileStream.pipe(res);
+            case ReportStatus.FAILED:
+                res.status(500).json({
+                    success: false,
+                    error: 'Combined subclass report generation failed.',
+                    message: reportRecord.error_message || 'An unknown error occurred during generation.',
+                    status: reportRecord.status,
+                });
+                break;
+
+            default:
+                res.status(500).json({
+                    success: false,
+                    error: `Unknown report status: ${reportRecord.status}`
+                });
+        }
+
     } catch (error: any) {
-        console.error('Error generating sub_class report cards:', error);
+        console.error('Error serving subclass report card:', error);
         res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Internal server error while serving subclass report card.'
         });
     }
 };
@@ -580,5 +698,48 @@ export const getStudentReportCard = async (req: Request, res: Response) => {
             success: false,
             error: error.message
         });
+    }
+};
+
+/**
+ * Controller to update the status of an ExamSequence.
+ * @route PATCH /exams/:id/status
+ */
+export const updateExamSequenceStatusController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const examSequenceId = parseInt(req.params.id);
+        const { status } = req.body; // Expecting { "status": "FINALIZED" } (camelCase from frontend)
+
+        // Validate input
+        if (isNaN(examSequenceId)) {
+            res.status(400).json({ success: false, error: 'Invalid Exam Sequence ID format' });
+            return;
+        }
+
+        // Validate the status value - ensure it's a valid ExamSequenceStatus enum member
+        if (!status || !Object.values(ExamSequenceStatus).includes(status as ExamSequenceStatus)) {
+            res.status(400).json({
+                success: false,
+                error: `Invalid status provided. Must be one of: ${Object.values(ExamSequenceStatus).join(', ')}`,
+            });
+            return;
+        }
+
+        // Call the service function (middleware handles snake_case conversion for status if needed, but enums are usually direct)
+        const updatedSequence = await examService.updateExamSequenceStatus(examSequenceId, status as ExamSequenceStatus);
+
+        res.json({
+            success: true,
+            message: `Exam sequence ${examSequenceId} status updated to ${status}. Report generation triggered if status was FINALIZED.`,
+            data: updatedSequence, // Return the updated sequence (which might show REPORTS_GENERATING)
+        });
+
+    } catch (error: any) {
+        console.error(`Error updating exam sequence ${req.params.id} status:`, error);
+        if (error.message.includes('not found')) {
+            res.status(404).json({ success: false, error: error.message });
+        } else {
+            res.status(500).json({ success: false, error: error.message || 'Internal server error updating exam sequence status.' });
+        }
     }
 };

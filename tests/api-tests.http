@@ -1,5 +1,8 @@
 @baseUrl = http://localhost:4000/api/v1
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJzdXBlcm1hbmFnZXJAc2Nob29sLmNvbSIsInJvbGUiOlsiVEVBQ0hFUiIsIk1BTkFHRVIiLCJHVUlEQU5DRV9DT1VOU0VMT1IiLCJQQVJFTlQiLCJQUklOQ0lQQUwiLCJCVVJTQVIiLCJESVNDSVBMSU5FX01BU1RFUiIsIlZJQ0VfUFJJTkNJUEFMIiwiU1VQRVJfTUFOQUdFUiJdLCJpYXQiOjE3NDM3NzkzODEsImV4cCI6MTc0Mzg2NTc4MX0.eznZ_E89-TkVgxMrPIKAdWo62lr3yWpE8I_EAtBDDnM
+
+###
+# Save the token from the login response
+@token = {{login.response.body.data.token}}
 
 ###
 # @name login
@@ -7,10 +10,17 @@
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
-# {
-#   "email": "admin@school.com",
-#   "password": "securePassword123"
-# }
+{
+  "email": "supermanager@school.com",
+  "password": "SuperManager@123"
+}
+
+
+
+###
+# Create Super Admin User (if not already created)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
 
 {
     "name": "Super Manager",
@@ -20,25 +30,6 @@ Content-Type: application/json
     "date_of_birth": "1985-01-01",
     "phone": "123456789",
     "address": "Super Manager Address"
-}
-
-###
-# Save the token from the login response
-@token = {{login.response.body.data.token}}
-
-###
-# Create Super Admin User (if not already created)
-POST {{baseUrl}}/auth/register
-Content-Type: application/json
-
-{
-  "name": "Admin User",
-  "email": "admin@school.com",
-  "password": "securePassword123",
-  "gender": "Male",
-  "date_of_birth": "1985-01-01",
-  "phone": "123456789",
-  "address": "Admin Address"
 }
 
 ###
@@ -473,7 +464,7 @@ Authorization: Bearer {{token}}
 
 ###
 # Generate Report Card
-GET {{baseUrl}}/report-cards/student/1/?studentId=1&academicYearId=3&examSequenceId=1
+GET {{baseUrl}}/report-cards/student/1/?academicYearId=3&examSequenceId=1
 Authorization: Bearer {{token}}
 
 ###
@@ -793,3 +784,165 @@ Content-Type: application/json
 DELETE {{baseUrl}}/users/5/assignments/discipline-master/1
 Authorization: Bearer {{token}}
 #?academicYearId=3 // Optionally specify year
+
+###
+# Update Academic Year (replace :id with actual ID)
+PUT {{baseUrl}}/academic-years/:id
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Updated Year Name",
+  "start_date": "2024-09-01",
+  "end_date": "2025-06-30"
+}
+
+###
+# Delete Academic Year (replace :id with actual ID)
+DELETE {{baseUrl}}/academic-years/:id
+Authorization: Bearer {{token}}
+
+###
+# Get Subjects for a Subclass (replace :subClassId with actual ID)
+GET {{baseUrl}}/classes/sub-classes/:subClassId/subjects
+Authorization: Bearer {{token}}
+
+###
+# Get Discipline Records for a Student (replace :studentId with actual ID)
+GET {{baseUrl}}/discipline/:studentId
+Authorization: Bearer {{token}}
+
+###
+# Get All Exam Papers
+GET {{baseUrl}}/exams/papers
+Authorization: Bearer {{token}}
+
+###
+# Get Exam by ID (replace :id with actual ID)
+GET {{baseUrl}}/exams/1
+Authorization: Bearer {{token}}
+
+###
+# Update Exam Sequence Status (replace :id with actual ID)
+PATCH {{baseUrl}}/exams/:id/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "FINALIZED"
+}
+
+###
+# Delete Exam (replace :id with actual ID)
+DELETE {{baseUrl}}/exams/:id
+Authorization: Bearer {{token}}
+
+###
+# Get Exam Paper with Questions (replace :examId with actual ID)
+GET {{baseUrl}}/exams/papers/1/with-questions
+Authorization: Bearer {{token}}
+
+###
+# Add Questions to Exam Paper (replace :id with actual ID)
+POST {{baseUrl}}/exams/papers/:id/questions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "questions": [
+    { "question_text": "What is 2+2?", "question_type": "MULTIPLE_CHOICE", "points": 10, "options": ["3", "4", "5"], "correct_answer": "4" }
+  ]
+}
+
+###
+# Generate Exam Paper (replace :id with actual ID)
+POST {{baseUrl}}/exams/papers/1/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "strategy": "RANDOM",
+  "numberOfQuestions": 10
+}
+
+###
+# Generate Report Cards for a Subclass (replace :sub_classId with actual ID)
+GET {{baseUrl}}/report-cards/sub_class/:sub_classId
+Authorization: Bearer {{token}}
+# Query parameters like academicYearId and examSequenceId might be needed
+# ?academicYearId=1&examSequenceId=1
+
+###
+# Get Fee by ID (replace :id with actual ID)
+GET {{baseUrl}}/fees/:id
+Authorization: Bearer {{token}}
+
+###
+# Update Fee (replace :id with actual ID)
+PUT {{baseUrl}}/fees/:id
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "amountExpected": 80000,
+  "amountPaid": 25000,
+  "dueDate": "2023-11-30"
+}
+
+###
+# Delete Fee (replace :id with actual ID)
+DELETE {{baseUrl}}/fees/:id
+Authorization: Bearer {{token}}
+
+###
+# Get Fees for a Student (replace :studentId with actual ID)
+GET {{baseUrl}}/fees/student/:studentId
+Authorization: Bearer {{token}}
+
+###
+# Get Fee Summary for a Subclass (replace :sub_classId with actual ID)
+GET {{baseUrl}}/fees/sub_class/:sub_classId/summary
+Authorization: Bearer {{token}}
+
+###
+# Get Subject by ID (replace :id with actual ID)
+GET {{baseUrl}}/subjects/:id
+Authorization: Bearer {{token}}
+
+###
+# Update Subject (replace :id with actual ID)
+PUT {{baseUrl}}/subjects/:id
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Advanced Mathematics",
+  "category": "SCIENCE_AND_TECHNOLOGY"
+}
+
+###
+# Delete Subject (replace :id with actual ID)
+DELETE {{baseUrl}}/subjects/:id
+Authorization: Bearer {{token}}
+
+###
+# Get Timetable for a Subclass
+GET {{baseUrl}}/timetables?subClassId=2
+Authorization: Bearer {{token}}
+# Query parameters like subClassId and academicYearId will be needed
+# ?subClassId=1&academicYearId=1
+
+###
+# Bulk Update Timetable Slots
+POST {{baseUrl}}/timetables/bulk-update
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "academicYearId": 1,
+  "subClassId": 1,
+  "slots": [
+    { "day_of_week": "MONDAY", "period_id": 1, "subject_id": 1, "teacher_id": 2 },
+    { "day_of_week": "MONDAY", "period_id": 2, "subject_id": 2, "teacher_id": 3 }
+  ]
+}

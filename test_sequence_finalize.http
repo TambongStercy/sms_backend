@@ -1,0 +1,64 @@
+@host = http://localhost:4000/api/v1
+@superManagerEmail = supermanager@school.com
+@superManagerPassword = SuperManager@123
+@examSequenceToFinalize = 1
+@token = {{login.response.body.data.token}}
+
+###
+# 1. Login as Super Manager
+# @name login
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{superManagerEmail}}",
+  "password": "{{superManagerPassword}}"
+}
+
+# > {% client.global.set("token", response.body.data.token); %}
+
+###
+# 2. Check Token (Optional)
+GET {{host}}/users/me
+Authorization: Bearer {{token}}
+
+###
+# 3. Finalize Exam Sequence
+# This will trigger the background report generation
+PATCH {{host}}/exams/{{examSequenceToFinalize}}/status
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "FINALIZED"
+}
+
+###
+# 4. (Optional) Update Status to something else (e.g., CLOSED)
+PATCH {{host}}/exams/{{examSequenceToFinalize}}/status
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "CLOSED"
+} 
+
+###
+# 5. Download a student's report card
+# This endpoint allows downloading a generated report card for a specific student
+# Parameters:
+# - student_id: The ID of the student
+# - academic_year_id: The academic year ID
+# - exam_sequence_id: The exam sequence ID for which to download the report
+GET {{host}}/report-cards/student/5?academic_year_id=4&exam_sequence_id={{examSequenceToFinalize}}
+Authorization: Bearer {{token}}
+
+###
+# 6. Download a subclass report (all students in one PDF)
+# This endpoint allows downloading a combined report for an entire subclass
+# Parameters:
+# - subclass_id: The ID of the subclass
+# - academic_year_id: The academic year ID
+# - exam_sequence_id: The exam sequence ID for which to download the report
+GET {{host}}/report-cards/sub_class/1?academic_year_id=4&exam_sequence_id={{examSequenceToFinalize}}
+Authorization: Bearer {{token}}

@@ -79,14 +79,22 @@ export async function getAllStudentsWithCurrentEnrollment(
         studentWhere.enrollments = { none: { academic_year_id: targetAcademicYearId } };
         console.log("Applying filter: NOT ENROLLED");
     } else { // Default to 'all' if enrollmentStatus is undefined or 'all'
-        // No enrollment conditions added to the main 'studentWhere' for the default 'all' case
-        // Subclass filter cannot be directly applied to the student list here either.
         if (sub_classIdFilter !== undefined) {
-            console.warn("Subclass filter not directly applicable when enrollmentStatus is 'all' (default). It will filter the included enrollment data if present.");
-            // We can apply it to the included enrollments though
+            // Apply sub_class_id filter to the main student query for 'all' status
+            studentWhere.enrollments = {
+                some: {
+                    academic_year_id: targetAcademicYearId,
+                    sub_class_id: sub_classIdFilter
+                }
+            };
+            // Also ensure the included enrollments are filtered by sub_class_id for consistency
             enrollmentCriteria.sub_class_id = sub_classIdFilter;
+            console.log("Applying filter: ALL (Default) with sub_class_id filter on Student enrollments");
+        } else {
+            // If no sub_class_id filter, no specific enrollment condition on studentWhere for 'all'
+            // but included enrollments are still filtered by academic year.
+            console.log("Applying filter: ALL (Default) - No sub_class_id filter on Student enrollments");
         }
-        console.log("Applying filter: ALL (Default)");
     }
 
     console.log("Final Student Where:", JSON.stringify(studentWhere));

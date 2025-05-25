@@ -14,7 +14,8 @@ import {
     removeVicePrincipal,
     assignDisciplineMaster,
     removeDisciplineMaster,
-    getAllTeachers
+    getAllTeachers,
+    getCurrentUserProfile
 } from '../controllers/userController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -31,6 +32,9 @@ router.post('/', authenticate, authorize(['MANAGER', 'SUPER_MANAGER']), createUs
 // Get all teachers (optionally filtered by subject)
 // Important: This route must be defined BEFORE the /:id route to avoid conflicts
 router.get('/teachers', authenticate, getAllTeachers);
+
+// Route for the current user's profile - MUST be before /:id
+router.get('/me', authenticate, getCurrentUserProfile);
 
 router.get('/:id', authenticate, authorize(['MANAGER', 'SUPER_MANAGER', 'PRINCIPAL']), getUserById);
 router.put('/:id', authenticate, authorize(['MANAGER', 'SUPER_MANAGER', 'PRINCIPAL']), updateUser);

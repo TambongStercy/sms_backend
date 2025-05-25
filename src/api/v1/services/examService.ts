@@ -1,6 +1,6 @@
 // src/api/v1/services/examService.ts
 
-import prisma, { ExamPaper, ExamPaperQuestion, Mark, ExamSequence } from '../../../config/db';
+import prisma, { ExamPaper, ExamPaperQuestion, Mark, ExamSequence, ExamSequenceStatus, ReportType, ReportStatus } from '../../../config/db';
 import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 import * as puppeteer from 'puppeteer';
@@ -10,6 +10,7 @@ import path from 'path';
 import * as StudentAverageService from './studentAverageService';
 import getPuppeteerConfig from '../../../utils/puppeteer.config';
 import * as PuppeteerManager from '../../../utils/puppeteerManager';
+import { reportGenerationQueue } from '../../../config/queue';
 
 export async function createExamPaper(data: {
     name: string;
@@ -200,10 +201,10 @@ export async function getAllMarks(
                     [key === 'minScore' ? 'gte' : 'lte']: score
                 };
             }
-        } else if (key.startsWith('include')) {
+        } else if (key.startsWith('include_')) {
             // Handle includes
             if (value === 'true') {
-                if (key === 'includeStudent') {
+                if (key === 'include_student') {
                     include.enrollment = {
                         ...(include.enrollment || {}),
                         // If selecting student_id, also include full student + sub_class/class
@@ -213,11 +214,11 @@ export async function getAllMarks(
                             sub_class: { include: { class: true } }
                         }
                     };
-                } else if (key === 'includeSubject') {
+                } else if (key === 'include_subject') {
                     include.sub_class_subject = { include: { subject: true } };
-                } else if (key === 'includeTeacher') {
+                } else if (key === 'include_teacher') {
                     include.teacher = true;
-                } else if (key === 'includeExamSequence') {
+                } else if (key === 'include_exam_sequence') {
                     include.exam_sequence = { include: { term: true } };
                 }
             }
@@ -1515,5 +1516,148 @@ export async function deleteMark(id: number): Promise<Mark> {
     return prisma.mark.delete({
         where: { id }
     });
+}
+
+/**
+ * Updates the status of an ExamSequence and triggers report generation if finalized.
+ */
+export async function updateExamSequenceStatus(
+    examSequenceId: number,
+    newStatus: ExamSequenceStatus
+): Promise<ExamSequence> {
+    const examSequence = await prisma.examSequence.findUnique({
+        where: { id: examSequenceId },
+        include: { academic_year: true } // Needed for academic year context
+    });
+
+    if (!examSequence) {
+        throw new Error(`Exam sequence with ID ${examSequenceId} not found`);
+    }
+    if (!examSequence.academic_year_id) {
+        throw new Error(`Exam sequence ${examSequenceId} does not have an associated academic year.`);
+    }
+
+    const updatedSequence = await prisma.examSequence.update({
+        where: { id: examSequenceId },
+        data: { status: newStatus },
+    });
+
+    // If the status is set to FINALIZED, trigger background report generation
+    if (newStatus === ExamSequenceStatus.FINALIZED) {
+        console.log(`Exam sequence ${examSequenceId} finalized. Triggering report generation...`);
+
+        // Update status to REPORTS_GENERATING immediately
+        await prisma.examSequence.update({
+            where: { id: examSequenceId },
+            data: { status: ExamSequenceStatus.REPORTS_GENERATING },
+        });
+
+        try {
+            // Find all distinct sub_classes associated with marks in this sequence
+            const marksInSequence = await prisma.mark.findMany({
+                where: { exam_sequence_id: examSequenceId },
+                distinct: ['enrollment_id'], // Get distinct enrollments first
+                select: {
+                    enrollment: {
+                        select: {
+                            id: true,
+                            student_id: true,
+                            sub_class_id: true,
+                        }
+                    }
+                }
+            });
+
+            if (marksInSequence.length === 0) {
+                console.warn(`No marks found for exam sequence ${examSequenceId}. Skipping report generation.`);
+                // Optionally set status back or to FAILED/AVAILABLE immediately
+                await prisma.examSequence.update({
+                    where: { id: examSequenceId },
+                    data: { status: ExamSequenceStatus.REPORTS_AVAILABLE }, // Or FAILED if appropriate
+                });
+                return updatedSequence; // Return the sequence updated to REPORTS_GENERATING
+            }
+
+            const enrollments = marksInSequence.map(m => m.enrollment).filter(e => e !== null) as {
+                id: number;
+                student_id: number;
+                sub_class_id: number;
+            }[];
+
+            // --- REMOVE Queueing jobs for INDIVIDUAL student reports ---
+            /*
+            const individualJobPromises = enrollments.map(async (enrollment) => {
+                // ... removed individual job queuing logic ...
+            });
+            */
+
+            // --- Queue jobs ONLY for combined SUBCLASS reports ---
+            const distinctSubClassIds = [...new Set(enrollments.map(e => e.sub_class_id))];
+            console.log(`[${examSequenceId}] Found distinct subclasses for combined reports: ${distinctSubClassIds.join(', ')}`);
+
+            const subclassJobPromises = distinctSubClassIds.map(async (subClassId) => {
+                // Create or find existing GeneratedReport record for the subclass manually
+                let reportRecord = await prisma.generatedReport.findFirst({
+                    where: {
+                        report_type: ReportType.SUBCLASS,
+                        exam_sequence_id: examSequenceId,
+                        academic_year_id: examSequence.academic_year_id!,
+                        sub_class_id: subClassId,
+                    }
+                });
+
+                if (reportRecord) {
+                    // Update existing record if found (reset status)
+                    reportRecord = await prisma.generatedReport.update({
+                        where: { id: reportRecord.id },
+                        data: { status: ReportStatus.PENDING, error_message: null, page_number: null, file_path: null } // Reset fields on retry
+                    });
+                } else {
+                    // Create new record if not found
+                    reportRecord = await prisma.generatedReport.create({
+                        data: {
+                            report_type: ReportType.SUBCLASS,
+                            exam_sequence_id: examSequenceId,
+                            academic_year_id: examSequence.academic_year_id!,
+                            sub_class_id: subClassId,
+                            status: ReportStatus.PENDING,
+                        }
+                    });
+                }
+
+                // Add job to the queue for the subclass
+                const subclassJobName = `generate-subclass-report-subclass-${subClassId}-seq-${examSequenceId}`;
+                const subclassJobId = `subclass-report-${reportRecord.id}`; // Unique job ID
+                await reportGenerationQueue.add(subclassJobName, { // Used imported queue
+                    generatedReportId: reportRecord.id, // ID of the SUBCLASS record
+                    reportType: ReportType.SUBCLASS,
+                    subClassId: subClassId,
+                    academicYearId: examSequence.academic_year_id!,
+                    examSequenceId: examSequenceId,
+                }, { jobId: subclassJobId }); // Prevent duplicate jobs
+                console.log(`[${examSequenceId}] Added combined report job (${subclassJobId}) for subclass ${subClassId}`);
+            });
+
+            // Wait for all subclass job additions to complete
+            await Promise.all(subclassJobPromises);
+            console.log(`[${examSequenceId}] All combined subclass report generation jobs added.`);
+
+        } catch (error) {
+            console.error(`Error triggering report generation jobs for sequence ${examSequenceId}:`, error);
+            // Attempt to mark sequence as FAILED if job creation failed
+            try {
+                await prisma.examSequence.update({
+                    where: { id: examSequenceId },
+                    data: { status: ExamSequenceStatus.REPORTS_FAILED },
+                });
+            } catch (statusUpdateError) {
+                console.error(`Failed to update sequence ${examSequenceId} status to REPORTS_FAILED:`, statusUpdateError);
+            }
+            // Re-throw the original error if needed
+            // throw error;
+        }
+    }
+
+    return updatedSequence;
 }
 
