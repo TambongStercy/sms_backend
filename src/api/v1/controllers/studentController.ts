@@ -2,6 +2,15 @@
 import { Request, Response } from 'express';
 import * as studentService from '../services/studentService';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
+import { transformUser } from './userController'; // Assuming transformUser is exported from userController
+import { User, ParentStudent } from '@prisma/client'; // Import User and ParentStudent
+import { getStudentStatus, getStudentsWithStatus } from '../../../utils/studentStatus'; // Import student status utilities
+import { getAcademicYearId } from '../../../utils/academicYear'; // Import academic year utilities
+
+// Define an interface for ParentStudent with the parent relation included
+interface ParentStudentWithParent extends ParentStudent {
+    parent?: User | null; // Or your specific User type if different
+}
 
 export const getAllStudents = async (req: Request, res: Response) => {
     try {
@@ -101,6 +110,41 @@ export const getStudentById = async (req: Request, res: Response): Promise<any> 
     }
 };
 
+export const updateStudent = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid student ID format' });
+        }
+
+        const studentData = req.body; // Middleware handles case conversion
+
+
+        // Basic validation: Ensure at least one field is being updated
+        if (Object.keys(studentData).length === 0) {
+            return res.status(400).json({ success: false, error: 'No data provided for update' });
+        }
+
+        const updatedStudent = await studentService.updateStudent(id, studentData);
+        res.json({
+            success: true,
+            data: updatedStudent
+        });
+    } catch (error: any) {
+        console.error('Error updating student:', error);
+        if (error.code === 'P2025') { // Prisma error code for record to update not found
+            return res.status(404).json({ success: false, error: 'Student not found' });
+        }
+        if (error.message.includes('Invalid gender')) {
+            return res.status(400).json({ success: false, error: error.message });
+        }
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
 export const linkParent = async (req: Request, res: Response) => {
     try {
         const studentId = parseInt(req.params.id);
@@ -122,6 +166,51 @@ export const linkParent = async (req: Request, res: Response) => {
             success: false,
             error: error.message
         });
+    }
+};
+
+export const unlinkParent = async (req: Request, res: Response) => {
+    try {
+        const studentId = parseInt(req.params.studentId);
+        const parentId = parseInt(req.params.parentId);
+
+        if (isNaN(studentId) || isNaN(parentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Student ID or Parent ID format' });
+        }
+
+        await studentService.unlinkParent(studentId, parentId);
+        res.json({ success: true, message: 'Parent-student link removed successfully' });
+    } catch (error: any) {
+        console.error('Error unlinking parent:', error);
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const getParentsByStudentId = async (req: Request, res: Response) => {
+    try {
+        const studentId = parseInt(req.params.studentId);
+        if (isNaN(studentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Student ID format' });
+        }
+
+        // The service now returns ParentStudentWithParent[] implicitly due to the include
+        const parentStudentLinks = await studentService.getParentsByStudentId(studentId) as ParentStudentWithParent[];
+
+        if (!parentStudentLinks || parentStudentLinks.length === 0) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const parentsData = parentStudentLinks
+            .map(link => link.parent ? transformUser(link.parent) : null)
+            .filter(p => p !== null);
+
+        res.json({ success: true, data: parentsData });
+    } catch (error: any) {
+        console.error('Error fetching parents for student:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
@@ -177,6 +266,94 @@ export const enrollStudent = async (req: Request, res: Response): Promise<any> =
         if (error.message.includes('not found')) {
             return res.status(404).json({ success: false, error: error.message });
         }
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get student status information (new/old/repeater)
+ */
+export const getStudentStatusInfo = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const studentId = parseInt(req.params.id);
+        if (isNaN(studentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Student ID format' });
+        }
+
+        // Get academic year from query params or use current
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) :
+            await getAcademicYearId();
+
+        if (!academic_year_id) {
+            return res.status(400).json({ success: false, error: 'Academic year not found' });
+        }
+
+        const statusInfo = await getStudentStatus(studentId, academic_year_id);
+
+        res.json({
+            success: true,
+            data: {
+                student_id: studentId,
+                academic_year_id,
+                ...statusInfo
+            }
+        });
+    } catch (error: any) {
+        console.error('Error getting student status:', error);
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get all students with their status information for a given academic year
+ */
+export const getStudentsWithStatusInfo = async (req: Request, res: Response): Promise<any> => {
+    try {
+        // Get academic year from query params or use current
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) :
+            await getAcademicYearId();
+
+        if (!academic_year_id) {
+            return res.status(400).json({ success: false, error: 'Academic year not found' });
+        }
+
+        // Get sub-class filter if provided
+        const sub_class_id = req.query.sub_class_id ?
+            parseInt(req.query.sub_class_id as string) :
+            undefined;
+
+        const studentsWithStatus = await getStudentsWithStatus(academic_year_id, sub_class_id);
+
+        // Group students by status for summary
+        const summary = {
+            total: studentsWithStatus.length,
+            new_students: studentsWithStatus.filter(s => s.statusInfo.status === 'NEW').length,
+            old_students: studentsWithStatus.filter(s => s.statusInfo.status === 'OLD').length,
+            repeaters: studentsWithStatus.filter(s => s.statusInfo.status === 'REPEATER').length
+        };
+
+        res.json({
+            success: true,
+            data: {
+                academic_year_id,
+                sub_class_id,
+                summary,
+                students: studentsWithStatus
+            }
+        });
+    } catch (error: any) {
+        console.error('Error getting students with status:', error);
         res.status(500).json({
             success: false,
             error: error.message

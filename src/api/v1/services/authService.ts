@@ -76,7 +76,7 @@ export async function login(email: string, password: string) {
  * @param userData - User registration data
  * @returns Created user data
  */
-export async function register(userData: UserRegistrationData) {
+export async function register(userData: UserRegistrationData & { status?: string }) {
     // Validate gender
     if (userData.gender && !Object.values(Gender).includes(userData.gender as any)) {
         throw new Error('Invalid gender. Choose a valid gender.');
@@ -112,7 +112,8 @@ export async function register(userData: UserRegistrationData) {
             phone: formattedData.phone,
             address: formattedData.address,
             id_card_num: formattedData.id_card_num,
-            photo: formattedData.photo
+            photo: formattedData.photo,
+            ...(userData.status && { status: userData.status as any })
         },
         include: {
             user_roles: true

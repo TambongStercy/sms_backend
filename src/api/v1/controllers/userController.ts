@@ -3,9 +3,10 @@ import { Role } from '@prisma/client'; // Import Role enum
 import { Request, Response } from 'express';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
 import * as userService from '../services/userService';
+import * as studentService from '../services/studentService'; // Added import for studentService
 
 // Helper function to transform user data
-const transformUser = (user: any) => {
+export const transformUser = (user: any) => {
     const transformed: any = { ...user }; // Clone user
 
     // If user has subject_teachers relation data
@@ -50,15 +51,13 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
 
 export const createUser = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Use the body directly - middleware handles the conversion
         const userData = req.body;
-
         // Basic validation
         if (!userData.name || !userData.email || !userData.password || !userData.gender || !userData.date_of_birth || !userData.phone || !userData.address) {
             res.status(400).json({ success: false, error: 'Missing required user fields' });
             return;
         }
-
+        // Pass status if provided
         const newUser = await userService.createUser(userData);
         res.status(201).json({
             success: true,
@@ -66,7 +65,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
         });
     } catch (error: any) {
         console.error('Error creating user:', error);
-        if (error.code === 'P2002') { // Unique constraint violation
+        if (error.code === 'P2002') {
             res.status(409).json({ success: false, error: 'User with this email already exists' });
         } else {
             res.status(500).json({ success: false, error: error.message });
@@ -77,35 +76,30 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 export const registerAndAssignRoles = async (req: Request, res: Response): Promise<void> => {
     try {
         const userData = req.body;
-
         // Basic validation for user data
         if (!userData.name || !userData.email || !userData.password || !userData.gender || !userData.date_of_birth || !userData.phone || !userData.address) {
             res.status(400).json({ success: false, error: 'Missing required user fields' });
             return;
         }
-        // Validation for roles array
         if (!userData.roles || !Array.isArray(userData.roles) || userData.roles.length === 0) {
             res.status(400).json({ success: false, error: 'Roles array is required and cannot be empty' });
             return;
         }
-        // Validate each role object in the array
         for (const roleData of userData.roles) {
-            if (!roleData.role || !Object.values(Role).includes(roleData.role)) {
+            if (!roleData.role) {
                 res.status(400).json({ success: false, error: `Invalid role provided: ${roleData.role}` });
                 return;
             }
-            // Optional: Validate academic_year_id if necessary (e.g., check if it exists)
         }
-
+        // Pass status if provided
         const newUserWithRoles = await userService.registerAndAssignRoles(userData);
-
         res.status(201).json({
             success: true,
             data: newUserWithRoles
         });
     } catch (error: any) {
         console.error('Error registering user with roles:', error);
-        if (error.code === 'P2002') { // Unique constraint violation (e.g., email)
+        if (error.code === 'P2002') {
             res.status(409).json({ success: false, error: 'User with this email already exists' });
         } else if (error.message.includes('Invalid role')) {
             res.status(400).json({ success: false, error: error.message });
@@ -151,6 +145,35 @@ export const getCurrentUserProfile = async (req: AuthenticatedRequest, res: Resp
             success: false,
             error: error.message
         });
+    }
+};
+
+// GET /users/me/dashboard?role=ROLE_NAME[&academicYearId=ID]
+export const getDashboardForRole = async (req: any, res: any) => {
+    try {
+        const userId = req.user?.id;
+        const role = req.query.role;
+        const academicYearId = req.query.academicYearId ? parseInt(req.query.academicYearId) : undefined;
+        if (!userId || !role) {
+            return res.status(400).json({ success: false, error: 'Missing user or role parameter' });
+        }
+        // Check if user has the role for the year
+        const hasRole = await userService.userHasRoleForAcademicYear(userId, role, academicYearId);
+        if (!hasRole) {
+            return res.status(403).json({ success: false, error: 'User does not have the specified role for this academic year' });
+        }
+        // Placeholder dashboard data (expand per role as needed)
+        return res.json({
+            success: true,
+            data: {
+                role,
+                academicYearId: academicYearId || 'current',
+                dashboard: {}
+            }
+        });
+    } catch (error: any) {
+        console.error('Error fetching dashboard:', error);
+        return res.status(500).json({ success: false, error: error.message });
     }
 };
 
@@ -290,8 +313,6 @@ export const removeRole = async (req: Request, res: Response): Promise<void> => 
 export const createUserWithRole = async (req: Request, res: Response): Promise<void> => {
     try {
         const userData = req.body;
-
-        // Validate required fields
         if (!userData.email || !userData.password || !userData.name || !userData.gender ||
             !userData.date_of_birth || !userData.phone || !userData.address || !userData.role) {
             res.status(400).json({
@@ -300,15 +321,11 @@ export const createUserWithRole = async (req: Request, res: Response): Promise<v
             });
             return;
         }
-
-        // Convert date string to Date object
         if (typeof userData.date_of_birth === 'string') {
             userData.date_of_birth = new Date(userData.date_of_birth);
         }
-
-        // Process optional assignments
+        // Pass status if provided
         const result = await userService.createUserWithRole(userData);
-
         res.status(201).json({
             success: true,
             message: `User created successfully with role ${userData.role}`,
@@ -316,8 +333,6 @@ export const createUserWithRole = async (req: Request, res: Response): Promise<v
         });
     } catch (error: any) {
         console.error('Error creating user with role:', error);
-
-        // Handle specific errors
         if (error.code === 'P2002') {
             res.status(409).json({
                 success: false,
@@ -325,7 +340,6 @@ export const createUserWithRole = async (req: Request, res: Response): Promise<v
             });
             return;
         }
-
         if (error.message.includes('not found')) {
             res.status(404).json({
                 success: false,
@@ -333,7 +347,6 @@ export const createUserWithRole = async (req: Request, res: Response): Promise<v
             });
             return;
         }
-
         res.status(500).json({
             success: false,
             error: `Failed to create user: ${error.message}`
@@ -539,5 +552,36 @@ export const getAllTeachers = async (req: Request, res: Response): Promise<void>
             success: false,
             error: error.message
         });
+    }
+};
+
+export const getStudentsForParent = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const parentId = parseInt(req.params.parentId);
+        if (isNaN(parentId)) {
+            res.status(400).json({ success: false, error: 'Invalid Parent ID format' });
+            return;
+        }
+
+        const academicYearId = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
+
+        if (req.finalQuery.academic_year_id && isNaN(academicYearId as number)) {
+            res.status(400).json({ success: false, error: 'Invalid Academic Year ID format in query' });
+            return;
+        }
+        // Call the function from studentService
+        const students = await studentService.getStudentsByParentId(parentId, academicYearId);
+
+        res.json({
+            success: true,
+            data: students
+        });
+    } catch (error: any) {
+        console.error('Error fetching students for parent:', error);
+        if (error.message.includes('not found')) {
+            res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({ success: false, error: error.message });
     }
 };

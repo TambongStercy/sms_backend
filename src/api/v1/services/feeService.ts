@@ -1,6 +1,7 @@
 // src/api/v1/services/feeService.ts
 import prisma, { SchoolFees, PaymentTransaction, PaymentMethod } from '../../../config/db';
 import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
+import { shouldPayNewStudentFees, getStudentStatus, StudentStatus } from '../../../utils/studentStatus';
 
 export async function getAllFees(academicYearId?: number): Promise<SchoolFees[]> {
     const yearId = await getAcademicYearId(academicYearId);
@@ -49,16 +50,20 @@ export async function createFee(data: {
     due_date: string;
     enrollment_id?: number;
     student_id?: number;
+    payment_method?: string;
 }): Promise<SchoolFees> {
     // Handle the case where student_id is provided instead of enrollment_id
     if (data.student_id && !data.enrollment_id) {
+        // Convert student_id to number if it's a string
+        const studentId = typeof data.student_id === 'string' ? parseInt(data.student_id, 10) : data.student_id;
+
         const enrollment = await getStudentSubclassByStudentAndYear(
-            data.student_id,
+            studentId,
             data.academic_year_id
         );
 
         if (!enrollment) {
-            throw new Error(`Student with ID ${data.student_id} is not enrolled in the specified academic year`);
+            throw new Error(`Student with ID ${studentId} is not enrolled in the specified academic year`);
         }
 
         data.enrollment_id = enrollment.id;
@@ -71,6 +76,20 @@ export async function createFee(data: {
             throw new Error("No academic year found and none provided");
         }
     }
+
+    if (data.payment_method) {
+        data.payment_method = normalizePaymentMethod(data.payment_method);
+    }
+
+    if (data.amount_paid) {
+        data.amount_paid = typeof data.amount_paid === 'string'
+            ? parseFloat(data.amount_paid)
+            : data.amount_paid;
+    }
+
+    // Normalize payment method
+    // const paymentMethod = normalizePaymentMethod(data.payment_method);
+
 
     return prisma.schoolFees.create({
         data: {
@@ -94,6 +113,7 @@ export async function updateFee(
     data: {
         amount_expected?: number;
         amount_paid?: number;
+        payment_method?: string;
         due_date?: string;
     }
 ): Promise<SchoolFees> {
@@ -114,11 +134,17 @@ export async function updateFee(
     }
 
     if (data.amount_paid !== undefined) {
-        updateData.amount_paid = data.amount_paid;
+        updateData.amount_paid = typeof data.amount_paid === 'string'
+            ? parseFloat(data.amount_paid)
+            : data.amount_paid;
     }
 
     if (data.due_date) {
         updateData.due_date = new Date(data.due_date);
+    }
+
+    if (data.payment_method) {
+        updateData.payment_method = normalizePaymentMethod(data.payment_method);
     }
 
     return prisma.schoolFees.update({
@@ -277,11 +303,19 @@ export async function getSubclassFeesSummary(sub_classId: number, academicYearId
     };
 }
 
+function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC' {
+    const normalized = method.trim().toUpperCase().replace(/\s+/g, '_');
+    if (normalized === 'EXPRESS_UNION') return 'EXPRESS_UNION';
+    if (normalized === 'CCA') return 'CCA';
+    if (normalized === '3DC' || normalized === 'F3DC') return 'F3DC';
+    throw new Error('Invalid payment method. Valid options are: EXPRESS UNION, CCA, F3DC');
+}
+
 export async function recordPayment(data: {
     amount: number;
     payment_date: string;
     receipt_number?: string;
-    payment_method: PaymentMethod;
+    payment_method: string;
     enrollment_id?: number;
     student_id?: number;
     academic_year_id?: number;
@@ -289,13 +323,16 @@ export async function recordPayment(data: {
 }): Promise<PaymentTransaction> {
     // Handle the case where student_id is provided instead of enrollment_id
     if (data.student_id && !data.enrollment_id) {
+        // Convert student_id to number if it's a string
+        const studentId = typeof data.student_id === 'string' ? parseInt(data.student_id, 10) : data.student_id;
+
         const enrollment = await getStudentSubclassByStudentAndYear(
-            data.student_id,
+            studentId,
             data.academic_year_id
         );
 
         if (!enrollment) {
-            throw new Error(`Student with ID ${data.student_id} is not enrolled in the specified academic year`);
+            throw new Error(`Student with ID ${studentId} is not enrolled in the specified academic year`);
         }
 
         data.enrollment_id = enrollment.id;
@@ -309,13 +346,27 @@ export async function recordPayment(data: {
         }
     }
 
+    // Normalize payment method
+    const paymentMethod = normalizePaymentMethod(data.payment_method);
+
+    console.log('PaymentTransaction.create data:', {
+        fee_id: data.fee_id,
+        amount: data.amount,
+        receipt_number: data.receipt_number,
+        payment_method: paymentMethod,
+        enrollment_id: data.enrollment_id,
+        student_id: data.student_id,
+        academic_year_id: data.academic_year_id,
+        payment_date: new Date(data.payment_date),
+    });
+
     // Create the payment transaction
     const transaction = await prisma.paymentTransaction.create({
         data: {
             fee_id: data.fee_id,
             amount: data.amount,
             receipt_number: data.receipt_number,
-            payment_method: data.payment_method,
+            payment_method: paymentMethod,
             enrollment_id: data.enrollment_id!,
             academic_year_id: data.academic_year_id,
             payment_date: new Date(data.payment_date),
@@ -438,11 +489,13 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
         // Add miscellaneous fees
         feeAmount += classInfo.miscellaneous_fee;
 
-        // Add extra fees for new students if applicable
-        if (enrollment.repeater) {
-            feeAmount += classInfo.old_student_add_fee;
-        } else {
+        // Add extra fees based on student status (new vs old)
+        // Use the enhanced student status logic
+        const shouldPayNewFees = await shouldPayNewStudentFees(enrollment.student_id, yearId);
+        if (shouldPayNewFees) {
             feeAmount += classInfo.new_student_add_fee;
+        } else {
+            feeAmount += classInfo.old_student_add_fee;
         }
 
         console.log(`Calculated fee amount for student ${enrollment.student.name}: ${feeAmount}`);
@@ -523,17 +576,19 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
     //     } else if (currentTerm.name.toLowerCase().includes('third')) {
     //     }
     // }
-    
+
     feeAmount += classInfo.first_term_fee + classInfo.second_term_fee + classInfo.third_term_fee;
 
     // Add miscellaneous fees
     feeAmount += classInfo.miscellaneous_fee;
 
-    // Add extra fees for new students if applicable
-    if (enrollment.repeater) {
-        feeAmount += classInfo.old_student_add_fee;
-    } else {
+    // Add extra fees based on student status (new vs old)
+    // Use the enhanced student status logic
+    const shouldPayNewFees = await shouldPayNewStudentFees(enrollment.student_id, enrollment.academic_year_id);
+    if (shouldPayNewFees) {
         feeAmount += classInfo.new_student_add_fee;
+    } else {
+        feeAmount += classInfo.old_student_add_fee;
     }
 
     // Create the fee record

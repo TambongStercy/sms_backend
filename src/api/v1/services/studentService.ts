@@ -1,9 +1,10 @@
 // src/api/v1/services/studentService.ts
-import prisma, { Student, ParentStudent, Gender, Enrollment } from '../../../config/db';
+import prisma, { Student, ParentStudent, Gender, Enrollment, Prisma } from '../../../config/db';
 import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 import * as feeService from './feeService'; // Import feeService
-import { PrismaClient, Prisma } from '@prisma/client';
+import { generateStudentMatricule } from '../../../utils/matriculeGenerator'; // Import student matricule generator
+import { setFirstEnrollmentYear } from '../../../utils/studentStatus'; // Import student status utilities
 
 // Get all students with pagination and filtering
 export async function getAllStudents(
@@ -165,7 +166,7 @@ export async function getAllStudentsWithCurrentEnrollment(
 }
 
 export async function createStudent(data: {
-    matricule: string;
+    matricule?: string; // Make matricule optional in input
     name: string;
     date_of_birth: string;
     place_of_birth: string;
@@ -178,10 +179,17 @@ export async function createStudent(data: {
         throw new Error("Invalid gender. Choose a valid gender.");
     }
 
+    let studentMatricule = data.matricule;
+    if (!studentMatricule) {
+        // Generate matricule based on the year of date_of_birth if sensible, or current year
+        // For simplicity, using current year for matricule generation.
+        // If student creation is tied to an academic year, that year could be used.
+        studentMatricule = await generateStudentMatricule();
+    }
 
     return prisma.student.create({
         data: {
-            matricule: data.matricule,
+            matricule: studentMatricule, // Use provided or generated matricule
             name: data.name,
             place_of_birth: data.place_of_birth,
             gender: data.gender as Gender,
@@ -189,6 +197,23 @@ export async function createStudent(data: {
             former_school: data.former_school,
             date_of_birth: new Date(data.date_of_birth),
         },
+    });
+}
+
+export async function updateStudent(id: number, data: Partial<Omit<Student, 'id' | 'created_at' | 'updated_at'>>): Promise<Student> {
+    const updateData: Prisma.StudentUpdateInput = { ...data };
+
+    if (data.date_of_birth && typeof data.date_of_birth === 'string') {
+        updateData.date_of_birth = new Date(data.date_of_birth);
+    }
+
+    if (data.gender && !Object.values(Gender).includes(data.gender as Gender)) {
+        throw new Error("Invalid gender. Choose a valid gender.");
+    }
+
+    return prisma.student.update({
+        where: { id },
+        data: updateData,
     });
 }
 
@@ -246,7 +271,7 @@ export async function enrollStudent(
         photo: string | null;
         repeater?: boolean;
     }
-): Promise<Enrollment> {
+): Promise<Enrollment & { fee_id: number }> {
     // Get current academic year if not provided
     const yearId = data.academic_year_id ?? await getAcademicYearId();
     if (!yearId) {
@@ -263,7 +288,7 @@ export async function enrollStudent(
         throw new Error(`Subclass with ID ${data.sub_class_id} or its parent Class not found`);
     }
 
-    // Use a transaction to create enrollment
+    // Use a transaction to create enrollment and set first enrollment year
     const enrollment = await prisma.enrollment.create({
         data: {
             student_id,
@@ -274,9 +299,14 @@ export async function enrollStudent(
         },
     });
 
-    await feeService.createFeeForNewEnrollment(enrollment.id);
+    // Set first enrollment year if this is the student's first enrollment
+    await setFirstEnrollmentYear(student_id, yearId);
 
-    return enrollment;
+    // Create fee record for the enrollment
+    const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
+    console.log('Fee created:', fee);
+
+    return { ...enrollment, fee_id: fee.id };
 }
 
 // Get students by sub_class for a specific academic year
@@ -303,6 +333,53 @@ export async function getStudentsBySubclass(
                     class: true
                 }
             }
+        }
+    });
+}
+
+export async function unlinkParent(student_id: number, parent_id: number): Promise<void> {
+    const result = await prisma.parentStudent.deleteMany({
+        where: {
+            student_id: student_id,
+            parent_id: parent_id
+        }
+    });
+
+    if (result.count === 0) {
+        throw new Error('Parent-student link not found or already deleted.');
+    }
+}
+
+export async function getStudentsByParentId(parentId: number, academicYearId?: number): Promise<Student[]> {
+    const targetAcademicYearId = academicYearId ?? await getAcademicYearId();
+
+    const parentStudents = await prisma.parentStudent.findMany({
+        where: {
+            parent_id: parentId
+        },
+        include: {
+            student: {
+                include: {
+                    enrollments: targetAcademicYearId ? {
+                        where: { academic_year_id: targetAcademicYearId },
+                        include: {
+                            sub_class: { include: { class: true } }
+                        }
+                    } : true,
+                }
+            }
+        }
+    });
+    return parentStudents.map(ps => ps.student);
+}
+
+export async function getParentsByStudentId(studentId: number): Promise<ParentStudent[]> {
+    return prisma.parentStudent.findMany({
+        where: {
+            student_id: studentId
+        },
+        include: {
+            parent: true // Assuming 'parent' is the relation to the User model for parents
         }
     });
 }

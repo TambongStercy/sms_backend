@@ -1,10 +1,11 @@
 // src/api/v1/services/userService.ts
 
-import prisma, { Gender, User, Role, UserRole } from '../../../config/db';
+import prisma, { Gender, User, Role, UserRole, UserStatus } from '../../../config/db';
 import bcrypt from 'bcrypt';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 import { getAcademicYearId, getCurrentAcademicYear } from '../../../utils/academicYear'; // Import the utility
 import { VicePrincipalAssignment, DisciplineMasterAssignment } from '@prisma/client';
+import { generateStaffMatricule } from '../../../utils/matriculeGenerator'; // Import staff matricule generator
 
 // Type definition for the input data for registering with roles
 export interface RegisterWithRolesData {
@@ -100,8 +101,12 @@ export async function createUser(data: {
     date_of_birth: string;
     phone: string;
     address: string;
+    status?: string;
+    // No roles passed directly here, so matricule will use default or be based on later role assignment
 }): Promise<User> {
     const hashedPassword = await bcrypt.hash(data.password, 10);
+    const matricule = await generateStaffMatricule([]);
+    const normalizedStatus = data.status ? (data.status as string).toUpperCase() as UserStatus : undefined;
     return prisma.user.create({
         data: {
             name: data.name,
@@ -111,15 +116,18 @@ export async function createUser(data: {
             date_of_birth: new Date(data.date_of_birth),
             phone: data.phone,
             address: data.address,
+            matricule: matricule,
+            ...(normalizedStatus && { status: normalizedStatus as UserStatus })
         },
     });
 }
 
-export async function registerAndAssignRoles(data: RegisterWithRolesData): Promise<User> {
+export async function registerAndAssignRoles(data: RegisterWithRolesData & { status?: string }): Promise<User> {
     const hashedPassword = await bcrypt.hash(data.password, 10);
-
+    const userRoles = data.roles.map(r => r.role);
+    const matricule = await generateStaffMatricule(userRoles);
+    const normalizedStatus = data.status ? (data.status as string).toUpperCase() as UserStatus : undefined;
     return prisma.$transaction(async (tx) => {
-        // 1. Create the user
         const newUser = await tx.user.create({
             data: {
                 name: data.name,
@@ -129,35 +137,27 @@ export async function registerAndAssignRoles(data: RegisterWithRolesData): Promi
                 date_of_birth: new Date(data.date_of_birth),
                 phone: data.phone,
                 address: data.address,
+                matricule: matricule,
+                ...(normalizedStatus && { status: normalizedStatus as UserStatus })
             },
         });
-
-        // 2. Create role assignments
         if (data.roles && data.roles.length > 0) {
             const roleAssignments = data.roles.map(roleData => ({
                 user_id: newUser.id,
                 role: roleData.role,
                 academic_year_id: roleData.academic_year_id,
             }));
-
             await tx.userRole.createMany({
                 data: roleAssignments,
             });
         }
-
-        // 3. Return the created user with their roles included
         const userWithRoles = await tx.user.findUnique({
             where: { id: newUser.id },
-            include: {
-                user_roles: true, // Include the assigned roles
-            },
+            include: { user_roles: true },
         });
-
         if (!userWithRoles) {
-            // This should theoretically not happen in a successful transaction
             throw new Error("Failed to retrieve the newly created user with roles.");
         }
-
         return userWithRoles;
     });
 }
@@ -173,9 +173,15 @@ export async function updateUser(id: number, data: Partial<User>): Promise<User>
     if (data.password) {
         data.password = await bcrypt.hash(data.password, 10);
     }
+    const normalizedStatus = data.status ? (data.status as string).toUpperCase() as UserStatus : undefined;
+    // Remove id from data if present (Prisma will error if you try to update the id)
+    const { id: _id, ...rest } = data;
     return prisma.user.update({
         where: { id },
-        data,
+        data: {
+            ...rest,
+            ...(normalizedStatus && { status: normalizedStatus as UserStatus })
+        },
     });
 }
 
@@ -299,15 +305,14 @@ export async function createUserWithRole(userData: {
     phone: string;
     address: string;
     role: Role;
+    status?: string;
     parentAssignments?: { studentId: number }[];
     teacherAssignments?: { subjectId: number }[];
 }): Promise<any> {
-    // Hash the password
     const hashedPassword = await bcrypt.hash(userData.password, 10);
-
-    // Create user with transaction to ensure atomicity
+    const matricule = await generateStaffMatricule([userData.role]);
+    const normalizedStatus = userData.status ? (userData.status as string).toUpperCase() as UserStatus : undefined;
     return prisma.$transaction(async (tx) => {
-        // 1. Create the user
         const newUser = await tx.user.create({
             data: {
                 email: userData.email,
@@ -317,18 +322,16 @@ export async function createUserWithRole(userData: {
                 date_of_birth: userData.date_of_birth,
                 phone: userData.phone,
                 address: userData.address,
+                matricule: matricule,
+                ...(normalizedStatus && { status: normalizedStatus as UserStatus })
             },
         });
-
-        // 2. Assign the role
         await tx.userRole.create({
             data: {
                 user_id: newUser.id,
                 role: userData.role,
             },
         });
-
-        // 3. Handle parent-student assignments if role is PARENT
         if (userData.role === 'PARENT' && userData.parentAssignments?.length) {
             const parentAssignmentPromises = userData.parentAssignments.map(assignment =>
                 tx.parentStudent.create({
@@ -340,8 +343,6 @@ export async function createUserWithRole(userData: {
             );
             await Promise.all(parentAssignmentPromises);
         }
-
-        // 4. Handle teacher-subject assignments if role is TEACHER
         if (userData.role === 'TEACHER' && userData.teacherAssignments?.length) {
             const teacherAssignmentPromises = userData.teacherAssignments.map(assignment =>
                 tx.subjectTeacher.create({
@@ -353,8 +354,6 @@ export async function createUserWithRole(userData: {
             );
             await Promise.all(teacherAssignmentPromises);
         }
-
-        // Return the created user with role and assignments
         return tx.user.findUnique({
             where: { id: newUser.id },
             include: {
@@ -583,4 +582,25 @@ export async function getAllTeachers(subjectId?: number): Promise<Teacher[]> {
             category: st.subject.category
         }))
     }));
+}
+
+// Utility: Check if a user has a specific role for the current or specified academic year (or globally)
+export async function userHasRoleForAcademicYear(userId: number, role: Role, academicYearId?: number): Promise<boolean> {
+    let yearId = academicYearId;
+    if (!yearId) {
+        const currentYear = await getCurrentAcademicYear();
+        if (!currentYear) throw new Error('No current academic year defined and none provided');
+        yearId = currentYear.id;
+    }
+    const userRole = await prisma.userRole.findFirst({
+        where: {
+            user_id: userId,
+            role,
+            OR: [
+                { academic_year_id: yearId },
+                { academic_year_id: null }
+            ]
+        }
+    });
+    return !!userRole;
 }

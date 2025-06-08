@@ -15,7 +15,9 @@ import {
     assignDisciplineMaster,
     removeDisciplineMaster,
     getAllTeachers,
-    getCurrentUserProfile
+    getCurrentUserProfile,
+    getStudentsForParent,
+    getDashboardForRole
 } from '../controllers/userController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -35,6 +37,14 @@ router.get('/teachers', authenticate, getAllTeachers);
 
 // Route for the current user's profile - MUST be before /:id
 router.get('/me', authenticate, getCurrentUserProfile);
+
+// Route for the current user's dashboard by role
+router.get('/me/dashboard', authenticate, getDashboardForRole);
+
+// GET /users/:parentId/students - Get all students linked to a specific parent user
+// PRINCIPAL, MANAGER, SUPER_MANAGER can view. Parent can view their own.
+router.get('/:parentId/students', authenticate, authorize(['PRINCIPAL', 'MANAGER', 'SUPER_MANAGER', 'PARENT']), getStudentsForParent);
+// Note: Add logic in controller/service to ensure PARENT can only access their own students if parentId matches req.user.id
 
 router.get('/:id', authenticate, authorize(['MANAGER', 'SUPER_MANAGER', 'PRINCIPAL']), getUserById);
 router.put('/:id', authenticate, authorize(['MANAGER', 'SUPER_MANAGER', 'PRINCIPAL']), updateUser);

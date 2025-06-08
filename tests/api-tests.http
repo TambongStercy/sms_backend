@@ -946,3 +946,19 @@ Content-Type: application/json
     { "day_of_week": "MONDAY", "period_id": 2, "subject_id": 2, "teacher_id": 3 }
   ]
 }
+
+###
+# Get Students for a Parent (replace :parentId with actual parent user ID)
+# Optionally add ?academicYearId=X
+GET {{baseUrl}}/users/:parentId/students
+Authorization: Bearer {{token}}
+
+###
+# Get Parents for a Student (replace :studentId with actual student ID)
+GET {{baseUrl}}/students/:studentId/parents
+Authorization: Bearer {{token}}
+
+###
+# Unlink Parent from Student (replace :studentId and :parentId)
+DELETE {{baseUrl}}/students/:studentId/parents/:parentId
+Authorization: Bearer {{token}}
