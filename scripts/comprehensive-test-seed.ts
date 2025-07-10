@@ -398,7 +398,17 @@ async function seedUserRoles(users: any[], academicYearId: number) {
     // Most roles are assigned to the current academic year.
     // SUPER_MANAGER is a global role (academic_year_id is null).
     const userRoles = [
+        // Super Manager gets ALL roles for comprehensive testing
         { user_id: users[0].id, role: Role.SUPER_MANAGER, academic_year_id: null },
+        { user_id: users[0].id, role: Role.PRINCIPAL, academic_year_id: academicYearId },
+        { user_id: users[0].id, role: Role.VICE_PRINCIPAL, academic_year_id: academicYearId },
+        { user_id: users[0].id, role: Role.BURSAR, academic_year_id: academicYearId },
+        { user_id: users[0].id, role: Role.DISCIPLINE_MASTER, academic_year_id: academicYearId },
+        { user_id: users[0].id, role: Role.TEACHER, academic_year_id: academicYearId },
+        { user_id: users[0].id, role: Role.HOD, academic_year_id: academicYearId },
+        { user_id: users[0].id, role: Role.PARENT, academic_year_id: academicYearId },
+
+        // Other users get their specific roles
         { user_id: users[1].id, role: Role.PRINCIPAL, academic_year_id: academicYearId },
         { user_id: users[2].id, role: Role.VICE_PRINCIPAL, academic_year_id: null },
         { user_id: users[3].id, role: Role.BURSAR, academic_year_id: academicYearId },
