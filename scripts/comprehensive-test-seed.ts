@@ -17,7 +17,7 @@ async function main() {
     const users = await seedUsers();
 
     // 3. Create UserRoles
-    await seedUserRoles(users, currentYear.id);
+    await seedUserRoles(users, academicYears);
 
     // 4. Create Classes and SubClasses
     const { classes, subclasses } = await seedClassesAndSubclasses();
@@ -392,40 +392,87 @@ async function seedUsers() {
     return users;
 }
 
-async function seedUserRoles(users: any[], academicYearId: number) {
-    console.log('🎭 Seeding User Roles...');
+async function seedUserRoles(users: any[], academicYears: any[]) {
+    console.log('🎭 Seeding User Roles across multiple academic years...');
 
-    // Most roles are assigned to the current academic year.
-    // SUPER_MANAGER is a global role (academic_year_id is null).
+    // Get academic year IDs
+    const currentYearId = academicYears.find(y => y.is_current)?.id;
+    const previousYearId = academicYears.find(y => y.name === '2023-2024')?.id;
+    const nextYearId = academicYears.find(y => y.name === '2025-2026')?.id;
+
     const userRoles = [
-        // Super Manager gets ALL roles for comprehensive testing
-        { user_id: users[0].id, role: Role.SUPER_MANAGER, academic_year_id: null },
-        { user_id: users[0].id, role: Role.PRINCIPAL, academic_year_id: academicYearId },
-        { user_id: users[0].id, role: Role.VICE_PRINCIPAL, academic_year_id: academicYearId },
-        { user_id: users[0].id, role: Role.BURSAR, academic_year_id: academicYearId },
-        { user_id: users[0].id, role: Role.DISCIPLINE_MASTER, academic_year_id: academicYearId },
-        { user_id: users[0].id, role: Role.TEACHER, academic_year_id: academicYearId },
-        { user_id: users[0].id, role: Role.HOD, academic_year_id: academicYearId },
-        { user_id: users[0].id, role: Role.PARENT, academic_year_id: academicYearId },
+        // Super Manager gets ALL roles for comprehensive testing (global + current year)
+        { user_id: users[0].id, role: Role.SUPER_MANAGER, academic_year_id: null }, // Global role
+        { user_id: users[0].id, role: Role.PRINCIPAL, academic_year_id: currentYearId },
+        { user_id: users[0].id, role: Role.VICE_PRINCIPAL, academic_year_id: currentYearId },
+        { user_id: users[0].id, role: Role.BURSAR, academic_year_id: currentYearId },
+        { user_id: users[0].id, role: Role.DISCIPLINE_MASTER, academic_year_id: currentYearId },
+        { user_id: users[0].id, role: Role.TEACHER, academic_year_id: currentYearId },
+        { user_id: users[0].id, role: Role.HOD, academic_year_id: currentYearId },
+        { user_id: users[0].id, role: Role.PARENT, academic_year_id: currentYearId },
 
-        // Other users get their specific roles
-        { user_id: users[1].id, role: Role.PRINCIPAL, academic_year_id: academicYearId },
-        { user_id: users[2].id, role: Role.VICE_PRINCIPAL, academic_year_id: null },
-        { user_id: users[3].id, role: Role.BURSAR, academic_year_id: academicYearId },
-        { user_id: users[4].id, role: Role.DISCIPLINE_MASTER, academic_year_id: academicYearId },
-        { user_id: users[5].id, role: Role.TEACHER, academic_year_id: academicYearId },
-        { user_id: users[6].id, role: Role.TEACHER, academic_year_id: academicYearId },
-        { user_id: users[7].id, role: Role.TEACHER, academic_year_id: academicYearId },
-        { user_id: users[8].id, role: Role.TEACHER, academic_year_id: academicYearId },
-        { user_id: users[9].id, role: Role.PARENT, academic_year_id: academicYearId },
-        { user_id: users[10].id, role: Role.PARENT, academic_year_id: academicYearId },
-        { user_id: users[11].id, role: Role.PARENT, academic_year_id: academicYearId },
-        { user_id: users[12].id, role: Role.HOD, academic_year_id: academicYearId },
-        { user_id: users[12].id, role: Role.TEACHER, academic_year_id: academicYearId },
+        // Principal - Has role in current and next year (continuity)
+        { user_id: users[1].id, role: Role.PRINCIPAL, academic_year_id: currentYearId },
+        { user_id: users[1].id, role: Role.PRINCIPAL, academic_year_id: nextYearId },
+
+        // Vice Principal - Has role across all years (global-like but year-specific)
+        { user_id: users[2].id, role: Role.VICE_PRINCIPAL, academic_year_id: previousYearId },
+        { user_id: users[2].id, role: Role.VICE_PRINCIPAL, academic_year_id: currentYearId },
+        { user_id: users[2].id, role: Role.VICE_PRINCIPAL, academic_year_id: nextYearId },
+
+        // Bursar - Current and next year
+        { user_id: users[3].id, role: Role.BURSAR, academic_year_id: currentYearId },
+        { user_id: users[3].id, role: Role.BURSAR, academic_year_id: nextYearId },
+
+        // Discipline Master - Current year only
+        { user_id: users[4].id, role: Role.DISCIPLINE_MASTER, academic_year_id: currentYearId },
+
+        // Teachers - Distributed across years
+        // Alice Math Teacher - Previous and Current year
+        { user_id: users[5].id, role: Role.TEACHER, academic_year_id: previousYearId },
+        { user_id: users[5].id, role: Role.TEACHER, academic_year_id: currentYearId },
+
+        // David Physics Teacher - Current and Next year
+        { user_id: users[6].id, role: Role.TEACHER, academic_year_id: currentYearId },
+        { user_id: users[6].id, role: Role.TEACHER, academic_year_id: nextYearId },
+
+        // Emma English Teacher - All three years
+        { user_id: users[7].id, role: Role.TEACHER, academic_year_id: previousYearId },
+        { user_id: users[7].id, role: Role.TEACHER, academic_year_id: currentYearId },
+        { user_id: users[7].id, role: Role.TEACHER, academic_year_id: nextYearId },
+
+        // James Chemistry Teacher - Current year only
+        { user_id: users[8].id, role: Role.TEACHER, academic_year_id: currentYearId },
+
+        // Parents - Distributed across years based on children's enrollment
+        // Parent 1 - Current and Next year (children progressing)
+        { user_id: users[9].id, role: Role.PARENT, academic_year_id: currentYearId },
+        { user_id: users[9].id, role: Role.PARENT, academic_year_id: nextYearId },
+
+        // Parent 2 - All three years (multiple children across years)
+        { user_id: users[10].id, role: Role.PARENT, academic_year_id: previousYearId },
+        { user_id: users[10].id, role: Role.PARENT, academic_year_id: currentYearId },
+        { user_id: users[10].id, role: Role.PARENT, academic_year_id: nextYearId },
+
+        // Parent 3 - Current year only
+        { user_id: users[11].id, role: Role.PARENT, academic_year_id: currentYearId },
+
+        // HOD - Has both HOD and TEACHER roles across years
+        { user_id: users[12].id, role: Role.HOD, academic_year_id: previousYearId },
+        { user_id: users[12].id, role: Role.HOD, academic_year_id: currentYearId },
+        { user_id: users[12].id, role: Role.HOD, academic_year_id: nextYearId },
+        { user_id: users[12].id, role: Role.TEACHER, academic_year_id: previousYearId },
+        { user_id: users[12].id, role: Role.TEACHER, academic_year_id: currentYearId },
+        { user_id: users[12].id, role: Role.TEACHER, academic_year_id: nextYearId },
     ];
 
-    // Deduplicate to prevent unique constraint errors if the same user has the same role twice
-    const uniqueUserRoles = userRoles.filter((v, i, a) =>
+    // Filter out any assignments where academic year ID is undefined
+    const validUserRoles = userRoles.filter(role => 
+        role.academic_year_id === null || role.academic_year_id !== undefined
+    );
+
+    // Deduplicate to prevent unique constraint errors
+    const uniqueUserRoles = validUserRoles.filter((v, i, a) =>
         a.findIndex(t => (
             t.user_id === v.user_id &&
             t.role === v.role &&
@@ -437,7 +484,12 @@ async function seedUserRoles(users: any[], academicYearId: number) {
         data: uniqueUserRoles,
     });
 
-    console.log(`✅ Created ${uniqueUserRoles.length} user roles`);
+    console.log(`✅ Created ${uniqueUserRoles.length} user roles across ${academicYears.length} academic years`);
+    console.log(`📊 Role Distribution Summary:`);
+    console.log(`   - Previous Year (${academicYears.find(y => y.name === '2023-2024')?.name}): ${uniqueUserRoles.filter(r => r.academic_year_id === previousYearId).length} roles`);
+    console.log(`   - Current Year (${academicYears.find(y => y.is_current)?.name}): ${uniqueUserRoles.filter(r => r.academic_year_id === currentYearId).length} roles`);
+    console.log(`   - Next Year (${academicYears.find(y => y.name === '2025-2026')?.name}): ${uniqueUserRoles.filter(r => r.academic_year_id === nextYearId).length} roles`);
+    console.log(`   - Global Roles: ${uniqueUserRoles.filter(r => r.academic_year_id === null).length} roles`);
 }
 
 async function seedClassesAndSubclasses() {
