@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as examController from '../controllers/examController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { validateTeacherMarksAccess, validateTeacherSubjectAccess } from '../middleware/teacherAuth.middleware';
 import { Role } from '@prisma/client';
 
 // Swagger documentation can be found in src/config/swagger/docs/examDocs.ts
@@ -23,6 +24,10 @@ router.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PR
 // POST /exams/papers - Create a new exam paper
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can create exam papers
 router.post('/papers', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), examController.createExamPaper);
+
+// DELETE /exams/papers/:id - Delete an exam paper
+// Only SUPER_MANAGER, PRINCIPAL can delete exam papers
+router.delete('/papers/:id', authenticate, authorize([Role.SUPER_MANAGER, Role.PRINCIPAL]), examController.deleteExamPaper);
 
 // GET /exams/:id - Get exam details
 // All authenticated users can view exam details
@@ -62,19 +67,97 @@ reportCardsRouter.get('/sub_class/:sub_classId', authenticate, examController.ge
 export const marksRouter = Router();
 
 // GET /marks - List all marks (with filters)
-// SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL, TEACHER can view all marks
-marksRouter.get('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']), examController.getAllMarks);
+// SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can view all marks
+// TEACHER can only view marks for their assigned subjects/subclasses
+marksRouter.get('/',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']),
+    // Add teacher access validation for TEACHER role only
+    (req: any, res: any, next: any) => {
+        // Check if user has TEACHER role
+        const userRoles = req.user?.roles || [];
+        const isTeacher = userRoles.includes('TEACHER');
+        const hasHigherRole = userRoles.some((role: string) =>
+            ['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL'].includes(role)
+        );
+
+        // If user is TEACHER only (no higher roles), apply subject access validation
+        if (isTeacher && !hasHigherRole) {
+            return validateTeacherSubjectAccess(req, res, next);
+        }
+
+        next();
+    },
+    examController.getAllMarks
+);
 
 // POST /marks - Create a new mark
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL, TEACHER can create marks
-marksRouter.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']), examController.createMark);
+// TEACHER can only create marks for their assigned subjects/subclasses
+marksRouter.post('/',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']),
+    // Add teacher marks access validation for TEACHER role
+    (req: any, res: any, next: any) => {
+        const userRoles = req.user?.roles || [];
+        const isTeacher = userRoles.includes('TEACHER');
+        const hasHigherRole = userRoles.some((role: string) =>
+            ['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL'].includes(role)
+        );
+
+        if (isTeacher && !hasHigherRole) {
+            return validateTeacherMarksAccess(req, res, next);
+        }
+
+        next();
+    },
+    examController.createMark
+);
 
 // PUT /marks/:id - Update a mark
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL, TEACHER can update marks
-marksRouter.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']), examController.updateMark);
+// TEACHER can only update marks for their assigned subjects/subclasses
+marksRouter.put('/:id',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']),
+    // Add teacher marks access validation for TEACHER role
+    (req: any, res: any, next: any) => {
+        const userRoles = req.user?.roles || [];
+        const isTeacher = userRoles.includes('TEACHER');
+        const hasHigherRole = userRoles.some((role: string) =>
+            ['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL'].includes(role)
+        );
+
+        if (isTeacher && !hasHigherRole) {
+            return validateTeacherMarksAccess(req, res, next);
+        }
+
+        next();
+    },
+    examController.updateMark
+);
 
 // DELETE /marks/:id - Delete a mark
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL, TEACHER can delete marks
-marksRouter.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']), examController.deleteMark);
+// TEACHER can only delete marks for their assigned subjects/subclasses
+marksRouter.delete('/:id',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']),
+    // Add teacher marks access validation for TEACHER role
+    (req: any, res: any, next: any) => {
+        const userRoles = req.user?.roles || [];
+        const isTeacher = userRoles.includes('TEACHER');
+        const hasHigherRole = userRoles.some((role: string) =>
+            ['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL'].includes(role)
+        );
+
+        if (isTeacher && !hasHigherRole) {
+            return validateTeacherMarksAccess(req, res, next);
+        }
+
+        next();
+    },
+    examController.deleteMark
+);
 
 export default router;

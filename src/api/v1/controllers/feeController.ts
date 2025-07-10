@@ -178,8 +178,12 @@ export const recordPayment = async (req: Request, res: Response) => {
     try {
         const feeId = parseInt(req.params.feeId);
 
-        // Use the body directly plus fee_id - middleware handles the conversion
-        const paymentData = { ...req.body, fee_id: feeId };
+        // Use the body directly plus fee_id and recorded_by_id - middleware handles the conversion
+        const paymentData = {
+            ...req.body,
+            fee_id: feeId,
+            recorded_by_id: (req as any).user?.id || 1 // Get from authenticated user or default to 1
+        };
         const payment = await feeService.recordPayment(paymentData);
 
         res.status(201).json({

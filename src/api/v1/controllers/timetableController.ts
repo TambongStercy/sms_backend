@@ -6,22 +6,22 @@ import prisma from '../../../config/db';
  */
 export const getSubclassTimetable = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Check for sub_class_id (converted from subClassId by middleware)
-        const sub_class_id = req.finalQuery.sub_class_id;
+        // Get sub_class_id from path parameters
+        const subclassId = req.params.subclassId;
 
-        if (!sub_class_id) {
+        if (!subclassId) {
             res.status(400).json({
                 success: false,
-                error: 'subClassId is required'
+                error: 'subclassId is required'
             });
             return;
         }
 
-        const parsedSubclassId = parseInt(sub_class_id as string);
+        const parsedSubclassId = parseInt(subclassId);
         if (isNaN(parsedSubclassId)) {
             res.status(400).json({
                 success: false,
-                error: 'Invalid subClassId format'
+                error: 'Invalid subclassId format'
             });
             return;
         }
@@ -65,7 +65,7 @@ export const getSubclassTimetable = async (req: Request, res: Response): Promise
             academicYearId = currentYear.id;
         }
 
-        // Get all teacher periods for this sub_class
+        // Get all teacher periods for this sub_class using direct references
         const teacherPeriods = await prisma.teacherPeriod.findMany({
             where: {
                 sub_class_id: parsedSubclassId,
@@ -73,12 +73,8 @@ export const getSubclassTimetable = async (req: Request, res: Response): Promise
             },
             include: {
                 period: true,
-                subject_teacher: {
-                    include: {
-                        subject: true,
-                        teacher: true
-                    }
-                }
+                teacher: true,
+                subject: true
             }
         });
 
@@ -95,16 +91,16 @@ export const getSubclassTimetable = async (req: Request, res: Response): Promise
                 endTime: tp.period.end_time,
                 isBreak: tp.period.is_break
             },
-            subjectId: tp.subject_teacher.subject.id,
+            subjectId: tp.subject.id,
             subject: {
-                id: tp.subject_teacher.subject.id,
-                name: tp.subject_teacher.subject.name,
-                category: tp.subject_teacher.subject.category
+                id: tp.subject.id,
+                name: tp.subject.name,
+                category: tp.subject.category
             },
-            teacherId: tp.subject_teacher.teacher.id,
+            teacherId: tp.teacher.id,
             teacher: {
-                id: tp.subject_teacher.teacher.id,
-                name: tp.subject_teacher.teacher.name
+                id: tp.teacher.id,
+                name: tp.teacher.name
             }
         }));
 
@@ -137,23 +133,23 @@ export const getSubclassTimetable = async (req: Request, res: Response): Promise
  */
 export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Look for sub_class_id (converted from subClassId by middleware)
-        const sub_class_id = req.body.sub_class_id;
+        // Get sub_class_id from path parameters
+        const subclassId = req.params.subclassId;
         const slots = req.body.slots;
 
-        if (!sub_class_id || !slots || !Array.isArray(slots)) {
+        if (!subclassId || !slots || !Array.isArray(slots)) {
             res.status(400).json({
                 success: false,
-                error: 'subClassId and slots array are required'
+                error: 'subclassId and slots array are required'
             });
             return;
         }
 
-        const parsedSubclassId = parseInt(sub_class_id);
+        const parsedSubclassId = parseInt(subclassId);
         if (isNaN(parsedSubclassId)) {
             res.status(400).json({
                 success: false,
-                error: 'Invalid subClassId format'
+                error: 'Invalid subclassId format'
             });
             return;
         }
@@ -285,42 +281,39 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
                     continue;
                 }
 
-                // Validate the subject-teacher relationship
-                const subjectTeacher = await prisma.subjectTeacher.findFirst({
+                // Validate that the teacher can teach this subject (check if there's a subject-teacher relationship)
+                const canTeachSubject = await prisma.subjectTeacher.findFirst({
                     where: {
                         subject_id: parsedSubjectId,
                         teacher_id: parsedTeacherId
                     }
                 });
 
-                if (!subjectTeacher) {
+                if (!canTeachSubject) {
                     result.data.errors.push({
                         periodId: parsedPeriodId,
-                        error: `Teacher ${parsedTeacherId} is not assigned to teach subject ${parsedSubjectId}`
+                        error: `Teacher ${parsedTeacherId} is not authorized to teach subject ${parsedSubjectId}`
                     });
                     continue;
                 }
 
-                // Check for teacher conflicts
+                // Check for teacher conflicts (same teacher, same period, different subclass)
                 const teacherConflict = await prisma.teacherPeriod.findFirst({
                     where: {
-                        subject_teacher: {
-                            teacher_id: parsedTeacherId
-                        },
-                        period_id: period.id, // Use the found period's ID
+                        teacher_id: parsedTeacherId,
+                        period_id: period.id,
                         academic_year_id: academicYearId,
-                        sub_class_id: { not: parsedSubclassId } // Exclude current sub_class
+                        sub_class_id: { not: parsedSubclassId }
                     },
                     include: {
                         sub_class: true,
-                        period: true // Include period to get its details for the error message
+                        period: true
                     }
                 });
 
                 if (teacherConflict) {
                     result.data.errors.push({
                         periodId: parsedPeriodId,
-                        // Use period.day_of_week from the looked-up period
                         error: `Teacher conflict: already assigned to ${teacherConflict.sub_class.name} on ${teacherConflict.period.day_of_week} during period ${teacherConflict.period.name}`
                     });
                     continue;
@@ -330,7 +323,7 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
                 const existingAssignment = await prisma.teacherPeriod.findFirst({
                     where: {
                         sub_class_id: parsedSubclassId,
-                        period_id: period.id, // Use the found period's ID
+                        period_id: period.id,
                         academic_year_id: academicYearId
                     }
                 });
@@ -349,7 +342,8 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
                     await prisma.teacherPeriod.update({
                         where: { id: existingAssignment.id },
                         data: {
-                            subject_teacher_id: subjectTeacher.id,
+                            teacher_id: parsedTeacherId,
+                            subject_id: parsedSubjectId,
                             assigned_by_id: assignedById
                         }
                     });
@@ -358,9 +352,10 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
                     // Create new assignment
                     await prisma.teacherPeriod.create({
                         data: {
-                            subject_teacher_id: subjectTeacher.id,
+                            teacher_id: parsedTeacherId,
+                            subject_id: parsedSubjectId,
                             sub_class_id: parsedSubclassId,
-                            period_id: period.id, // Use the found period's ID
+                            period_id: period.id,
                             academic_year_id: academicYearId,
                             assigned_by_id: assignedById
                         }

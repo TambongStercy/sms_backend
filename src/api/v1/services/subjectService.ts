@@ -111,7 +111,7 @@ export async function getTeacherSchedule(teacher_id: number, academicYearId?: nu
 
     return prisma.teacherPeriod.findMany({
         where: {
-            subject_teacher_id: { in: subjectTeacherIds },
+            teacher_id: teacher_id,
             academic_year_id: yearId
         },
         include: {
@@ -121,11 +121,8 @@ export async function getTeacherSchedule(teacher_id: number, academicYearId?: nu
                     class: true
                 }
             },
-            subject_teacher: {
-                include: {
-                    subject: true
-                }
-            }
+            subject: true,
+            teacher: true
         }
     });
 }

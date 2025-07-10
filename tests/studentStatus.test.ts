@@ -1,5 +1,6 @@
 // src/tests/studentStatus.test.ts
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+// Test imports - requires test framework to be set up
+// import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getStudentStatus, shouldPayNewStudentFees, StudentStatus } from '../utils/studentStatus';
 import prisma from '../config/db';
 
@@ -34,8 +35,12 @@ describe('Student Status System', () => {
             data: {
                 name: 'Test Class',
                 base_fee: 75000,
-                new_student_add_fee: 10000,
-                old_student_add_fee: 5000
+                miscellaneous_fee: 5000,
+                first_term_fee: 15000,
+                second_term_fee: 15000,
+                third_term_fee: 15000,
+                new_student_fee: 10000,
+                old_student_fee: 5000
             }
         });
 
@@ -77,7 +82,7 @@ describe('Student Status System', () => {
             where: { name: 'Test Class' }
         });
         await prisma.academicYear.deleteMany({
-            where: { 
+            where: {
                 OR: [
                     { id: testAcademicYearId },
                     { id: secondAcademicYearId }

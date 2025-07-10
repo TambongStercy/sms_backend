@@ -154,22 +154,65 @@ export const getDashboardForRole = async (req: any, res: any) => {
         const userId = req.user?.id;
         const role = req.query.role;
         const academicYearId = req.query.academicYearId ? parseInt(req.query.academicYearId) : undefined;
+
         if (!userId || !role) {
             return res.status(400).json({ success: false, error: 'Missing user or role parameter' });
         }
-        // Check if user has the role for the year
-        const hasRole = await userService.userHasRoleForAcademicYear(userId, role, academicYearId);
+
+        // Check if user has the role (simplified - no academic year needed)
+        const hasRole = await userService.userHasRole(userId, role);
         if (!hasRole) {
-            return res.status(403).json({ success: false, error: 'User does not have the specified role for this academic year' });
+            return res.status(403).json({ success: false, error: 'User does not have the specified role' });
         }
-        // Placeholder dashboard data (expand per role as needed)
+
+        // Get role-specific dashboard data
+        let dashboardData;
+
+        switch (role) {
+            case 'SUPER_MANAGER':
+                dashboardData = await userService.getSuperManagerDashboard(academicYearId);
+                break;
+            case 'PRINCIPAL':
+                dashboardData = await userService.getPrincipalDashboard(academicYearId);
+                break;
+            case 'VICE_PRINCIPAL':
+                dashboardData = await userService.getVicePrincipalDashboard(userId, academicYearId);
+                break;
+            case 'TEACHER':
+                dashboardData = await userService.getTeacherDashboard(userId, academicYearId);
+                break;
+            case 'DISCIPLINE_MASTER':
+                dashboardData = await userService.getDisciplineMasterDashboard(userId, academicYearId);
+                break;
+            case 'MANAGER':
+                dashboardData = await userService.getManagerDashboard(academicYearId);
+                break;
+            case 'BURSAR':
+                dashboardData = await userService.getBursarDashboard(academicYearId);
+                break;
+            case 'PARENT':
+                dashboardData = await userService.getParentDashboard(userId, academicYearId);
+                break;
+            case 'STUDENT':
+                dashboardData = await userService.getStudentDashboard(userId, academicYearId);
+                break;
+            case 'HOD':
+                // Map HOD to TEACHER dashboard with additional data
+                dashboardData = await userService.getTeacherDashboard(userId, academicYearId);
+                break;
+            case 'GUIDANCE_COUNSELOR':
+                // Map to a counselor-specific dashboard (using discipline master as base)
+                dashboardData = await userService.getDisciplineMasterDashboard(userId, academicYearId);
+                break;
+            default:
+                dashboardData = {
+                    message: `Dashboard for role ${role} is not yet implemented`
+                };
+        }
+
         return res.json({
             success: true,
-            data: {
-                role,
-                academicYearId: academicYearId || 'current',
-                dashboard: {}
-            }
+            data: dashboardData
         });
     } catch (error: any) {
         console.error('Error fetching dashboard:', error);
@@ -211,19 +254,44 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
 export const updateUser = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
-        const userData = req.body;
+        if (isNaN(id)) {
+            res.status(400).json({ success: false, error: 'Invalid user ID format' });
+            return;
+        }
 
-        // Prevent changing email if necessary, or add validation
-        // delete userData.email; 
+        const updatedUser = await userService.updateUser(id, req.body);
+        if (!updatedUser) {
+            res.status(404).json({ success: false, error: 'User not found' });
+            return;
+        }
+        res.json({ success: true, data: transformUser(updatedUser) });
+    } catch (error: any) {
+        console.error(`Error updating user ${req.params.id}:`, error);
+        if (error.code === 'P2025') {
+            res.status(404).json({ success: false, error: 'User not found' });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+};
 
-        const updatedUser = await userService.updateUser(id, userData);
+export const updateCurrentUserProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        if (!req.user || typeof req.user.id !== 'number') {
+            res.status(401).json({ success: false, error: 'Unauthorized or user ID not found in token' });
+            return;
+        }
+
+        const userId = req.user.id;
+        const updatedUser = await userService.updateUser(userId, req.body);
+
         res.json({
             success: true,
-            data: updatedUser
+            data: transformUser(updatedUser)
         });
     } catch (error: any) {
-        console.error('Error updating user:', error);
-        if (error.code === 'P2025') { // Record to update not found
+        console.error('Error updating current user profile:', error);
+        if (error.code === 'P2025') {
             res.status(404).json({ success: false, error: 'User not found' });
         } else {
             res.status(500).json({ success: false, error: error.message });
@@ -257,7 +325,7 @@ export const assignRole = async (req: Request, res: Response): Promise<void> => 
         const userId = parseInt(req.params.id);
         const roleData = {
             role: req.body.role as Role,
-            academic_year_id: req.body.academic_year_id
+            // Removed academic_year_id since we're no longer using it
         };
 
         // Validate role
@@ -273,8 +341,8 @@ export const assignRole = async (req: Request, res: Response): Promise<void> => 
         });
     } catch (error: any) {
         console.error('Error assigning role:', error);
-        if (error.code === 'P2003') { // Foreign key constraint failed (user_id or academic_year_id doesn't exist)
-            res.status(404).json({ success: false, error: 'User or Academic Year not found' });
+        if (error.code === 'P2003') { // Foreign key constraint failed
+            res.status(404).json({ success: false, error: 'User not found' });
         } else {
             res.status(500).json({ success: false, error: error.message });
         }
@@ -284,14 +352,31 @@ export const assignRole = async (req: Request, res: Response): Promise<void> => 
 export const removeRole = async (req: Request, res: Response): Promise<void> => {
     try {
         const userId = parseInt(req.params.id);
-        const userRoleId = parseInt(req.params.roleId); // Expecting the UserRole ID
+        const userRoleId = req.params.roleId ? parseInt(req.params.roleId) : undefined; // Optional roleId from URL
+        const roleFromBody = req.body.role; // Role name from request body
 
-        if (isNaN(userRoleId)) {
-            res.status(400).json({ success: false, error: 'Invalid role ID provided' });
+        // Support two scenarios:
+        // 1. Remove by role ID: DELETE /users/:id/roles/:roleId
+        // 2. Remove by role name: DELETE /users/:id/roles (with role in body)
+
+        if (userRoleId !== undefined) {
+            // Scenario 1: Remove by role ID
+            if (isNaN(userRoleId)) {
+                res.status(400).json({ success: false, error: 'Invalid role ID provided' });
+                return;
+            }
+            await userService.removeRoleById(userId, userRoleId);
+        } else if (roleFromBody) {
+            // Scenario 2: Remove by role name
+            await userService.removeRoleByName(userId, roleFromBody);
+        } else {
+            res.status(400).json({
+                success: false,
+                error: 'Either roleId in URL or role in request body is required'
+            });
             return;
         }
 
-        await userService.removeRole(userId, userRoleId);
         res.json({
             success: true,
             message: 'Role assignment removed successfully'

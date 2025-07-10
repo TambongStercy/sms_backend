@@ -11,18 +11,18 @@ router.get('/announcements', authenticate, communicationController.getAnnounceme
 
 // POST /announcements - Create an announcement
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can create announcements
-router.post('/announcements', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.createAnnouncement);
+router.post('/announcements', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.createAnnouncement);
 
 // PUT /announcements/:id - Update an announcement
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can update announcements
-router.put('/announcements/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.updateAnnouncement);
+router.put('/announcements/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.updateAnnouncement);
 
 // DELETE /announcements/:id - Delete an announcement
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can delete announcements
-router.delete('/announcements/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.deleteAnnouncement);
+router.delete('/announcements/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.deleteAnnouncement);
 
 // POST /notifications - Send push notifications
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can send notifications
-router.post('/notifications', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.sendNotification);
+router.post('/notifications', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), communicationController.sendNotification);
 
 export default router;

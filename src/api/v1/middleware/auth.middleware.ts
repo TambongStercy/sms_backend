@@ -166,21 +166,24 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
  */
 export const authorize = (roles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
+        const user = (req as AuthenticatedRequest).user;
 
-
-
-        if (!req.user) {
-            res.status(401).json({ error: 'Unauthorized' });
-            return;
+        if (!user || !user.role) {
+            return res.status(401).json({ error: 'Unauthorized: User or role not found' });
         }
 
-        // Check if user's role is in the allowed roles
-        if (req.user.role && roles.some(role => req.user!.role!.includes(role))) {
-            next();
-        } else {
-            console.log(req.user?.role);
-            console.log(roles);
-            res.status(403).json({ error: `Forbidden: Insufficient permissions(Your Role: ${req.user?.role})` });
+        // Super managers have access to everything
+        if (user.role.includes('SUPER_MANAGER')) {
+            return next();
         }
+
+        // Check if user has any of the required roles
+        if (roles.some(role => user.role!.includes(role))) {
+            return next();
+        }
+
+        return res.status(403).json({
+            error: `Forbidden: Insufficient permissions. Required: ${roles.join(' or ')}, You have: ${user.role.join(', ')}`
+        });
     };
 }; 

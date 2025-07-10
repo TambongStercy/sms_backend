@@ -6,10 +6,9 @@ import { getCurrentAcademicYear, getAcademicYearId } from '../../../utils/academ
 // Interface for create/update data to ensure type safety
 interface ClassData {
     name: string;
-    level?: number;
     base_fee?: number;
-    new_student_add_fee?: number;
-    old_student_add_fee?: number;
+    new_student_fee?: number;
+    old_student_fee?: number;
     miscellaneous_fee?: number;
     first_term_fee?: number;
     second_term_fee?: number;
@@ -128,7 +127,7 @@ export async function getAllClassesWithSubclasses(): Promise<any[]> {
     const classes = await prisma.class.findMany({
         include: {
             sub_classes: {
-                include:{
+                include: {
                     sub_class_subjects: {
                         select: {
                             subject_id: true
@@ -181,10 +180,9 @@ export async function createClass(data: ClassData): Promise<Class> {
     return prisma.class.create({
         data: {
             name: data.name,
-            level: data.level,
             base_fee: data.base_fee,
-            new_student_add_fee: data.new_student_add_fee,
-            old_student_add_fee: data.old_student_add_fee,
+            new_student_fee: data.new_student_fee,
+            old_student_fee: data.old_student_fee,
             miscellaneous_fee: data.miscellaneous_fee,
             first_term_fee: data.first_term_fee,
             second_term_fee: data.second_term_fee,
@@ -245,10 +243,9 @@ export async function updateClass(id: number, data: Partial<ClassData>): Promise
         where: { id },
         data: {
             name: data.name,
-            level: data.level,
             base_fee: data.base_fee,
-            new_student_add_fee: data.new_student_add_fee,
-            old_student_add_fee: data.old_student_add_fee,
+            new_student_fee: data.new_student_fee,
+            old_student_fee: data.old_student_fee,
             miscellaneous_fee: data.miscellaneous_fee,
             first_term_fee: data.first_term_fee,
             second_term_fee: data.second_term_fee,

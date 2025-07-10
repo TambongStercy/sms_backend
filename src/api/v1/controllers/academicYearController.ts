@@ -121,6 +121,17 @@ export const updateAcademicYear = async (req: Request, res: Response): Promise<v
 export const deleteAcademicYear = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
+
+        // Check if academic year exists
+        const existingYear = await academicYearService.getAcademicYearById(id);
+        if (!existingYear) {
+            res.status(404).json({
+                success: false,
+                error: 'Academic year not found'
+            });
+            return;
+        }
+
         await academicYearService.deleteAcademicYear(id);
         res.json({
             success: true,
@@ -128,6 +139,16 @@ export const deleteAcademicYear = async (req: Request, res: Response): Promise<v
         });
     } catch (error: any) {
         console.error('Error deleting academic year:', error);
+
+        // Check if this is a dependency constraint error
+        if (error.message && error.message.includes('Cannot delete academic year. It is referenced by:')) {
+            res.status(409).json({
+                success: false,
+                error: error.message
+            });
+            return;
+        }
+
         res.status(500).json({
             success: false,
             error: error.message
@@ -204,6 +225,62 @@ export const getTerms = async (req: Request, res: Response): Promise<void> => {
         });
     } catch (error: any) {
         console.error('Error getting terms:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const getCurrentAcademicYear = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const currentYear = await academicYearService.getCurrentYear();
+
+        if (!currentYear) {
+            res.status(404).json({
+                success: false,
+                error: 'No current academic year found'
+            });
+            return;
+        }
+
+        // Response will be automatically converted to camelCase by middleware
+        res.json({
+            success: true,
+            data: currentYear
+        });
+    } catch (error: any) {
+        console.error('Error fetching current academic year:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const setCurrentAcademicYear = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = parseInt(req.params.id);
+
+        // Check if academic year exists
+        const existingYear = await academicYearService.getAcademicYearById(id);
+        if (!existingYear) {
+            res.status(404).json({
+                success: false,
+                error: 'Academic year not found'
+            });
+            return;
+        }
+
+        const updatedYear = await academicYearService.setCurrentAcademicYear(id);
+
+        res.json({
+            success: true,
+            message: 'Academic year set as current successfully',
+            data: updatedYear
+        });
+    } catch (error: any) {
+        console.error('Error setting current academic year:', error);
         res.status(500).json({
             success: false,
             error: error.message

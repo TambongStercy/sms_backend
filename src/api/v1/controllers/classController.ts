@@ -100,8 +100,8 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
             name,
             level,
             base_fee,
-            new_student_add_fee,
-            old_student_add_fee,
+            new_student_fee,
+            old_student_fee,
             miscellaneous_fee,
             first_term_fee,
             second_term_fee,
@@ -121,8 +121,8 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
             name,
             level: level !== undefined ? parseInt(level) : undefined,
             base_fee: base_fee !== undefined ? parseFloat(base_fee) : undefined,
-            new_student_add_fee: new_student_add_fee !== undefined ? parseFloat(new_student_add_fee) : undefined,
-            old_student_add_fee: old_student_add_fee !== undefined ? parseFloat(old_student_add_fee) : undefined,
+            new_student_fee: new_student_fee !== undefined ? parseFloat(new_student_fee) : undefined,
+            old_student_fee: old_student_fee !== undefined ? parseFloat(old_student_fee) : undefined,
             miscellaneous_fee: miscellaneous_fee !== undefined ? parseFloat(miscellaneous_fee) : undefined,
             first_term_fee: first_term_fee !== undefined ? parseFloat(first_term_fee) : undefined,
             second_term_fee: second_term_fee !== undefined ? parseFloat(second_term_fee) : undefined,
@@ -193,8 +193,8 @@ export const updateClass = async (req: Request, res: Response): Promise<void> =>
             name,
             level,
             base_fee,
-            new_student_add_fee,
-            old_student_add_fee,
+            new_student_fee,
+            old_student_fee,
             miscellaneous_fee,
             first_term_fee,
             second_term_fee,
@@ -206,8 +206,8 @@ export const updateClass = async (req: Request, res: Response): Promise<void> =>
         if (name !== undefined) updateData.name = name;
         if (level !== undefined) updateData.level = parseInt(level);
         if (base_fee !== undefined) updateData.base_fee = parseFloat(base_fee);
-        if (new_student_add_fee !== undefined) updateData.new_student_add_fee = parseFloat(new_student_add_fee);
-        if (old_student_add_fee !== undefined) updateData.old_student_add_fee = parseFloat(old_student_add_fee);
+        if (new_student_fee !== undefined) updateData.new_student_fee = parseFloat(new_student_fee);
+        if (old_student_fee !== undefined) updateData.old_student_fee = parseFloat(old_student_fee);
         if (miscellaneous_fee !== undefined) updateData.miscellaneous_fee = parseFloat(miscellaneous_fee);
         if (first_term_fee !== undefined) updateData.first_term_fee = parseFloat(first_term_fee);
         if (second_term_fee !== undefined) updateData.second_term_fee = parseFloat(second_term_fee);
@@ -223,8 +223,8 @@ export const updateClass = async (req: Request, res: Response): Promise<void> =>
         // Check if any fee-related fields were updated
         const feeFieldsUpdated =
             base_fee !== undefined ||
-            new_student_add_fee !== undefined ||
-            old_student_add_fee !== undefined ||
+            new_student_fee !== undefined ||
+            old_student_fee !== undefined ||
             miscellaneous_fee !== undefined ||
             first_term_fee !== undefined ||
             second_term_fee !== undefined ||

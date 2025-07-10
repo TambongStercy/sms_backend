@@ -10,6 +10,8 @@ declare module 'express' {
         finalQuery: any;
         params: any;
         user?: any;
+        ip: string;
+        get(field: string): string | undefined;
     }
 
     export interface Response extends http.ServerResponse {

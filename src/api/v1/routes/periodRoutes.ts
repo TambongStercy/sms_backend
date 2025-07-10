@@ -11,7 +11,7 @@ router.get('/', authenticate, periodController.getAllPeriods);
 // POST /periods - Create a new period
 router.post('/',
     authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL']),
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']),
     periodController.createPeriod
 );
 
@@ -21,14 +21,14 @@ router.get('/:id', authenticate, periodController.getPeriodById);
 // PUT /periods/:id - Update a period
 router.put('/:id',
     authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL']),
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']),
     periodController.updatePeriod
 );
 
 // DELETE /periods/:id - Delete a period
 router.delete('/:id',
     authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL']),
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']),
     periodController.deletePeriod
 );
 

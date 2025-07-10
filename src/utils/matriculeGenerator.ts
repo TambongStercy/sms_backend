@@ -15,12 +15,11 @@ const POSITION_CODES = {
 // Defines the hierarchy for determining the matricule position code.
 // Highest role in this list that the user has will determine the code.
 const MATRICULE_ROLE_PRIORITY: Role[] = [
-    Role.SUPER_MANAGER,
-    Role.MANAGER,
-    Role.TEACHER,
-    // Add other specific roles here if they need a code other than SO 
-    // and have a specific position in the hierarchy above general 'OTHERS'.
-    // For now, any role not SUPER_MANAGER, MANAGER, or TEACHER will become OTHERS (SO).
+    Role.SUPER_MANAGER,    // CEO prefix
+    Role.MANAGER,          // SA prefix  
+    Role.TEACHER,          // ST prefix
+    Role.HOD,              // ST prefix (Head of Department is teacher role)
+    // All other roles (PRINCIPAL, VICE_PRINCIPAL, BURSAR, DISCIPLINE_MASTER, GUIDANCE_COUNSELOR, PARENT) get SO prefix
 ];
 
 /**
@@ -41,8 +40,8 @@ export function getPositionCodeForRoles(roles: Role[] | undefined | null): strin
                 case Role.MANAGER:
                     return POSITION_CODES.MANAGER;
                 case Role.TEACHER:
+                case Role.HOD:  // HOD gets same prefix as TEACHER (ST)
                     return POSITION_CODES.TEACHER;
-                // Add other cases here if MATRICULE_ROLE_PRIORITY is expanded
             }
         }
     }

@@ -33,7 +33,7 @@ export async function createExamPaper(data: {
             subject_id: data.subject_id,
             academic_year_id: data.academic_year_id,
             exam_date: new Date(data.exam_date),
-            duration: BigInt(data.duration), // Convert to BigInt as expected in schema
+            duration: data.duration, // Use regular number since schema is now Int
         },
     });
 }
@@ -288,10 +288,10 @@ export async function getAllExamPapers(
 
     // Setup includes based on filterOptions (example)
     const include: any = {};
-    if (filterOptions?.includeSubject === 'true') {
+    if (filterOptions?.include_subject === 'true') {
         include.subject = true;
     }
-    if (filterOptions?.includeQuestions === 'true') {
+    if (filterOptions?.include_questions === 'true') {
         include.questions = {
             include: {
                 question: true
@@ -316,8 +316,8 @@ export async function getExamPaperWithQuestions(examPaperId: number): Promise<Ex
         academic_year: true
     };
 
-    // Use bracket notation to add the relationship that might have a different name
-    include['exam_paper_questions'] = {
+    // Use the correct relation name 'questions' as defined in the Prisma schema
+    include['questions'] = {
         include: { question: true },
         orderBy: { order: 'asc' }
     };
@@ -1659,5 +1659,21 @@ export async function updateExamSequenceStatus(
     }
 
     return updatedSequence;
+}
+
+export async function deleteExamPaper(id: number): Promise<ExamPaper> {
+    // Check if exam paper exists
+    const examPaper = await prisma.examPaper.findUnique({
+        where: { id }
+    });
+
+    if (!examPaper) {
+        throw new Error(`Exam paper with ID ${id} not found`);
+    }
+
+    // Delete the exam paper by ID
+    return prisma.examPaper.delete({
+        where: { id }
+    });
 }
 

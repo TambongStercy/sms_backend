@@ -87,9 +87,17 @@ export async function createFee(data: {
             : data.amount_paid;
     }
 
-    // Normalize payment method
-    // const paymentMethod = normalizePaymentMethod(data.payment_method);
+    // Validate that enrollment exists
+    if (!data.enrollment_id) {
+        throw new Error("Enrollment ID is required");
+    }
 
+    const enrollment = await prisma.enrollment.findUnique({
+        where: { id: data.enrollment_id }
+    });
+    if (!enrollment) {
+        throw new Error(`Enrollment with ID ${data.enrollment_id} not found`);
+    }
 
     return prisma.schoolFees.create({
         data: {
@@ -320,45 +328,24 @@ export async function recordPayment(data: {
     student_id?: number;
     academic_year_id?: number;
     fee_id: number;
+    recorded_by_id?: number;
 }): Promise<PaymentTransaction> {
-    // Handle the case where student_id is provided instead of enrollment_id
-    if (data.student_id && !data.enrollment_id) {
-        // Convert student_id to number if it's a string
-        const studentId = typeof data.student_id === 'string' ? parseInt(data.student_id, 10) : data.student_id;
-
-        const enrollment = await getStudentSubclassByStudentAndYear(
-            studentId,
-            data.academic_year_id
-        );
-
-        if (!enrollment) {
-            throw new Error(`Student with ID ${studentId} is not enrolled in the specified academic year`);
-        }
-
-        data.enrollment_id = enrollment.id;
-    }
-
-    // Get current academic year if not provided
-    if (!data.academic_year_id) {
-        data.academic_year_id = await getAcademicYearId() || undefined;
-        if (!data.academic_year_id) {
-            throw new Error("No academic year found and none provided");
-        }
-    }
-
-    // Normalize payment method
-    const paymentMethod = normalizePaymentMethod(data.payment_method);
-
-    console.log('PaymentTransaction.create data:', {
-        fee_id: data.fee_id,
-        amount: data.amount,
-        receipt_number: data.receipt_number,
-        payment_method: paymentMethod,
-        enrollment_id: data.enrollment_id,
-        student_id: data.student_id,
-        academic_year_id: data.academic_year_id,
-        payment_date: new Date(data.payment_date),
+    const fee = await prisma.schoolFees.findUnique({
+        where: { id: data.fee_id },
+        include: { enrollment: true }
     });
+
+    if (!fee) {
+        throw new Error(`Fee with ID ${data.fee_id} not found`);
+    }
+
+    const yearId = await getAcademicYearId(data.academic_year_id || fee.academic_year_id);
+    if (!yearId) {
+        throw new Error("Could not determine academic year for payment");
+    }
+
+    // Use enrollment_id from the fee record
+    const enrollmentId = fee.enrollment_id;
 
     // Create the payment transaction
     const transaction = await prisma.paymentTransaction.create({
@@ -366,14 +353,15 @@ export async function recordPayment(data: {
             fee_id: data.fee_id,
             amount: data.amount,
             receipt_number: data.receipt_number,
-            payment_method: paymentMethod,
-            enrollment_id: data.enrollment_id!,
-            academic_year_id: data.academic_year_id,
+            payment_method: normalizePaymentMethod(data.payment_method),
+            enrollment_id: enrollmentId,
+            academic_year_id: yearId,
             payment_date: new Date(data.payment_date),
-        },
+            recorded_by_id: data.recorded_by_id,
+        }
     });
 
-    // Update the amount_paid in the SchoolFees record
+    // Update the amount_paid on the SchoolFees record
     await prisma.schoolFees.update({
         where: { id: data.fee_id },
         data: {
@@ -387,9 +375,71 @@ export async function recordPayment(data: {
 }
 
 export async function exportFeeReports(academicYearId?: number): Promise<any> {
-    // Implementation for exporting fee reports
-    // This is a placeholder - actual implementation would generate the report
-    return { message: "Fee report exported successfully" };
+    try {
+        // Get current academic year if not provided
+        const yearId = await getAcademicYearId(academicYearId);
+
+        if (!yearId) {
+            throw new Error("No academic year found and none provided");
+        }
+
+        // Get all fees for the academic year
+        const fees = await prisma.schoolFees.findMany({
+            where: { academic_year_id: yearId },
+            include: {
+                enrollment: {
+                    include: {
+                        student: true,
+                        sub_class: {
+                            include: {
+                                class: true
+                            }
+                        }
+                    }
+                },
+                academic_year: true,
+                payment_transactions: true
+            },
+            orderBy: [
+                { enrollment: { sub_class: { class: { name: 'asc' } } } },
+                { enrollment: { student: { name: 'asc' } } }
+            ]
+        });
+
+        // Calculate summary statistics
+        const totalExpected = fees.reduce((sum, fee) => sum + fee.amount_expected, 0);
+        const totalPaid = fees.reduce((sum, fee) => sum + fee.amount_paid, 0);
+        const outstanding = totalExpected - totalPaid;
+        const paymentPercentage = totalExpected > 0 ? (totalPaid / totalExpected) * 100 : 0;
+
+        return {
+            academicYearId: yearId,
+            summary: {
+                totalStudents: fees.length,
+                totalExpected,
+                totalPaid,
+                outstanding,
+                paymentPercentage: parseFloat(paymentPercentage.toFixed(2))
+            },
+            fees: fees.map(fee => ({
+                feeId: fee.id,
+                studentName: fee.enrollment.student.name,
+                studentMatricule: fee.enrollment.student.matricule,
+                className: fee.enrollment.sub_class?.class.name || 'No Class',
+                subClassName: fee.enrollment.sub_class?.name || 'No Subclass',
+                expectedAmount: fee.amount_expected,
+                paidAmount: fee.amount_paid,
+                outstanding: fee.amount_expected - fee.amount_paid,
+                paymentPercentage: fee.amount_expected > 0 ?
+                    parseFloat(((fee.amount_paid / fee.amount_expected) * 100).toFixed(2)) : 0,
+                dueDate: fee.due_date,
+                paymentsCount: fee.payment_transactions.length
+            }))
+        };
+    } catch (error: any) {
+        console.error('Error in exportFeeReports:', error);
+        throw error;
+    }
 }
 
 /**
@@ -493,9 +543,9 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
         // Use the enhanced student status logic
         const shouldPayNewFees = await shouldPayNewStudentFees(enrollment.student_id, yearId);
         if (shouldPayNewFees) {
-            feeAmount += classInfo.new_student_add_fee;
+            feeAmount += classInfo.new_student_fee;
         } else {
-            feeAmount += classInfo.old_student_add_fee;
+            feeAmount += classInfo.old_student_fee;
         }
 
         console.log(`Calculated fee amount for student ${enrollment.student.name}: ${feeAmount}`);
@@ -586,9 +636,9 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
     // Use the enhanced student status logic
     const shouldPayNewFees = await shouldPayNewStudentFees(enrollment.student_id, enrollment.academic_year_id);
     if (shouldPayNewFees) {
-        feeAmount += classInfo.new_student_add_fee;
+        feeAmount += classInfo.new_student_fee;
     } else {
-        feeAmount += classInfo.old_student_add_fee;
+        feeAmount += classInfo.old_student_fee;
     }
 
     // Create the fee record

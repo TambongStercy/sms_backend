@@ -143,7 +143,8 @@ export const recordDisciplineIssue = async (req: Request, res: Response): Promis
         // Use the body directly - middleware handles conversion
         const issueData = {
             ...req.body,
-            assigned_by_id: req.user.id // Set assigned_by_id from authenticated user
+            assigned_by_id: req.user.id, // Set assigned_by_id from authenticated user
+            reviewed_by_id: req.user.id  // Same user initially reviews the issue
         };
 
         const issue = await disciplineService.recordDisciplineIssue(issueData);
@@ -192,6 +193,133 @@ export const getDisciplineHistory = async (req: Request, res: Response): Promise
         });
     } catch (error: any) {
         console.error('Error fetching discipline history:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Record morning lateness for a single student (SDM)
+ */
+export const recordMorningLateness = async (req: Request, res: Response): Promise<any> => {
+    try {
+        // Check if user is authenticated
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated or missing ID'
+            });
+        }
+
+        const latenessData = {
+            ...req.body,
+            assigned_by_id: req.user.id
+        };
+
+        const lateness = await disciplineService.recordMorningLateness(latenessData);
+
+        res.status(201).json({
+            success: true,
+            message: 'Morning lateness recorded successfully',
+            data: lateness
+        });
+    } catch (error: any) {
+        console.error('Error recording morning lateness:', error);
+
+        let statusCode = 500;
+        if (error.message.includes('not enrolled')) {
+            statusCode = 404;
+        } else if (error.message.includes('already recorded')) {
+            statusCode = 409;
+        } else if (error.message.includes('No academic year')) {
+            statusCode = 400;
+        }
+
+        res.status(statusCode).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Record bulk morning lateness for multiple students (SDM daily use)
+ */
+export const recordBulkMorningLateness = async (req: Request, res: Response): Promise<any> => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated or missing ID'
+            });
+        }
+
+        const bulkData = req.body;
+        const results = await disciplineService.recordBulkMorningLateness(bulkData, req.user.id);
+
+        res.status(201).json({
+            success: true,
+            message: `Processed ${results.success.length + results.errors.length} records`,
+            data: {
+                successful_records: results.success.length,
+                failed_records: results.errors.length,
+                successes: results.success,
+                errors: results.errors
+            }
+        });
+    } catch (error: any) {
+        console.error('Error recording bulk morning lateness:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get lateness statistics for SDM dashboard
+ */
+export const getLatenessStatistics = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+
+        const statistics = await disciplineService.getLatenessStatistics(academicYearId);
+
+        res.json({
+            success: true,
+            data: statistics
+        });
+    } catch (error: any) {
+        console.error('Error fetching lateness statistics:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get daily lateness report for SDM
+ */
+export const getDailyLatenessReport = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const date = req.query.date as string;
+        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+
+        const report = await disciplineService.getDailyLatenessReport(date, academicYearId);
+
+        res.json({
+            success: true,
+            data: {
+                date: date || new Date().toISOString().split('T')[0],
+                total_late_students: report.length,
+                records: report
+            }
+        });
+    } catch (error: any) {
+        console.error('Error fetching daily lateness report:', error);
         res.status(500).json({
             success: false,
             error: error.message

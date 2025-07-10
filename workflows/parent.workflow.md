@@ -1,0 +1,684 @@
+# PARENT Role - Complete Workflow & UX Design
+
+## Post-Login Parent Dashboard (`/parent/dashboard`)
+
+### **API Integration**
+**Primary Endpoint:** `GET /api/v1/parents/dashboard`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current year
+  }
+  ```
+- **Response Data:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      totalChildren: number;
+      childrenEnrolled: number;
+      pendingFees: number;        // Total fees owed in FCFA
+      totalFeesOwed: number;      // Same as pendingFees
+      latestGrades: number;       // Count of recent grades
+      disciplineIssues: number;   // Active discipline issues
+      unreadMessages: number;     // Unread messages count
+      upcomingEvents: number;     // Upcoming school events
+      children: Array<{
+        id: number;
+        name: string;
+        className?: string;
+        subclassName?: string;
+        enrollmentStatus: string;
+        photo?: string;
+        attendanceRate: number;   // Percentage
+        latestMarks: Array<{
+          subjectName: string;
+          latestMark: number;
+          sequence: string;
+          date: string;
+        }>;
+        pendingFees: number;      // Individual child's pending fees
+        disciplineIssues: number; // Child's discipline issues
+        recentAbsences: number;   // Recent absence count
+      }>;
+    };
+  }
+  ```
+
+### **Main Dashboard Layout**
+```
+┌─────────────────────────────────────────────────────────┐
+│ [🏠] School Management System    [🔔] [👤] [⚙️] [🚪]    │
+├─────────────────────────────────────────────────────────┤
+│ Welcome back, [Parent Name] | Academic Year: 2024-2025  │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│ ┌─── Quick Stats (Cards) ───┐                          │
+│ │ 👨‍👩‍👧‍👦 Total Children: 2    💰 Pending Fees: 50,000 FCFA │
+│ │ 📚 Enrolled: 2            📊 Latest Grades: 5         │
+│ │ ⚠️ Discipline Issues: 0    📧 Unread Messages: 3      │
+│ │ 📅 Upcoming Events: 2                                 │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── My Children ───┐                                   │
+│ │ [Child 1 Card] [Child 2 Card]                        │ 
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Recent Activity ───┐                               │
+│ │ • New quiz result for John - Math (85%)              │
+│ │ • Fee payment recorded for Mary - 25,000 FCFA        │
+│ │ • New announcement: Parent-Teacher Meeting            │
+│ └─────────────────────────────────────────────────────┘
+```
+
+### **Child Cards Design**
+Each child gets a card showing:
+```
+┌─── [Child Photo] John Doe ───┐
+│ Form 5A - Science Stream     │
+│ ─────────────────────────    │
+│ 📊 Attendance: 92%           │
+│ 📚 Latest Average: 15.2/20   │
+│ 💰 Pending Fees: 25,000 FCFA │
+│ ⚠️ Discipline Issues: 0       │
+│ [View Details] [Quick Actions]│
+└─────────────────────────────┘
+```
+
+## Child Details Page (`/parent/children/:studentId`)
+
+### **API Integration**
+**Primary Endpoint:** `GET /api/v1/parents/children/:studentId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current year
+  }
+  ```
+- **Response Data:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      matricule: string;
+      dateOfBirth: string;
+      classInfo?: {
+        className: string;
+        subclassName: string;
+        classMaster?: string;
+      };
+      attendance: {
+        presentDays: number;
+        absentDays: number;
+        lateDays: number;
+        attendanceRate: number; // Percentage
+      };
+      academicPerformance: {
+        subjects: Array<{
+          subjectName: string;
+          teacherName: string;
+          marks: Array<{
+            sequence: string;
+            mark: number;
+            total: number;
+            date: string;
+          }>;
+          average: number;
+        }>;
+        overallAverage: number;
+        positionInClass?: number;
+      };
+      fees: {
+        totalExpected: number;
+        totalPaid: number;
+        outstandingBalance: number;
+        lastPaymentDate?: string;
+        paymentHistory: Array<{
+          id: number;
+          amount: number;
+          paymentDate: string;
+          paymentMethod: string;
+          receiptNumber?: string;
+          recordedBy: string;
+        }>;
+      };
+      discipline: {
+        totalIssues: number;
+        recentIssues: Array<{
+          id: number;
+          type: string;
+          description: string;
+          dateOccurred: string;
+          status: string;
+          resolvedAt?: string;
+        }>;
+      };
+      reports: {
+        availableReports: Array<{
+          id: number;
+          sequenceName: string;
+          academicYear: string;
+          generatedAt: string;
+          downloadUrl: string;
+        }>;
+      };
+    };
+  }
+  ```
+
+### **Navigation Tabs**
+```
+[📊 Overview] [💰 Fees] [📚 Academics] [🎯 Quizzes] [⚠️ Discipline] [📊 Analytics]
+```
+
+### **1. Overview Tab**
+```
+┌─── Student Information ───┐
+│ Photo: [Image]            │
+│ Name: John Doe            │
+│ Matricule: STU2024001     │
+│ Class: Form 5A            │
+│ Class Master: Mrs. Smith  │
+└─────────────────────────┘
+
+┌─── Quick Metrics ───┐
+│ Attendance Rate: 92%  │
+│ Overall Average: 15.2 │
+│ Class Rank: 5/30      │
+│ Fee Status: Partial   │
+└─────────────────────┘
+
+┌─── Recent Activity ───┐
+│ • Math Quiz: 85% (2 days ago)        │
+│ • English Essay submitted             │
+│ • Fee payment: 25,000 FCFA received  │
+└─────────────────────────────────────┘
+```
+
+### **2. Fees Tab**
+**API Integration:**
+
+#### **Get Student Fee Information**
+**Endpoint:** `GET /api/v1/fees/student/:studentId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): Student ID
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current year
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      studentId: number;
+      studentName: string;
+      studentMatricule: string;
+      academicYear: string;
+      totalExpected: number;
+      totalPaid: number;
+      outstandingBalance: number;
+      lastPaymentDate?: string;
+      nextDueDate?: string;
+      feeSummary: {
+        schoolFees: number;
+        miscellaneousFees: number;
+        newStudentFees?: number;
+        termFees: {
+          firstTerm: number;
+          secondTerm: number;
+          thirdTerm: number;
+        };
+      };
+      paymentHistory: Array<{
+        id: number;
+        amount: number;
+        paymentDate: string;
+        paymentMethod: "EXPRESS_UNION" | "CCA" | "3DC";
+        receiptNumber?: string;
+        recordedBy: string;
+        notes?: string;
+      }>;
+      outstandingFees: Array<{
+        id: number;
+        feeType: string;
+        amountDue: number;
+        dueDate: string;
+        daysOverdue?: number;
+        description?: string;
+      }>;
+      paymentMethodBreakdown: Array<{
+        method: string;
+        totalAmount: number;
+        transactionCount: number;
+        percentage: number;
+      }>;
+    };
+  }
+  ```
+
+```
+┌─── Fee Summary ───┐
+│ Total Expected: 150,000 FCFA    │
+│ Total Paid: 100,000 FCFA        │
+│ Outstanding: 50,000 FCFA        │
+│ Last Payment: 2024-01-15        │
+└───────────────────────────────┘
+
+┌─── Payment History ───┐
+│ Date        Amount      Method       Receipt    │
+│ 2024-01-15  25,000 FCFA EXPRESS_UNION #R001   │
+│ 2023-12-10  75,000 FCFA CCA          #R002    │
+│ [View All Payments]                           │
+└─────────────────────────────────────────────┘
+
+┌─── Outstanding Fees ───┐
+│ Fee Type: School Fees               │
+│ Amount Due: 50,000 FCFA            │
+│ Due Date: 2024-02-15               │
+│ [Contact Bursar] [Payment Guide]   │
+└──────────────────────────────────┘
+```
+
+### **3. Academics Tab**
+**Additional API Endpoints:**
+- Academic performance data is included in the main child details endpoint
+
+```
+┌─── Performance Overview ───┐
+│ Overall Average: 15.2/20          │
+│ Grade: B                          │
+│ Class Position: 5/30              │
+│ Trend: ↗️ Improving               │
+└─────────────────────────────────┘
+
+┌─── Subject Performance ───┐
+│ Subject     Teacher        Seq1  Seq2  Avg   │
+│ Mathematics Mr. Johnson    16    15    15.5  │
+│ English     Mrs. Brown     14    16    15.0  │
+│ Physics     Dr. Wilson     18    17    17.5  │
+│ Chemistry   Ms. Davis      12    14    13.0  │
+│ [View Detailed Marks]                        │
+└────────────────────────────────────────────┘
+
+┌─── Available Reports ───┐
+│ 📄 Sequence 1 Report - 2024      [Download] │
+│ 📄 Sequence 2 Report - 2024      [Download] │
+└─────────────────────────────────────────────┘
+```
+
+### **4. Quizzes Tab**
+**API Integration:**
+- `GET /api/v1/parents/children/:studentId/quiz-results`
+- Query Parameters: `{ academicYearId?: number }`
+- **Response Data:**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      quizTitle: string;
+      subjectName: string;
+      completedAt: string;
+      score: number;
+      totalMarks: number;
+      percentage: number;
+      status: "COMPLETED" | "PENDING" | "OVERDUE";
+    }>;
+  }
+  ```
+
+```
+┌─── Quiz Summary ───┐
+│ Total Quizzes: 12       │
+│ Completed: 10           │
+│ Average Score: 78%      │
+│ Completion Rate: 83%    │
+└───────────────────────┘
+
+┌─── Recent Quizzes ───┐
+│ Subject    Date       Score    Status      Action     │
+│ Math       2024-01-20 85%      Completed   [View]     │
+│ English    2024-01-18 92%      Completed   [View]     │
+│ Physics    2024-01-15 78%      Completed   [View]     │
+│ Chemistry  2024-01-22 -        Available   [Start]    │
+└──────────────────────────────────────────────────────┘
+
+[View All Quiz Results]
+```
+
+### **5. Discipline Tab**
+**API Integration:**
+- Discipline data is included in the main child details endpoint
+
+```
+┌─── Discipline Summary ───┐
+│ Total Issues: 2             │
+│ Resolved: 2                 │
+│ Pending: 0                  │
+│ Latest Issue: 2023-12-05    │
+└───────────────────────────┘
+
+┌─── Discipline History ───┐
+│ Date       Type         Description        Status    │
+│ 2023-12-05 Lateness     Arrived 8:30 AM    Resolved  │
+│ 2023-11-20 Class Absence Missed History    Resolved  │
+│ [View Details]                                       │
+└────────────────────────────────────────────────────┘
+
+┌─── Attendance Tracking ───┐
+│ This Month: 20/22 days present           │
+│ Attendance Rate: 91%                     │
+│ Recent Absences: 2                       │
+│ [View Attendance Calendar]               │
+└────────────────────────────────────────┘
+```
+
+### **6. Analytics Tab**
+**API Integration:**
+- `GET /api/v1/parents/children/:studentId/analytics`
+- Query Parameters: `{ academicYearId?: number }`
+- **Response Data:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      studentInfo: {
+        id: number;
+        name: string;
+        classInfo: object;
+      };
+      performanceAnalytics: {
+        overallAverage: number;
+        grade: string;
+        classRank?: number;
+        improvementTrend: "IMPROVING" | "DECLINING" | "STABLE";
+        subjectsAboveAverage: number;
+        subjectsBelowAverage: number;
+        recommendation: string;
+      };
+      attendanceAnalytics: {
+        totalDays: number;
+        presentDays: number;
+        absentDays: number;
+        attendanceRate: number;
+        status: string;
+        monthlyTrends: Array<{
+          month: string;
+          attendanceRate: number;
+        }>;
+      };
+      quizAnalytics: {
+        totalQuizzes: number;
+        completedQuizzes: number;
+        averageScore: number;
+        highestScore: number;
+        completionRate: number;
+        recentQuizzes: Array<object>;
+      };
+      subjectTrends: Array<{
+        subjectName: string;
+        currentAverage: number;
+        trend: "IMPROVING" | "DECLINING" | "STABLE";
+        bestMark: number;
+        lowestMark: number;
+      }>;
+      comparativeAnalytics: {
+        studentAverage: number;
+        classAverage: number;
+        aboveClassAverage: boolean;
+        percentileRank?: number;
+      };
+    };
+  }
+  ```
+
+```
+┌─── Performance Analytics ───┐
+│ Current Average: 15.2/20         │
+│ Class Rank: 5/30                 │
+│ Improvement Trend: ↗️ Improving  │
+│ Above Class Average: ✅ Yes       │
+│ Recommendation: Focus on Chemistry│
+└────────────────────────────────┘
+
+┌─── Subject Trends ───┐
+│ [📊 Chart showing performance trends by subject] │
+│ Mathematics: ↗️ Improving                        │
+│ English: → Stable                               │
+│ Physics: ↗️ Improving                           │
+│ Chemistry: ↘️ Declining                         │
+└───────────────────────────────────────────────┘
+
+┌─── Comparative Analytics ───┐
+│ Your Child's Average: 15.2/20    │
+│ Class Average: 14.8/20           │
+│ Performance: Above Average        │
+│ Percentile Rank: 75th            │
+└─────────────────────────────────┘
+```
+
+## All Children Overview (`/parent/children`)
+
+### **API Integration**
+**Primary Endpoint:** `GET /api/v1/parents/children/quiz-results`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional
+  }
+  ```
+
+```
+┌─── All My Children ───┐
+│ [Filter: All Classes] [Sort: Name ▼]                    │
+│                                                         │
+│ ┌─── John Doe (Form 5A) ───┐                            │
+│ │ 📊 Attendance: 92% | 📚 Average: 15.2/20             │
+│ │ 💰 Pending: 25,000 FCFA | ⚠️ Issues: 0               │
+│ │ Recent: Math Quiz 85% | Physics Test 17/20           │
+│ │ [View Details] [Quick Message]                       │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Mary Doe (Form 3B) ───┐                            │
+│ │ 📊 Attendance: 95% | 📚 Average: 14.8/20             │
+│ │ 💰 Pending: 0 FCFA | ⚠️ Issues: 1                    │
+│ │ Recent: English Essay A+ | Chemistry Quiz 12/20      │
+│ │ [View Details] [Quick Message]                       │
+│ └─────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────┘
+```
+
+## Messaging (`/parent/messages`)
+
+### **API Integration**
+**Send Message Endpoint:** `POST /api/v1/parents/message-staff`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    recipientId: number;    // Staff member ID
+    subject: string;        // Required
+    message: string;        // Required
+    priority?: "LOW" | "MEDIUM" | "HIGH";
+    studentId?: number;     // Optional - if about specific child
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    message: "Message sent successfully";
+    data: {
+      id: number;
+      subject: string;
+      sentAt: string;
+      recipientName: string;
+    };
+  }
+  ```
+
+**Get Messages Endpoint:** `GET /api/v1/messaging/threads`
+- Query parameters for filtering and pagination
+
+```
+┌─── Parent Messaging Center ───┐
+│ [📝 Compose] [📥 Inbox] [📤 Sent] [⭐ Important]       │
+│                                                        │
+│ ┌─── Quick Message to Staff ───┐                       │
+│ │ To: [Select Staff ▼] Teacher | Class Master | HOD    │
+│ │     [Search: Mr. Johnson, Mrs. Smith...]             │
+│ │ About Child: [Select Child ▼] [John Doe] [Mary Doe] │
+│ │ Subject: [Text Input]                                │
+│ │ Priority: [●Medium] [○Low] [○High]                   │
+│ │ Message: [Text Area]                                 │
+│ │ [Send Message] [Save Draft]                          │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ ┌─── Recent Conversations ───┐                         │
+│ │ 📧 Mr. Johnson (Math Teacher)     | 2 hours ago     │
+│ │    Re: John's Math Performance                       │
+│ │    "Thank you for the update..."                     │
+│ │                                                      │
+│ │ 📧 Mrs. Smith (Class Master)      | 1 day ago       │
+│ │    Mary's Attendance Query                           │
+│ │    "I'll check the records..."                       │
+│ │                                                      │
+│ │ 📧 Principal                      | 3 days ago       │
+│ │    Parent-Teacher Meeting Notice                     │
+│ │    "Dear parents, we are..."                         │
+│ │                                                      │
+│ │ [View All Messages]                                  │
+│ └────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────┘
+```
+
+## School Announcements (`/parent/announcements`)
+
+### **API Integration**
+**Primary Endpoint:** `GET /api/v1/parents/announcements`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      title: string;
+      content: string;
+      priority: "LOW" | "MEDIUM" | "HIGH";
+      publishedAt: string;
+      author: string;
+      category: string;
+      attachments?: Array<{
+        fileName: string;
+        fileUrl: string;
+      }>;
+    }>;
+  }
+  ```
+
+```
+┌─── School Announcements ───┐
+│ [🔔 All] [📚 Academic] [💰 Financial] [📅 Events]     │
+│                                                        │
+│ ┌─── 🔴 URGENT: School Closure Notice ───┐             │
+│ │ Published: January 20, 2024 | Principal             │
+│ │ Due to heavy rains, school will be closed            │
+│ │ tomorrow (January 21). All classes resuming          │
+│ │ Monday. Stay safe!                                   │
+│ │ [Read More] [Download Notice]                        │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ ┌─── 📅 Parent-Teacher Conference ───┐                  │
+│ │ Published: January 18, 2024 | Academic Office       │
+│ │ Annual parent-teacher conference scheduled           │
+│ │ for February 5-7. Book your appointments...         │
+│ │ [Read More] [Book Appointment]                       │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ ┌─── 💰 Fee Payment Reminder ───┐                       │
+│ │ Published: January 15, 2024 | Bursar                │
+│ │ Second term fees due January 31st.                  │
+│ │ Various payment methods available...                 │
+│ │ [Read More] [Payment Guide]                          │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ [Load More Announcements]                              │
+└──────────────────────────────────────────────────────┘
+```
+
+## Settings & Profile (`/parent/settings`)
+
+### **API Integration**
+**Get Profile:** `GET /api/v1/users/me`
+**Update Profile:** `PUT /api/v1/users/me`
+**Update Preferences:** `PUT /api/v1/messaging/preferences`
+
+```
+┌─── Parent Settings ───┐
+│ [👤 Profile] [🔔 Notifications] [🔒 Security] [👨‍👩‍👧‍👦 Children]│
+│                                                        │
+│ ┌─── Profile Information ───┐                          │
+│ │ Name: [Mr. Johnson]                                  │
+│ │ Email: [johnson@email.com]                           │
+│ │ Phone: [677123456]                                   │
+│ │ WhatsApp: [677123456]                                │
+│ │ Address: [123 Main Street, Douala]                   │
+│ │ [Update Profile]                                     │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ ┌─── Notification Preferences ───┐                     │
+│ │ ✅ Email Notifications                               │
+│ │ ✅ SMS Notifications                                 │
+│ │ ✅ Academic Updates                                  │
+│ │ ✅ Fee Reminders                                     │
+│ │ ✅ Discipline Alerts                                 │
+│ │ ❌ Marketing Messages                                │
+│ │ [Save Preferences]                                   │
+│ └────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────┘
+```
+
+## Error States & Loading
+
+### **API Error Handling**
+```typescript
+// Standard error response format
+{
+  success: false;
+  error: string; // User-friendly error message
+}
+
+// Common error scenarios:
+// 401: "User not authenticated" - Redirect to login
+// 403: "Access denied: insufficient permissions"  
+// 404: "Student/Resource not found"
+// 500: "Internal server error" - Show generic error message
+```
+
+### **Loading States**
+- Show skeleton loaders for dashboard cards
+- Spinner for individual API calls
+- Progressive loading for large data sets
+- Offline state handling with cached data
+
+### **Data Refresh**
+- Auto-refresh dashboard every 5 minutes
+- Pull-to-refresh on mobile
+- Real-time updates for critical notifications
+- Cache strategy for frequently accessed data
+
+**Frontend Implementation Notes:**
+1. Use React Query or SWR for efficient data fetching and caching
+2. Implement optimistic updates for better UX
+3. Handle network failures gracefully with retry mechanisms
+4. Store authentication token securely
+5. Implement proper TypeScript interfaces matching API response types

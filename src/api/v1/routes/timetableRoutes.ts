@@ -5,15 +5,15 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// GET /timetables - Get timetable for a sub_class
+// GET /timetables/subclass/:subclassId - Get timetable for a specific sub_class
 // All authenticated users can view timetables
-router.get('/', authenticate, timetableController.getSubclassTimetable);
+router.get('/subclass/:subclassId', authenticate, timetableController.getSubclassTimetable);
 
-// POST /timetables/bulk-update - Update multiple timetable slots
+// POST /timetables/subclass/:subclassId/bulk-update - Update multiple timetable slots for a specific sub_class
 // Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can update timetables
-router.post('/bulk-update',
+router.post('/subclass/:subclassId/bulk-update',
     authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
     timetableController.bulkUpdateTimetable
 );
 

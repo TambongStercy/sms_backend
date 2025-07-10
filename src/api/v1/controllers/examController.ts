@@ -217,10 +217,20 @@ export const createExamPaper = async (req: Request, res: Response): Promise<any>
 
 export const addQuestionsToExam = async (req: Request, res: Response) => {
     try {
-        const questions = await examService.addQuestionsToExam(parseInt(req.params.id), req.body);
+        // Extract questions array from request body
+        const { questions } = req.body;
+
+        if (!questions || !Array.isArray(questions)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Questions array is required in request body'
+            });
+        }
+
+        const questionLinks = await examService.addQuestionsToExam(parseInt(req.params.id), questions);
         res.status(201).json({
             success: true,
-            data: questions
+            data: questionLinks
         });
     } catch (error: any) {
         console.error('Error adding questions to exam:', error);
@@ -552,30 +562,19 @@ export const getExamById = async (req: Request, res: Response): Promise<any> => 
 
 export const deleteExam = async (req: Request, res: Response): Promise<any> => {
     try {
-        const examId = parseInt(req.params.id);
-
-        // Check if exam exists
-        const exam = await examService.getExamById(examId);
-        if (!exam) {
-            return res.status(404).json({
-                success: false,
-                error: 'Exam not found'
-            });
-        }
-
-        // Delete exam
-        await examService.deleteExam(examId);
-
+        const id = parseInt(req.params.id);
+        await examService.deleteExam(id);
         res.json({
             success: true,
             message: 'Exam deleted successfully'
         });
     } catch (error: any) {
         console.error('Error deleting exam:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        if (error.code === 'P2025') { // Record to delete not found
+            res.status(404).json({ success: false, error: 'Exam not found' });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
     }
 };
 
@@ -740,6 +739,39 @@ export const updateExamSequenceStatusController = async (req: Request, res: Resp
             res.status(404).json({ success: false, error: error.message });
         } else {
             res.status(500).json({ success: false, error: error.message || 'Internal server error updating exam sequence status.' });
+        }
+    }
+};
+
+export const deleteExamPaper = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+
+        if (isNaN(id)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid exam paper ID format'
+            });
+        }
+
+        await examService.deleteExamPaper(id);
+
+        res.json({
+            success: true,
+            message: 'Exam paper deleted successfully'
+        });
+    } catch (error: any) {
+        console.error('Error deleting exam paper:', error);
+        if (error.message.includes('not found') || error.code === 'P2025') {
+            res.status(404).json({
+                success: false,
+                error: 'Exam paper not found'
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
         }
     }
 };

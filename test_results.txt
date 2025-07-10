@@ -1,0 +1,155 @@
+
+[1;33mLogging in as all user roles...[0m
+
+[0;32m✅ Logged in as SUPER_MANAGER[0m
+[0;32m✅ Logged in as PRINCIPAL[0m
+[0;32m✅ Logged in as VICE_PRINCIPAL[0m
+[0;32m✅ Logged in as BURSAR[0m
+[0;32m✅ Logged in as DISCIPLINE_MASTER[0m
+[0;32m✅ Logged in as TEACHER_MATH[0m
+[0;32m✅ Logged in as TEACHER_PHYSICS[0m
+[0;32m✅ Logged in as TEACHER_ENGLISH[0m
+[0;32m✅ Logged in as TEACHER_CHEMISTRY[0m
+[0;32m✅ Logged in as HOD[0m
+[0;32m✅ Logged in as PARENT1[0m
+[0;32m✅ Logged in as PARENT2[0m
+[0;32m✅ Logged in as PARENT3[0m
+📧 Using random email for registration: test-1752079275@test.com
+
+[1;33m🔐 Testing Authentication Endpoints...[0m
+[0;32m✅ Login with Email (200)[0m
+[0;32m✅ Login with Matricule (200)[0m
+[0;32m✅ Invalid Login (401)[0m
+[0;32m✅ Register User (201)[0m
+[0;32m✅ Get Profile (200)[0m
+
+👨‍👩‍👧‍👦 Testing Parent Portal Endpoints...
+[0;32m✅ Parent Dashboard (200)[0m
+[0;32m✅ Parent Dashboard with Academic Year (200)[0m
+✅ Extracted CHILD_ID for PARENT1: 279
+[0;32m✅ Get Child Details (200)[0m
+[0;32m✅ Get Child Details with Academic Year (200)[0m
+[0;32m✅ Send Message to Staff (201)[0m
+[0;32m✅ Get Child Quiz Results (200)[0m
+[0;32m✅ Get Child Analytics (200)[0m
+[0;32m✅ Get All Children Quiz Results (400)[0m
+[0;32m✅ Get School Announcements (200)[0m
+
+[1;33m🧩 Testing Quiz System Endpoints...[0m
+Creating quiz and capturing ID...
+✅ Successfully created quiz with ID: 55
+[0;32m✅ Create Quiz (Teacher) (201)[0m
+[0;32m✅ Get Available Quizzes for Student (200)[0m
+[0;32m✅ Start Quiz (201)[0m
+[0;32m✅ Get All Quizzes (Teacher) (200)[0m
+
+[1;33m🎓 Testing Vice Principal (Student Management) Endpoints...[0m
+
+🎓 Testing Vice Principal (Student Management) Endpoints...
+Registering a new student to capture ID...
+✅ Successfully registered new student with ID: 385
+✅ Successfully created enrollment with ID: 334
+[0;32m✅ Register Student to Class (201)[0m
+[0;31m❌ Record Interview Mark (500)[0m
+[0;31m❌ Assign Student to Subclass (500)[0m
+[0;32m✅ Get Unassigned Students (200)[0m
+[0;32m✅ Get Available Subclasses (200)[0m
+[0;32m✅ Get Enrollment Statistics (200)[0m
+[0;32m✅ Get Student Enrollment Status (200)[0m
+
+[1;33m💰 Testing Bursar (Financial Management) Endpoints...[0m
+Creating fee for enrollment ID: 334
+✅ Successfully created fee with ID: 276
+[0;32m✅ Create Fee (201)[0m
+[0;32m✅ Record Payment (201)[0m
+[0;32m✅ Get Student Fees (200)[0m
+[0;32m✅ Get Fee by ID (200)[0m
+[0;32m✅ Update Fee (200)[0m
+[0;32m✅ Get Fee Payments (200)[0m
+[0;32m✅ Get Subclass Fees Summary (200)[0m
+[0;32m✅ Get All Fees (200)[0m
+[0;32m✅ Export Fee Reports (200)[0m
+
+[1;33m⚠️ Testing Discipline Master Endpoints...[0m
+[0;32m✅ Get All Discipline Issues (200)[0m
+[0;32m✅ Get Discipline Issues with Filters (200)[0m
+[0;32m✅ Record Discipline Issue (201)[0m
+[0;32m✅ Get Discipline History (200)[0m
+[0;32m✅ Record Morning Lateness (201)[0m
+[0;32m✅ Record Bulk Morning Lateness (201)[0m
+[0;32m✅ Get Lateness Statistics (200)[0m
+[0;32m✅ Get Daily Lateness Report (200)[0m
+
+[1;33m👨‍🏫 Testing Teacher Portal Endpoints...[0m
+[0;32m✅ Get My Subjects (Teacher) (200)[0m
+[0;32m✅ Get My Students (Teacher) (200)[0m
+[0;32m✅ Get My Subclasses (Teacher) (200)[0m
+[0;32m✅ Get My Dashboard (Teacher) (200)[0m
+[0;32m✅ Check My Access (Teacher) (200)[0m
+[0;32m✅ Get My Subject IDs (Teacher) (200)[0m
+[0;32m✅ Get My Subclass IDs (Teacher) (200)[0m
+
+📅 Testing Timetable Management Endpoints...
+[0;32m✅ Get Subclass Timetable (404)[0m
+[0;32m✅ Bulk Update Timetable (404)[0m
+
+📅 Testing Academic Year Management Endpoints...
+[0;32m✅ Get All Academic Years (200)[0m
+[0;32m✅ Create Academic Year (201)[0m
+[0;32m✅ Get Academic Year by ID (200)[0m
+[0;32m✅ Update Academic Year (200)[0m
+[0;32m✅ Set Current Academic Year (200)[0m
+[0;32m✅ Get Current Academic Year (200)[0m
+
+👨‍🎓 Testing Student Management Endpoints...
+[0;32m✅ Get All Students (200)[0m
+[0;32m✅ Get Students with Filters (200)[0m
+[0;32m✅ Create Student (201)[0m
+[0;32m✅ Get Student by ID (200)[0m
+[0;32m✅ Update Student (200)[0m
+[0;32m✅ Link Parent (500)[0m
+[0;32m✅ Get Parents by Student (200)[0m
+[0;32m✅ Enroll Student (404)[0m
+[0;32m✅ Get Students by Subclass (400)[0m
+[0;32m✅ Get Students by Parent (200)[0m
+
+👥 Testing User Management Endpoints...
+[0;32m✅ Get All Users (200)[0m
+[0;32m✅ Get Users with Filters (200)[0m
+[0;31m❌ Create User (409)[0m
+[0;32m✅ Get User by ID (200)[0m
+[0;32m✅ Update User (200)[0m
+[0;32m✅ Get User Profile (200)[0m
+[0;32m✅ Update User Profile (200)[0m
+[0;31m❌ Assign Role (201)[0m
+[0;32m✅ Remove Role (200)[0m
+
+📊 Testing Dashboard Endpoints...
+[0;32m✅ Super Manager Dashboard (200)[0m
+[0;32m✅ Principal Dashboard (200)[0m
+[0;32m✅ Vice Principal Dashboard (200)[0m
+[0;32m✅ Bursar Dashboard (200)[0m
+[0;32m✅ Discipline Master Dashboard (200)[0m
+[0;32m✅ Teacher Dashboard (200)[0m
+
+[1;33m🏫 Testing Class Management Endpoints...[0m
+[0;32m✅ Get All Classes (200)[0m
+[0;32m✅ Get Class by ID (200)[0m
+
+[1;33m📚 Testing Subject Management Endpoints...[0m
+[0;32m✅ Get All Subjects (200)[0m
+[0;32m✅ Get Subject by ID (200)[0m
+
+[1;33m📊 Testing Exam and Marks Endpoints...[0m
+[0;32m✅ Get All Exams (200)[0m
+[0;31m❌ Get Student Marks (404)[0m
+
+[1;33m🔒 Testing Authorization Edge Cases...[0m
+[0;32m✅ Unauthorized Access (No Token) (401)[0m
+[0;32m✅ Teacher Access to Admin Endpoint (403)[0m
+[0;32m✅ Parent Access to Teacher Endpoint (403)[0m
+
+🔑 Testing Logout...
+[0;32m✅ Logout (200)[0m
+
+[0;32mAll tests completed.[0m

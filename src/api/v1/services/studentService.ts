@@ -5,6 +5,7 @@ import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../
 import * as feeService from './feeService'; // Import feeService
 import { generateStudentMatricule } from '../../../utils/matriculeGenerator'; // Import student matricule generator
 import { setFirstEnrollmentYear } from '../../../utils/studentStatus'; // Import student status utilities
+import { StudentStatus } from '@prisma/client'; // Import StudentStatus enum
 
 // Get all students with pagination and filtering
 export async function getAllStudents(
@@ -23,7 +24,8 @@ export async function getAllStudentsWithCurrentEnrollment(
     academicYearIdInput?: number, // Explicitly name the input
     paginationOptions?: PaginationOptions,
     filterOptions?: FilterOptions,
-    enrollmentStatus?: 'enrolled' | 'not_enrolled' | 'all' // Add enrollmentStatus parameter
+    enrollmentStatus?: 'enrolled' | 'not_enrolled' | 'all', // Add enrollmentStatus parameter
+    teacherSubClassIds?: number[] // Add teacher subclass restriction
 ): Promise<PaginatedResult<any>> {
 
     // 1. Determine Target Academic Year
@@ -65,9 +67,15 @@ export async function getAllStudentsWithCurrentEnrollment(
         academic_year_id: targetAcademicYearId
     };
 
-    // Apply sub_class filter ONLY if filtering for 'enrolled' students
+    // Apply teacher subclass restriction if provided
+    if (teacherSubClassIds && teacherSubClassIds.length > 0) {
+        enrollmentCriteria.sub_class_id = { in: teacherSubClassIds };
+        console.log("Applying teacher restriction: students must be in assigned subclasses", teacherSubClassIds);
+    }
+
+    // Apply sub_class filter ONLY if filtering for 'enrolled' students and no teacher restriction
     if (enrollmentStatus === 'enrolled') { // Check specifically for 'enrolled'
-        if (sub_classIdFilter !== undefined) {
+        if (sub_classIdFilter !== undefined && (!teacherSubClassIds || teacherSubClassIds.length === 0)) {
             enrollmentCriteria.sub_class_id = sub_classIdFilter;
         }
         studentWhere.enrollments = { some: enrollmentCriteria };
@@ -77,10 +85,23 @@ export async function getAllStudentsWithCurrentEnrollment(
         if (sub_classIdFilter !== undefined) {
             console.warn("Subclass filter ignored when enrollmentStatus is 'not_enrolled'");
         }
-        studentWhere.enrollments = { none: { academic_year_id: targetAcademicYearId } };
+        if (teacherSubClassIds && teacherSubClassIds.length > 0) {
+            // For teachers, we can't show not_enrolled students as they can only see their assigned students
+            studentWhere.enrollments = {
+                none: {
+                    academic_year_id: targetAcademicYearId,
+                    sub_class_id: { in: teacherSubClassIds }
+                }
+            };
+        } else {
+            studentWhere.enrollments = { none: { academic_year_id: targetAcademicYearId } };
+        }
         console.log("Applying filter: NOT ENROLLED");
     } else { // Default to 'all' if enrollmentStatus is undefined or 'all'
-        if (sub_classIdFilter !== undefined) {
+        // Always ensure students have enrollments in their assigned subclasses for teachers
+        if (teacherSubClassIds && teacherSubClassIds.length > 0) {
+            studentWhere.enrollments = { some: enrollmentCriteria };
+        } else if (sub_classIdFilter !== undefined) {
             // Apply sub_class_id filter to the main student query for 'all' status
             studentWhere.enrollments = {
                 some: {
@@ -172,32 +193,78 @@ export async function createStudent(data: {
     place_of_birth: string;
     gender: string;
     residence: string;
-    former_school: string;
+    former_school?: string;
+    is_new_student?: boolean; // Add support for new/old student tracking
+    status?: StudentStatus; // Add support for initial status
 }): Promise<Student> {
 
-    if (!Object.values(Gender).includes(data.gender as Gender)) {
+    // Validate required fields
+    if (!data.name || !data.date_of_birth || !data.place_of_birth || !data.gender || !data.residence) {
+        throw new Error("Missing required fields: name, date_of_birth, place_of_birth, gender, and residence are required");
+    }
+
+    // Validate and normalize gender
+    let normalizedGender: Gender;
+    const genderLower = data.gender.toLowerCase();
+    if (genderLower === 'male') {
+        normalizedGender = Gender.Male;
+    } else if (genderLower === 'female') {
+        normalizedGender = Gender.Female;
+    } else {
         throw new Error("Invalid gender. Choose a valid gender.");
     }
 
+    // Validate date of birth
+    const dateOfBirth = new Date(data.date_of_birth);
+    if (isNaN(dateOfBirth.getTime())) {
+        throw new Error("Invalid date of birth format");
+    }
+
+    // Check if date of birth is not in the future
+    if (dateOfBirth > new Date()) {
+        throw new Error("Date of birth cannot be in the future");
+    }
+
+    // Generate matricule if not provided
     let studentMatricule = data.matricule;
     if (!studentMatricule) {
-        // Generate matricule based on the year of date_of_birth if sensible, or current year
-        // For simplicity, using current year for matricule generation.
-        // If student creation is tied to an academic year, that year could be used.
         studentMatricule = await generateStudentMatricule();
     }
 
-    return prisma.student.create({
-        data: {
-            matricule: studentMatricule, // Use provided or generated matricule
-            name: data.name,
-            place_of_birth: data.place_of_birth,
-            gender: data.gender as Gender,
-            residence: data.residence,
-            former_school: data.former_school,
-            date_of_birth: new Date(data.date_of_birth),
-        },
+    // Check if matricule already exists
+    const existingStudent = await prisma.student.findUnique({
+        where: { matricule: studentMatricule }
     });
+
+    if (existingStudent) {
+        throw new Error(`Student with matricule ${studentMatricule} already exists`);
+    }
+
+    // Set defaults for new/old student and status
+    const isNewStudent = data.is_new_student !== undefined ? data.is_new_student : true;
+    const studentStatus = data.status || StudentStatus.NOT_ENROLLED;
+
+    try {
+        return await prisma.student.create({
+            data: {
+                matricule: studentMatricule,
+                name: data.name.trim(),
+                place_of_birth: data.place_of_birth.trim(),
+                gender: normalizedGender,
+                residence: data.residence.trim(),
+                former_school: data.former_school?.trim() || null,
+                date_of_birth: dateOfBirth,
+                is_new_student: isNewStudent,
+                status: studentStatus,
+                // first_enrollment_year_id will be set when student is first enrolled
+            },
+        });
+    } catch (error: any) {
+        if (error.code === 'P2002') {
+            throw new Error("Student with this matricule already exists");
+        }
+        throw new Error(`Failed to create student: ${error.message}`);
+    }
 }
 
 export async function updateStudent(id: number, data: Partial<Omit<Student, 'id' | 'created_at' | 'updated_at'>>): Promise<Student> {
@@ -207,8 +274,15 @@ export async function updateStudent(id: number, data: Partial<Omit<Student, 'id'
         updateData.date_of_birth = new Date(data.date_of_birth);
     }
 
-    if (data.gender && !Object.values(Gender).includes(data.gender as Gender)) {
-        throw new Error("Invalid gender. Choose a valid gender.");
+    if (data.gender) {
+        const genderLower = data.gender.toLowerCase();
+        if (genderLower === 'male') {
+            updateData.gender = Gender.Male;
+        } else if (genderLower === 'female') {
+            updateData.gender = Gender.Female;
+        } else {
+            throw new Error("Invalid gender. Choose a valid gender.");
+        }
     }
 
     return prisma.student.update({
@@ -251,6 +325,35 @@ export async function getStudentById(id: number, academicYearId?: number): Promi
 }
 
 export async function linkParent(student_id: number, data: { parent_id: number }): Promise<ParentStudent> {
+    // First verify that both student and parent exist
+    const student = await prisma.student.findUnique({
+        where: { id: student_id }
+    });
+
+    if (!student) {
+        throw new Error(`Student with ID ${student_id} not found`);
+    }
+
+    const parent = await prisma.user.findUnique({
+        where: { id: data.parent_id }
+    });
+
+    if (!parent) {
+        throw new Error(`Parent with ID ${data.parent_id} not found`);
+    }
+
+    // Check if relationship already exists
+    const existingLink = await prisma.parentStudent.findFirst({
+        where: {
+            student_id: student_id,
+            parent_id: data.parent_id
+        }
+    });
+
+    if (existingLink) {
+        throw new Error(`Parent ${data.parent_id} is already linked to student ${student_id}`);
+    }
+
     return prisma.parentStudent.create({
         data: {
             student: {
@@ -292,7 +395,8 @@ export async function enrollStudent(
     const enrollment = await prisma.enrollment.create({
         data: {
             student_id,
-            sub_class_id: data.sub_class_id,
+            class_id: sub_class.class_id, // Required: parent class
+            sub_class_id: data.sub_class_id, // Optional: specific subclass
             academic_year_id: yearId,
             repeater: data.repeater ?? false,
             photo: data.photo ?? null,

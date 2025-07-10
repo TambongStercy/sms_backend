@@ -1,20 +1,27 @@
 // src/api/v1/services/authService.ts
-import prisma, { Gender, Role } from '../../../config/db';
-import jwt from 'jsonwebtoken';
+import { PrismaClient, User, Role, Gender, UserStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
-import { JwtPayload } from '../middleware/auth.middleware';
+import { generateToken } from '../../../config/auth';
+import prisma from '../../../config/db';
+
+interface LoginCredentials {
+    email?: string;
+    matricule?: string;
+    password: string;
+}
 
 // Define user registration data interface
 interface UserRegistrationData {
     name: string;
     email: string;
     password: string;
-    gender: string;
+    gender: "Male" | "Female";
     date_of_birth: string;
     phone: string;
     address: string;
     id_card_num?: string;
     photo?: string;
+    status?: UserStatus;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -25,105 +32,101 @@ if (!JWT_SECRET) {
 const TOKEN_EXPIRY = '24h';
 
 /**
- * Authenticate user and generate JWT token
- * @param email - User email
- * @param password - User password
- * @returns Object containing JWT token and user data
+ * Logs a user in.
+ * @param credentials - The user's login credentials (email or matricule, and password).
+ * @returns The JWT token and user data.
  */
-export async function login(email: string, password: string) {
-    // Find user by email
+export const login = async (credentials: LoginCredentials): Promise<any> => {
+    const { email, matricule, password } = credentials;
+
+    if (!password || (!email && !matricule)) {
+        throw new Error('Email/Matricule and password are required');
+    }
+
+    const findCondition = email ? { email } : { matricule };
+
     const user = await prisma.user.findUnique({
-        where: { email },
+        where: findCondition,
         include: {
-            user_roles: true
-        }
+            user_roles: true,
+        },
     });
 
-    // Check if user exists
     if (!user) {
+        console.error(`Login failed: User not found with identifier - ${email || matricule}`);
+        throw new Error('User not found');
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+        console.error(`Login failed: Password mismatch for user ${user.email}`);
         throw new Error('Invalid credentials');
     }
 
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-        throw new Error('Invalid credentials');
+    if (user.status !== 'ACTIVE') {
+        throw new Error('User account is not active');
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-        {
-            id: user.id,
-            email: user.email,
-            role: user.user_roles.map(role => role.role) as Role[]
-        } as JwtPayload,
-        JWT_SECRET,
-        { expiresIn: TOKEN_EXPIRY }
-    );
+    const userActiveRoles = user.user_roles.map(ur => ur.role);
+    const token = generateToken({ id: user.id, roles: userActiveRoles });
 
-    // Return token and user (excluding password)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...userWithoutPassword } = user;
 
-    return {
-        token,
-        expiresIn: TOKEN_EXPIRY,
-        user: userWithoutPassword
-    };
-}
+    return { token, expiresIn: '24h', user: userWithoutPassword };
+};
 
 /**
- * Register a new user
+ * Registers a new user.
  * @param userData - User registration data
- * @returns Created user data
+ * @returns The newly created user.
  */
-export async function register(userData: UserRegistrationData & { status?: string }) {
-    // Validate gender
-    if (userData.gender && !Object.values(Gender).includes(userData.gender as any)) {
-        throw new Error('Invalid gender. Choose a valid gender.');
-    }
+export const register = async (userData: UserRegistrationData): Promise<User> => {
+    const {
+        name,
+        email,
+        password,
+        gender,
+        date_of_birth: dateOfBirth,
+        phone,
+        address,
+        id_card_num: idCardNum,
+        photo,
+        status,
+    } = userData;
 
-    // Check if email is already in use
-    const existingUser = await prisma.user.findUnique({
-        where: { email: userData.email }
-    });
-
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
         throw new Error('Email already in use');
     }
 
-    // Format date correctly if it's a string
-    const formattedData = {
-        ...userData,
-        gender: userData.gender as Gender,
-        date_of_birth: new Date(userData.date_of_birth)
-    };
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
-
-    // Create user
-    const user = await prisma.user.create({
+    const createdUser = await prisma.user.create({
         data: {
-            name: formattedData.name,
-            email: formattedData.email,
+            name,
+            email,
             password: hashedPassword,
-            gender: formattedData.gender as Gender,
-            date_of_birth: formattedData.date_of_birth,
-            phone: formattedData.phone,
-            address: formattedData.address,
-            id_card_num: formattedData.id_card_num,
-            photo: formattedData.photo,
-            ...(userData.status && { status: userData.status as any })
+            gender: gender,
+            date_of_birth: new Date(dateOfBirth),
+            phone,
+            address,
+            id_card_num: idCardNum,
+            photo,
+            status: status || 'ACTIVE',
+            user_roles: {
+                create: [{ role: Role.PARENT }], // Default role for new users is PARENT
+            },
         },
         include: {
-            user_roles: true
-        }
+            user_roles: true,
+        },
     });
 
-    // Return user data (excluding password)
-    const { password: _, ...userWithoutPassword } = user;
-    return userWithoutPassword;
-}
+    return createdUser;
+};
 
 /**
  * Get user profile by ID

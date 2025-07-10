@@ -7,13 +7,22 @@ import { blacklistToken } from '../services/tokenBlacklistService';
 /**
  * Handle user login
  * 
- * @param req - Express request object containing email and password in the body
+ * @param req - Express request object containing email/matricule and password in the body
  * @param res - Express response object
  */
 export const login = async (req: Request, res: Response) => {
     try {
-        const { email, password } = req.body;
-        const result = await authService.login(email, password);
+        const { email, matricule, password } = req.body;
+
+        if ((!email && !matricule) || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Email/matricule and password are required'
+            });
+        }
+
+        const result = await authService.login(req.body);
+
         res.json({
             success: true,
             data: result

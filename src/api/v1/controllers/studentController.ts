@@ -52,7 +52,8 @@ export const getAllStudents = async (req: Request, res: Response) => {
             academic_year_id,
             paginationOptions,
             filterOptions, // Pass the filters extracted (including sub_class_id)
-            valid_enrollment_status // Pass the validated enrollment status filter
+            valid_enrollment_status, // Pass the validated enrollment status filter
+            (req as any).teacherSubClassIds // Pass teacher's accessible subclass IDs if present
         );
 
         res.json({
@@ -72,6 +73,30 @@ export const createStudent = async (req: Request, res: Response) => {
     try {
         // Use the body directly - middleware handles conversion
         const studentData = req.body;
+
+        // Validate required fields
+        const requiredFields = ['name', 'date_of_birth', 'place_of_birth', 'gender', 'residence'];
+        const missingFields = requiredFields.filter(field => !studentData[field]);
+
+        if (missingFields.length > 0) {
+            return res.status(400).json({
+                success: false,
+                error: `Missing required fields: ${missingFields.join(', ')}`
+            });
+        }
+
+        // Validate gender
+        const validGenders = ['MALE', 'FEMALE', 'OTHER'];
+        if (!validGenders.includes(studentData.gender?.toUpperCase())) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid gender. Must be MALE, FEMALE, or OTHER'
+            });
+        }
+
+        // Normalize gender to uppercase
+        studentData.gender = studentData.gender.toUpperCase();
+
         const newStudent = await studentService.createStudent(studentData);
 
         res.status(201).json({
@@ -80,6 +105,22 @@ export const createStudent = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         console.error('Error creating student:', error);
+
+        // Handle specific error types
+        if (error.message.includes('Missing required fields')) {
+            return res.status(400).json({ success: false, error: error.message });
+        }
+
+        if (error.message.includes('Invalid gender') ||
+            error.message.includes('Invalid date of birth') ||
+            error.message.includes('already exists')) {
+            return res.status(400).json({ success: false, error: error.message });
+        }
+
+        if (error.message.includes('Date of birth cannot be in the future')) {
+            return res.status(400).json({ success: false, error: error.message });
+        }
+
         res.status(500).json({
             success: false,
             error: error.message
@@ -149,11 +190,25 @@ export const linkParent = async (req: Request, res: Response) => {
     try {
         const studentId = parseInt(req.params.id);
 
+        if (isNaN(studentId)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid student ID'
+            });
+        }
+
         // Use the body directly with student_id - middleware handles conversion
         const linkData = {
             ...req.body,
             student_id: studentId
         };
+
+        if (!linkData.parent_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'Parent ID is required'
+            });
+        }
 
         const newLink = await studentService.linkParent(studentId, linkData);
         res.status(201).json({
@@ -162,6 +217,21 @@ export const linkParent = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         console.error('Error linking parent:', error);
+
+        if (error.message.includes('not found')) {
+            return res.status(404).json({
+                success: false,
+                error: error.message
+            });
+        }
+
+        if (error.message.includes('already linked')) {
+            return res.status(409).json({
+                success: false,
+                error: error.message
+            });
+        }
+
         res.status(500).json({
             success: false,
             error: error.message
@@ -354,6 +424,70 @@ export const getStudentsWithStatusInfo = async (req: Request, res: Response): Pr
         });
     } catch (error: any) {
         console.error('Error getting students with status:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get all students in a specific subclass
+ */
+export const getStudentsBySubclass = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const subclassId = parseInt(req.params.subclassId);
+        if (isNaN(subclassId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Subclass ID format' });
+        }
+
+        // Get academic year from query params or use current
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
+
+        const students = await studentService.getStudentsBySubclass(subclassId, academic_year_id);
+
+        res.json({
+            success: true,
+            data: students
+        });
+    } catch (error: any) {
+        console.error('Error getting students by subclass:', error);
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get all students for a specific parent
+ */
+export const getStudentsByParent = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const parentId = parseInt(req.params.parentId);
+        if (isNaN(parentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Parent ID format' });
+        }
+
+        // Get academic year from query params or use current  
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
+
+        const students = await studentService.getStudentsByParentId(parentId, academic_year_id);
+
+        res.json({
+            success: true,
+            data: students
+        });
+    } catch (error: any) {
+        console.error('Error getting students by parent:', error);
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
         res.status(500).json({
             success: false,
             error: error.message

@@ -15,8 +15,13 @@ const PORT = parseInt(process.env.PORT || DEFAULT_PORT.toString(), 10);
 function startServer(port: number) {
     const server = app.listen(port, () => {
         const addressInfo = server.address() as AddressInfo;
-        console.log(`Server is running on port ${addressInfo.port}`);
-        console.log(`API documentation available at http://localhost:${addressInfo.port}/api-docs`);
+        if (addressInfo) {
+            console.log(`Server is running on port ${addressInfo.port}`);
+            console.log(`API documentation available at http://localhost:${addressInfo.port}/api-docs`);
+        } else {
+            console.log(`Server is running on port ${port}`);
+            console.log(`API documentation available at http://localhost:${port}/api-docs`);
+        }
 
         // Start scheduled tasks
         scheduleAverageCalculations();

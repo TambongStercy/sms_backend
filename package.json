@@ -17,7 +17,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate",
     "seed-periods": "ts-node ./scripts/seed-periods.ts",
-    "start:worker": "ts-node src/workers/reportGenerator.ts"
+    "start:worker": "ts-node src/workers/reportGenerator.ts",
+    "seed:test": "ts-node scripts/comprehensive-test-seed.ts"
   },
   "dependencies": {
     "@faker-js/faker": "^9.5.0",

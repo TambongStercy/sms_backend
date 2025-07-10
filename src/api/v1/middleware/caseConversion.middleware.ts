@@ -41,12 +41,16 @@ const convertObjectKeys = (obj: any): any => {
 
 /**
  * Recursively converts all keys in an object from snake_case to camelCase
- * and converts Date objects to ISO 8601 strings.
+ * and converts Date objects to ISO 8601 strings and BigInt to numbers.
  * @param obj Object to convert
  * @returns Object with camelCase keys and date strings
  */
 const convertObjectKeysToClient = (obj: any): any => {
     if (obj === null || typeof obj !== 'object') {
+        // Handle BigInt values
+        if (typeof obj === 'bigint') {
+            return Number(obj); // Convert BigInt to number
+        }
         return obj;
     }
 

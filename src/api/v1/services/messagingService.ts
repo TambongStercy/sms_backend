@@ -1,0 +1,497 @@
+import prisma from '../../../config/db';
+import { MessageStatus } from '@prisma/client';
+import { getCurrentAcademicYear } from '../../../utils/academicYear';
+import { sendNotification } from './notificationService';
+
+export interface CreateMessageData {
+    senderId: number;
+    receiverId: number;
+    subject: string;
+    content: string;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+    attachments?: string[];
+}
+
+export interface MessageFilters {
+    status?: MessageStatus;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+    dateFrom?: string;
+    dateTo?: string;
+    search?: string;
+}
+
+export interface ConversationParticipant {
+    id: number;
+    name: string;
+    role: string;
+    matricule: string;
+    unreadCount: number;
+    lastMessage?: {
+        content: string;
+        timestamp: Date;
+        isFromMe: boolean;
+    };
+}
+
+// Send a direct message
+export async function sendDirectMessage(data: CreateMessageData) {
+    try {
+        // Validate users exist
+        const [sender, receiver] = await Promise.all([
+            prisma.user.findUnique({ where: { id: data.senderId } }),
+            prisma.user.findUnique({ where: { id: data.receiverId } })
+        ]);
+
+        if (!sender || !receiver) {
+            throw new Error('Sender or receiver not found');
+        }
+
+        // Create message
+        const message = await prisma.message.create({
+            data: {
+                sender_id: data.senderId,
+                receiver_id: data.receiverId,
+                subject: data.subject,
+                content: data.content,
+                status: MessageStatus.SENT
+            },
+            include: {
+                sender: { select: { id: true, name: true, matricule: true } },
+                receiver: { select: { id: true, name: true, matricule: true } }
+            }
+        });
+
+        // Send notification to receiver
+        await sendNotification({
+            recipient_id: data.receiverId,
+            notification_type: 'IN_APP',
+            title: `New message from ${sender.name}`,
+            message: `Subject: ${data.subject}`,
+            priority: data.priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
+            category: 'GENERAL'
+        });
+
+        return message;
+    } catch (error: any) {
+        throw new Error(`Failed to send message: ${error.message}`);
+    }
+}
+
+// Get conversation history between two users
+export async function getConversationHistory(
+    userId: number,
+    otherUserId: number,
+    page: number = 1,
+    limit: number = 50
+) {
+    try {
+        const skip = (page - 1) * limit;
+
+        const messages = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { sender_id: userId, receiver_id: otherUserId },
+                    { sender_id: otherUserId, receiver_id: userId }
+                ]
+            },
+            include: {
+                sender: { select: { id: true, name: true, matricule: true } },
+                receiver: { select: { id: true, name: true, matricule: true } }
+            },
+            orderBy: { created_at: 'desc' },
+            skip,
+            take: limit
+        });
+
+        const total = await prisma.message.count({
+            where: {
+                OR: [
+                    { sender_id: userId, receiver_id: otherUserId },
+                    { sender_id: otherUserId, receiver_id: userId }
+                ]
+            }
+        });
+
+        // Mark messages as read
+        await prisma.message.updateMany({
+            where: {
+                sender_id: otherUserId,
+                receiver_id: userId,
+                status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] }
+            },
+            data: {
+                status: MessageStatus.READ
+            }
+        });
+
+        return {
+            messages: messages.reverse(), // Return in chronological order
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        };
+    } catch (error: any) {
+        throw new Error(`Failed to get conversation history: ${error.message}`);
+    }
+}
+
+// Get all conversations for a user
+export async function getUserConversations(userId: number): Promise<ConversationParticipant[]> {
+    try {
+        // Get all unique conversation partners
+        const conversations = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { sender_id: userId },
+                    { receiver_id: userId }
+                ]
+            },
+            select: {
+                id: true,
+                subject: true,
+                content: true,
+                status: true,
+                created_at: true,
+                sender_id: true,
+                receiver_id: true,
+                sender: { select: { id: true, name: true, matricule: true } },
+                receiver: { select: { id: true, name: true, matricule: true } }
+            },
+            orderBy: { created_at: 'desc' }
+        });
+
+        // Group by conversation partner
+        const partnersMap = new Map<number, ConversationParticipant>();
+
+        for (const message of conversations) {
+            const partnerId = message.sender_id === userId ? message.receiver_id : message.sender_id;
+            const partner = message.sender_id === userId ? message.receiver : message.sender;
+
+            if (!partnersMap.has(partnerId)) {
+                // Count unread messages from this partner
+                const unreadCount = await prisma.message.count({
+                    where: {
+                        sender_id: partnerId,
+                        receiver_id: userId,
+                        status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] }
+                    }
+                });
+
+                // Get user role
+                const userRole = await prisma.userRole.findFirst({
+                    where: { user_id: partnerId },
+                    orderBy: { created_at: 'desc' }
+                });
+
+                partnersMap.set(partnerId, {
+                    id: partnerId,
+                    name: partner.name,
+                    role: userRole?.role || 'PARENT',
+                    matricule: partner.matricule,
+                    unreadCount,
+                    lastMessage: {
+                        content: message.content.substring(0, 100) + (message.content.length > 100 ? '...' : ''),
+                        timestamp: message.created_at,
+                        isFromMe: message.sender_id === userId
+                    }
+                });
+            }
+        }
+
+        return Array.from(partnersMap.values()).sort((a, b) =>
+            (b.lastMessage?.timestamp || new Date(0)).getTime() - (a.lastMessage?.timestamp || new Date(0)).getTime()
+        );
+    } catch (error: any) {
+        throw new Error(`Failed to get user conversations: ${error.message}`);
+    }
+}
+
+// Get messages by filters
+export async function getMessagesByFilters(
+    userId: number,
+    filters: MessageFilters,
+    page: number = 1,
+    limit: number = 20
+) {
+    try {
+        const skip = (page - 1) * limit;
+
+        const where: any = {
+            OR: [
+                { sender_id: userId },
+                { receiver_id: userId }
+            ]
+        };
+
+        if (filters.status) {
+            where.status = filters.status;
+        }
+
+        if (filters.priority) {
+            where.priority = filters.priority;
+        }
+
+        if (filters.dateFrom) {
+            where.created_at = { gte: new Date(filters.dateFrom) };
+        }
+
+        if (filters.dateTo) {
+            where.created_at = { ...where.created_at, lte: new Date(filters.dateTo) };
+        }
+
+        if (filters.search) {
+            where.OR = [
+                { subject: { contains: filters.search, mode: 'insensitive' } },
+                { content: { contains: filters.search, mode: 'insensitive' } },
+                { sender: { name: { contains: filters.search, mode: 'insensitive' } } },
+                { receiver: { name: { contains: filters.search, mode: 'insensitive' } } }
+            ];
+        }
+
+        const messages = await prisma.message.findMany({
+            where,
+            include: {
+                sender: { select: { id: true, name: true, matricule: true } },
+                receiver: { select: { id: true, name: true, matricule: true } }
+            },
+            orderBy: { created_at: 'desc' },
+            skip,
+            take: limit
+        });
+
+        const total = await prisma.message.count({ where });
+
+        return {
+            messages,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        };
+    } catch (error: any) {
+        throw new Error(`Failed to get messages: ${error.message}`);
+    }
+}
+
+// Mark message as read
+export async function markMessageAsRead(messageId: number, userId: number) {
+    try {
+        const message = await prisma.message.findUnique({
+            where: { id: messageId }
+        });
+
+        if (!message) {
+            throw new Error('Message not found');
+        }
+
+        if (message.receiver_id !== userId) {
+            throw new Error('Not authorized to mark this message as read');
+        }
+
+        return await prisma.message.update({
+            where: { id: messageId },
+            data: {
+                status: MessageStatus.READ
+            }
+        });
+    } catch (error: any) {
+        throw new Error(`Failed to mark message as read: ${error.message}`);
+    }
+}
+
+// Get message by ID
+export async function getMessageById(messageId: number, userId: number) {
+    try {
+        const message = await prisma.message.findUnique({
+            where: { id: messageId },
+            include: {
+                sender: { select: { id: true, name: true, matricule: true } },
+                receiver: { select: { id: true, name: true, matricule: true } }
+            }
+        });
+
+        if (!message) {
+            throw new Error('Message not found');
+        }
+
+        // Check if user is authorized to view this message
+        if (message.sender_id !== userId && message.receiver_id !== userId) {
+            throw new Error('Not authorized to view this message');
+        }
+
+        // Mark as read if user is the receiver
+        if (message.receiver_id === userId && message.status !== MessageStatus.READ) {
+            await prisma.message.update({
+                where: { id: messageId },
+                data: {
+                    status: MessageStatus.READ
+                }
+            });
+        }
+
+        return message;
+    } catch (error: any) {
+        throw new Error(`Failed to get message: ${error.message}`);
+    }
+}
+
+// Delete message
+export async function deleteMessage(messageId: number, userId: number) {
+    try {
+        const message = await prisma.message.findUnique({
+            where: { id: messageId }
+        });
+
+        if (!message) {
+            throw new Error('Message not found');
+        }
+
+        if (message.sender_id !== userId) {
+            throw new Error('Not authorized to delete this message');
+        }
+
+        return await prisma.message.delete({
+            where: { id: messageId }
+        });
+    } catch (error: any) {
+        throw new Error(`Failed to delete message: ${error.message}`);
+    }
+}
+
+// Get message statistics for a user
+export async function getMessageStats(userId: number) {
+    try {
+        const [totalSent, totalReceived, unreadCount, todaysMessages] = await Promise.all([
+            prisma.message.count({
+                where: { sender_id: userId }
+            }),
+            prisma.message.count({
+                where: { receiver_id: userId }
+            }),
+            prisma.message.count({
+                where: {
+                    receiver_id: userId,
+                    status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] }
+                }
+            }),
+            prisma.message.count({
+                where: {
+                    OR: [
+                        { sender_id: userId },
+                        { receiver_id: userId }
+                    ],
+                    created_at: {
+                        gte: new Date(new Date().setHours(0, 0, 0, 0))
+                    }
+                }
+            })
+        ]);
+
+        return {
+            totalSent,
+            totalReceived,
+            unreadCount,
+            todaysMessages
+        };
+    } catch (error: any) {
+        throw new Error(`Failed to get message statistics: ${error.message}`);
+    }
+}
+
+// Get suggested contacts for a user (based on role relationships)
+export async function getSuggestedContacts(userId: number) {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                user_roles: true
+            }
+        });
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        const currentAcademicYear = await getCurrentAcademicYear();
+        if (!currentAcademicYear) {
+            throw new Error('No current academic year found');
+        }
+
+        const userRole = user.user_roles[0]?.role; // Get primary role
+        let suggestedContacts = [];
+
+        switch (userRole) {
+            case 'PARENT':
+                // Parents can contact teachers and administrators
+                suggestedContacts = await prisma.user.findMany({
+                    where: {
+                        user_roles: {
+                            some: {
+                                role: { in: ['PARENT', 'TEACHER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'MANAGER'] }
+                            }
+                        },
+                        id: { not: userId }
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        matricule: true,
+                        user_roles: { select: { role: true } }
+                    },
+                    take: 10
+                });
+                break;
+
+            case 'TEACHER':
+            case 'HOD':
+                // Teachers can contact parents, students, and administrators
+                suggestedContacts = await prisma.user.findMany({
+                    where: {
+                        user_roles: {
+                            some: {
+                                role: { in: ['PARENT', 'TEACHER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'MANAGER'] }
+                            }
+                        },
+                        id: { not: userId }
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        matricule: true,
+                        user_roles: { select: { role: true } }
+                    },
+                    take: 10
+                });
+                break;
+
+            default:
+                // Administrators can contact everyone
+                suggestedContacts = await prisma.user.findMany({
+                    where: {
+                        id: { not: userId }
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        matricule: true,
+                        user_roles: { select: { role: true } }
+                    },
+                    take: 10
+                });
+        }
+
+        return suggestedContacts.map(contact => ({
+            id: contact.id,
+            name: contact.name,
+            matricule: contact.matricule,
+            role: contact.user_roles[0]?.role || 'PARENT'
+        }));
+    } catch (error: any) {
+        throw new Error(`Failed to get suggested contacts: ${error.message}`);
+    }
+} 

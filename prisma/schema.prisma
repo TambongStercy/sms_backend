@@ -8,75 +8,106 @@ datasource db {
 }
 
 model AcademicYear {
-  id                            Int                          @id @unique @default(autoincrement())
-  name                          String?
-  start_date                    DateTime
-  end_date                      DateTime
-  created_at                    DateTime                     @default(now())
-  updated_at                    DateTime                     @updatedAt
-  announcements                 Announcement[]
-  bursar_assignment             BursarAssignment?
-  discipline_master_assignments DisciplineMasterAssignment[]
-  enrollments                   Enrollment[]
-  exam_papers                   ExamPaper[]
-  exam_sequences                ExamSequence[]
-  payment_transactions          PaymentTransaction[]
-  principal_assignment          PrincipalAssignment?
-  school_fees                   SchoolFees[]
-  teacher_periods               TeacherPeriod[]
-  terms                         Term[]
-  user_roles                    UserRole[]
-  vice_principal_assignments    VicePrincipalAssignment[]
-  GeneratedReport               GeneratedReport[]
-  first_enrollment_students     Student[]                    @relation("StudentFirstEnrollment")
+  id                        Int                  @id @unique @default(autoincrement())
+  name                      String?
+  start_date                DateTime
+  end_date                  DateTime
+  is_current                Boolean              @default(false)
+  report_deadline           DateTime?
+  created_at                DateTime             @default(now())
+  updated_at                DateTime             @updatedAt
+  announcements             Announcement[]
+  enrollments               Enrollment[]
+  exam_papers               ExamPaper[]
+  exam_sequences            ExamSequence[]
+  generated_reports         GeneratedReport[]
+  payment_transactions      PaymentTransaction[]
+  school_fees               SchoolFees[]
+  first_enrollment_students Student[]            @relation("StudentFirstEnrollment")
+  teacher_periods           TeacherPeriod[]
+  terms                     Term[]
+  role_assignments          RoleAssignment[]
+  QuizTemplate              QuizTemplate[]
+  QuizSubmission            QuizSubmission[]
+  UserRole                  UserRole[]
 }
 
 model User {
-  id                            Int                          @id @unique @default(autoincrement())
-  name                          String
-  gender                        Gender
-  date_of_birth                 DateTime
-  photo                         String?
-  phone                         String
-  address                       String
-  email                         String                       @unique
-  password                      String
-  id_card_num                   String?
-  matricule                     String?                      @unique
-  status                        UserStatus                   @default(ACTIVE)
-  created_at                    DateTime                     @default(now())
-  updated_at                    DateTime                     @updatedAt
-  announcements                 Announcement[]
-  bursar_assignments            BursarAssignment[]
-  discipline_issues_assigned    DisciplineIssue[]            @relation("AssignedDisciplineIssue")
-  discipline_issues_reviewed    DisciplineIssue[]            @relation("ReviewedDisciplineIssue")
-  discipline_master_assignments DisciplineMasterAssignment[]
-  marks                         Mark[]                       @relation("RecordedByUser")
-  mobile_notifications          MobileNotification[]
-  parent_students               ParentStudent[]
-  principal_assignments         PrincipalAssignment[]
-  student_absences              StudentAbsence[]
-  sub_class_subjects            SubClassSubject[]
-  subject_teachers              SubjectTeacher[]
-  assigned_teacher_absences     TeacherAbsence[]             @relation("AssignedByUser")
-  teacher_absences              TeacherAbsence[]
-  assigned_teacher_periods      TeacherPeriod[]              @relation("TeacherPeriods-AssignedBy")
-  user_roles                    UserRole[]
-  vice_principal_assignments    VicePrincipalAssignment[]
-  class_master_of               SubClass[]                   @relation("ClassMaster")
+  id                         Int                  @id @unique @default(autoincrement())
+  name                       String
+  gender                     Gender
+  date_of_birth              DateTime
+  photo                      String?
+  phone                      String
+  whatsapp_number            String? // For parents communication
+  address                    String
+  email                      String               @unique
+  password                   String
+  id_card_num                String?
+  matricule                  String?              @unique
+  status                     UserStatus           @default(ACTIVE)
+  total_hours_per_week       Int? // For teachers
+  created_at                 DateTime             @default(now())
+  updated_at                 DateTime             @updatedAt
+  // Relationships
+  announcements              Announcement[]
+  discipline_issues_assigned DisciplineIssue[]    @relation("AssignedDisciplineIssue")
+  discipline_issues_reviewed DisciplineIssue[]    @relation("ReviewedDisciplineIssue")
+  marks                      Mark[]               @relation("RecordedByUser")
+  mobile_notifications       MobileNotification[]
+  parent_students            ParentStudent[]
+  student_absences           StudentAbsence[]
+  class_master_of            SubClass[]           @relation("ClassMaster")
+  hod_subjects               Subject[]            @relation("HODSubject") // Head of Department
+  sub_class_subjects         SubClassSubject[]
+  subject_teachers           SubjectTeacher[]
+  assigned_teacher_absences  TeacherAbsence[]     @relation("AssignedByUser")
+  teacher_absences           TeacherAbsence[]
+  assigned_teacher_periods   TeacherPeriod[]      @relation("TeacherPeriods-AssignedBy")
+  teacher_periods            TeacherPeriod[]      @relation("TeacherPeriods-Teacher")
+  user_roles                 UserRole[]
+  role_assignments           RoleAssignment[]
+  // Communication
+  sent_messages              Message[]            @relation("SentMessages")
+  received_messages          Message[]            @relation("ReceivedMessages")
+  // Forms and tracking
+  form_submissions           FormSubmission[]
+  audit_logs                 AuditLog[]
+  // Fee management
+  recorded_payments          PaymentTransaction[] @relation("RecordedByUser")
+  QuizTemplate               QuizTemplate[]
+  QuizSubmission             QuizSubmission[]
 }
 
 model UserRole {
   id               Int           @id @default(autoincrement())
   user_id          Int
-  academic_year_id Int?
   role             Role
+  academic_year_id Int? // Nullable for global roles like SUPER_MANAGER
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
-  academic_year    AcademicYear? @relation(fields: [academic_year_id], references: [id])
   user             User          @relation(fields: [user_id], references: [id])
+  academic_year    AcademicYear? @relation(fields: [academic_year_id], references: [id])
 
-  @@unique([user_id, role, academic_year_id], name: "user_id_role_academic_year_id")
+  @@unique([user_id, role, academic_year_id], name: "user_id_role_academic_year")
+}
+
+// Simplified assignment table replacing multiple assignment tables
+model RoleAssignment {
+  id               Int            @id @default(autoincrement())
+  user_id          Int
+  academic_year_id Int
+  role_type        AssignmentRole
+  sub_class_id     Int? // For VP and SDM assignments
+  subject_id       Int? // For HOD assignments
+  created_at       DateTime       @default(now())
+  updated_at       DateTime       @updatedAt
+  academic_year    AcademicYear   @relation(fields: [academic_year_id], references: [id])
+  user             User           @relation(fields: [user_id], references: [id])
+  sub_class        SubClass?      @relation(fields: [sub_class_id], references: [id])
+  subject          Subject?       @relation(fields: [subject_id], references: [id])
+
+  @@unique([user_id, role_type, academic_year_id, sub_class_id, subject_id])
 }
 
 model ParentStudent {
@@ -92,85 +123,97 @@ model ParentStudent {
 }
 
 model Class {
-  id                  Int        @id @unique @default(autoincrement())
-  name                String
-  created_at          DateTime   @default(now())
-  updated_at          DateTime   @updatedAt
-  base_fee            Float      @default(0)
-  new_student_add_fee Float      @default(0)
-  old_student_add_fee Float      @default(0)
-  miscellaneous_fee   Float      @default(0)
-  first_term_fee      Float      @default(0)
-  second_term_fee     Float      @default(0)
-  third_term_fee      Float      @default(0)
-  level               Int        @default(1)
-  sub_classes         SubClass[]
+  id                Int          @id @unique @default(autoincrement())
+  name              String
+  max_students      Int          @default(80) // Maximum 80 students per class
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+  // Simplified fee structure
+  base_fee          Float        @default(0)
+  miscellaneous_fee Float        @default(0)
+  new_student_fee   Float        @default(0)
+  old_student_fee   Float        @default(0)
+  first_term_fee    Float        @default(0)
+  second_term_fee   Float        @default(0)
+  third_term_fee    Float        @default(0)
+  sub_classes       SubClass[]
+  Enrollment        Enrollment[]
 }
 
 model SubClass {
-  id                            Int                          @id @unique @default(autoincrement())
-  name                          String
-  created_at                    DateTime                     @default(now())
-  updated_at                    DateTime                     @updatedAt
-  class_id                      Int
-  class_master_id               Int?
-  discipline_master_assignments DisciplineMasterAssignment[]
-  enrollments                   Enrollment[]
-  class                         Class                        @relation(fields: [class_id], references: [id])
-  class_master                  User?                        @relation("ClassMaster", fields: [class_master_id], references: [id])
-  sub_class_subjects            SubClassSubject[]
-  teacher_periods               TeacherPeriod[]
-  vice_principal_assignments    VicePrincipalAssignment[]
-  GeneratedReport               GeneratedReport[]
+  id                 Int               @id @unique @default(autoincrement())
+  name               String
+  current_students   Int               @default(0) // Track current enrollment
+  created_at         DateTime          @default(now())
+  updated_at         DateTime          @updatedAt
+  class_id           Int
+  class_master_id    Int?
+  enrollments        Enrollment[]
+  generated_reports  GeneratedReport[]
+  class              Class             @relation(fields: [class_id], references: [id])
+  class_master       User?             @relation("ClassMaster", fields: [class_master_id], references: [id])
+  sub_class_subjects SubClassSubject[]
+  teacher_periods    TeacherPeriod[]
+  role_assignments   RoleAssignment[]
+  // Timetables
+  timetables         TimeTable[]
 }
 
 model Student {
   id                       Int               @id @unique @default(autoincrement())
-  matricule                String
+  matricule                String            @unique
   name                     String
   date_of_birth            DateTime
   place_of_birth           String
   gender                   Gender
   residence                String
-  former_school            String
-  first_enrollment_year_id Int? // Track when student first joined the school
+  former_school            String?
+  is_new_student           Boolean           @default(true) // Track new vs old students
+  status                   StudentStatus     @default(NOT_ENROLLED) // Track enrollment status
+  first_enrollment_year_id Int?
   created_at               DateTime          @default(now())
   updated_at               DateTime          @updatedAt
   enrollments              Enrollment[]
+  generated_reports        GeneratedReport[]
   parents                  ParentStudent[]   @relation("StudentParents")
-  GeneratedReport          GeneratedReport[]
   first_enrollment_year    AcademicYear?     @relation("StudentFirstEnrollment", fields: [first_enrollment_year_id], references: [id])
+  interview_marks          InterviewMark[] // VP interview marks
+  QuizSubmission           QuizSubmission[]
 }
 
 model Enrollment {
   id                        Int                      @id @default(autoincrement())
   student_id                Int
-  sub_class_id              Int
   academic_year_id          Int
+  class_id                  Int // Initial class assignment (required)
   repeater                  Boolean                  @default(false)
   photo                     String?
+  enrollment_date           DateTime                 @default(now())
   created_at                DateTime                 @default(now())
   updated_at                DateTime                 @updatedAt
+  sub_class_id              Int? // Subclass assignment after interview (optional)
   discipline_issues         DisciplineIssue[]
   academic_year             AcademicYear             @relation(fields: [academic_year_id], references: [id])
   student                   Student                  @relation(fields: [student_id], references: [id])
-  sub_class                 SubClass                 @relation(fields: [sub_class_id], references: [id])
+  class                     Class                    @relation(fields: [class_id], references: [id])
+  sub_class                 SubClass?                @relation(fields: [sub_class_id], references: [id])
   marks                     Mark[]
   payment_transactions      PaymentTransaction[]
   school_fees               SchoolFees[]
   absences                  StudentAbsence[]
   student_sequence_averages StudentSequenceAverage[]
 
-  @@unique([student_id, sub_class_id, academic_year_id])
+  @@unique([student_id, academic_year_id])
 }
 
 model SchoolFees {
   id                   Int                  @id @default(autoincrement())
   amount_expected      Float
-  amount_paid          Float
+  amount_paid          Float                @default(0)
   academic_year_id     Int
   due_date             DateTime
   enrollment_id        Int
+  is_new_student       Boolean              @default(false) // Different fees for new/old
   created_at           DateTime             @default(now())
   updated_at           DateTime             @updatedAt
   payment_transactions PaymentTransaction[]
@@ -184,12 +227,17 @@ model Subject {
   id                 Int               @id @unique @default(autoincrement())
   name               String
   category           SubjectCategory
+  hod_id             Int? // Head of Department
   created_at         DateTime          @default(now())
   updated_at         DateTime          @updatedAt
+  hod                User?             @relation("HODSubject", fields: [hod_id], references: [id])
   exam_papers        ExamPaper[]
   questions          Question[]
   sub_class_subjects SubClassSubject[]
   subject_teachers   SubjectTeacher[]
+  teacher_periods    TeacherPeriod[]
+  role_assignments   RoleAssignment[]
+  QuizTemplate       QuizTemplate[]
 }
 
 model SubClassSubject {
@@ -199,40 +247,40 @@ model SubClassSubject {
   subject_id   Int
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
+  userId       Int?
   marks        Mark[]
   sub_class    SubClass @relation(fields: [sub_class_id], references: [id])
   subject      Subject  @relation(fields: [subject_id], references: [id])
   User         User?    @relation(fields: [userId], references: [id])
-  userId       Int?
 
   @@unique([sub_class_id, subject_id])
 }
 
 model SubjectTeacher {
-  id              Int             @id @default(autoincrement())
-  subject_id      Int
-  teacher_id      Int
-  created_at      DateTime        @default(now())
-  updated_at      DateTime        @updatedAt
-  subject         Subject         @relation(fields: [subject_id], references: [id])
-  teacher         User            @relation(fields: [teacher_id], references: [id])
-  teacher_periods TeacherPeriod[]
+  id         Int      @id @default(autoincrement())
+  subject_id Int
+  teacher_id Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  subject    Subject  @relation(fields: [subject_id], references: [id])
+  teacher    User     @relation(fields: [teacher_id], references: [id])
 
   @@unique([subject_id, teacher_id])
 }
 
 model DisciplineIssue {
-  id             Int        @id @unique @default(autoincrement())
+  id             Int            @id @unique @default(autoincrement())
   enrollment_id  Int
+  issue_type     DisciplineType
   description    String
   notes          String?
   assigned_by_id Int
   reviewed_by_id Int
-  created_at     DateTime   @default(now())
-  updated_at     DateTime   @updatedAt
-  assigned_by    User       @relation("AssignedDisciplineIssue", fields: [assigned_by_id], references: [id])
-  enrollment     Enrollment @relation(fields: [enrollment_id], references: [id])
-  reviewed_by    User       @relation("ReviewedDisciplineIssue", fields: [reviewed_by_id], references: [id])
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+  assigned_by    User           @relation("AssignedDisciplineIssue", fields: [assigned_by_id], references: [id])
+  enrollment     Enrollment     @relation(fields: [enrollment_id], references: [id])
+  reviewed_by    User           @relation("ReviewedDisciplineIssue", fields: [reviewed_by_id], references: [id])
 }
 
 model StudentAbsence {
@@ -240,6 +288,9 @@ model StudentAbsence {
   assigned_by_id    Int
   teacher_period_id Int?
   enrollment_id     Int
+  absence_type      AbsenceType    @default(CLASS_ABSENCE)
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
   assigned_by       User           @relation(fields: [assigned_by_id], references: [id])
   enrollment        Enrollment     @relation(fields: [enrollment_id], references: [id])
   teacher_period    TeacherPeriod? @relation(fields: [teacher_period_id], references: [id])
@@ -267,14 +318,14 @@ model ExamSequence {
   sequence_number           Int
   academic_year_id          Int
   term_id                   Int
-  status                    ExamSequenceStatus       @default(OPEN)
   created_at                DateTime                 @default(now())
   updated_at                DateTime                 @updatedAt
+  status                    ExamSequenceStatus       @default(OPEN)
   academic_year             AcademicYear             @relation(fields: [academic_year_id], references: [id])
   term                      Term                     @relation(fields: [term_id], references: [id])
+  generated_reports         GeneratedReport[]
   marks                     Mark[]
   student_sequence_averages StudentSequenceAverage[]
-  GeneratedReport           GeneratedReport[]
 
   @@unique([sequence_number, term_id, academic_year_id])
 }
@@ -282,8 +333,8 @@ model ExamSequence {
 model Term {
   id               Int            @id @default(autoincrement())
   name             String
-  start_date       DateTime
-  end_date         DateTime
+  start_date       DateTime?
+  end_date         DateTime?
   academic_year_id Int?
   fee_deadline     DateTime?
   exam_sequences   ExamSequence[]
@@ -295,12 +346,12 @@ model Term {
 model Mark {
   id                   Int             @id @default(autoincrement())
   enrollment_id        Int
-  sub_class_subject_id Int
   teacher_id           Int
   exam_sequence_id     Int
-  score                Float
+  score                Float? // Optional score (can be null)
   created_at           DateTime        @default(now())
   updated_at           DateTime        @updatedAt
+  sub_class_subject_id Int
   enrollment           Enrollment      @relation(fields: [enrollment_id], references: [id])
   exam_sequence        ExamSequence    @relation(fields: [exam_sequence_id], references: [id])
   sub_class_subject    SubClassSubject @relation(fields: [sub_class_subject_id], references: [id])
@@ -309,84 +360,54 @@ model Mark {
   @@unique([exam_sequence_id, enrollment_id, sub_class_subject_id])
 }
 
-model VicePrincipalAssignment {
-  id               Int          @id @default(autoincrement())
-  user_id          Int
-  sub_class_id     Int
-  academic_year_id Int
-  created_at       DateTime     @default(now())
-  updated_at       DateTime     @updatedAt
-  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
-  sub_class        SubClass     @relation(fields: [sub_class_id], references: [id])
-  user             User         @relation(fields: [user_id], references: [id])
-
-  @@unique([user_id, sub_class_id, academic_year_id])
-}
-
-model DisciplineMasterAssignment {
-  id               Int          @id @default(autoincrement())
-  user_id          Int
-  sub_class_id     Int
-  academic_year_id Int
-  created_at       DateTime     @default(now())
-  updated_at       DateTime     @updatedAt
-  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
-  sub_class        SubClass     @relation(fields: [sub_class_id], references: [id])
-  user             User         @relation(fields: [user_id], references: [id])
-
-  @@unique([user_id, sub_class_id, academic_year_id])
-}
-
-model PrincipalAssignment {
-  id               Int          @id @default(autoincrement())
-  user_id          Int
-  academic_year_id Int          @unique
-  created_at       DateTime     @default(now())
-  updated_at       DateTime     @updatedAt
-  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
-  user             User         @relation(fields: [user_id], references: [id])
-}
-
-model BursarAssignment {
-  id               Int          @id @default(autoincrement())
-  user_id          Int
-  academic_year_id Int          @unique
-  created_at       DateTime     @default(now())
-  updated_at       DateTime     @updatedAt
-  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
-  user             User         @relation(fields: [user_id], references: [id])
-}
-
 model Period {
   id              Int             @id @default(autoincrement())
-  name            String // Added: descriptive name for the period
   day_of_week     DayOfWeek
   start_time      String
   end_time        String
-  is_break        Boolean         @default(false) // Added: flag for lunch/break periods
+  is_break        Boolean         @default(false)
+  name            String
   teacher_periods TeacherPeriod[]
 
   @@unique([id, day_of_week, start_time, end_time])
 }
 
 model TeacherPeriod {
-  id                 Int              @id @default(autoincrement())
-  subject_teacher_id Int
-  sub_class_id       Int
-  period_id          Int
-  academic_year_id   Int
-  assigned_by_id     Int
-  created_at         DateTime         @default(now())
-  updated_at         DateTime         @updatedAt
-  student_absences   StudentAbsence[]
-  teacher_absences   TeacherAbsence[]
-  academic_year      AcademicYear     @relation(fields: [academic_year_id], references: [id])
-  assigned_by        User             @relation("TeacherPeriods-AssignedBy", fields: [assigned_by_id], references: [id])
-  period             Period           @relation(fields: [period_id], references: [id])
-  sub_class          SubClass         @relation(fields: [sub_class_id], references: [id])
-  subject_teacher    SubjectTeacher   @relation(fields: [subject_teacher_id], references: [id])
+  id               Int              @id @default(autoincrement())
+  teacher_id       Int
+  subject_id       Int
+  period_id        Int
+  academic_year_id Int
+  assigned_by_id   Int
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  sub_class_id     Int
+  student_absences StudentAbsence[]
+  teacher_absences TeacherAbsence[]
+  academic_year    AcademicYear     @relation(fields: [academic_year_id], references: [id])
+  assigned_by      User             @relation("TeacherPeriods-AssignedBy", fields: [assigned_by_id], references: [id])
+  period           Period           @relation(fields: [period_id], references: [id])
+  sub_class        SubClass         @relation(fields: [sub_class_id], references: [id])
+  teacher          User             @relation("TeacherPeriods-Teacher", fields: [teacher_id], references: [id])
+  subject          Subject          @relation(fields: [subject_id], references: [id])
 
-  @@unique([subject_teacher_id, period_id, assigned_by_id, academic_year_id])
+  @@unique([teacher_id, subject_id, period_id, sub_class_id, academic_year_id])
+}
+
+// Simplified timetable model
+model TimeTable {
+  id           Int       @id @default(autoincrement())
+  sub_class_id Int
+  day_of_week  DayOfWeek
+  period_time  String
+  subject_name String?
+  teacher_name String?
+  is_saved     Boolean   @default(false) // Auto-save functionality
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  sub_class    SubClass  @relation(fields: [sub_class_id], references: [id])
+
+  @@unique([sub_class_id, day_of_week, period_time])
 }
 
 model PaymentTransaction {
@@ -394,15 +415,18 @@ model PaymentTransaction {
   enrollment_id    Int
   academic_year_id Int
   amount           Float
-  payment_date     DateTime
+  payment_date     DateTime // Date on receipt (compulsory)
   receipt_number   String?
   payment_method   PaymentMethod
+  recorded_by_id   Int
+  notes            String? // Feedback notes
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
   fee_id           Int
   academic_year    AcademicYear  @relation(fields: [academic_year_id], references: [id])
   enrollment       Enrollment    @relation(fields: [enrollment_id], references: [id])
   school_fees      SchoolFees    @relation(fields: [fee_id], references: [id])
+  recorded_by      User          @relation("RecordedByUser", fields: [recorded_by_id], references: [id])
 }
 
 model Announcement {
@@ -450,7 +474,7 @@ model ExamPaper {
   subject_id       Int
   academic_year_id Int
   exam_date        DateTime
-  duration         BigInt
+  duration         Int
   created_at       DateTime            @default(now())
   updated_at       DateTime            @updatedAt
   academic_year    AcademicYear        @relation(fields: [academic_year_id], references: [id])
@@ -487,27 +511,103 @@ model StudentSequenceAverage {
 
 model GeneratedReport {
   id               Int          @id @default(autoincrement())
-  report_type      ReportType // SINGLE_STUDENT or SUBCLASS
+  report_type      ReportType
   exam_sequence_id Int
   academic_year_id Int
-  student_id       Int? // Null for SUBCLASS type
-  sub_class_id     Int? // Null for SINGLE_STUDENT type (though student implies subclass)
-  status           ReportStatus @default(PENDING) // PENDING, PROCESSING, COMPLETED, FAILED
-  file_path        String? // Path to the generated PDF
-  error_message    String? // Store error if status is FAILED
-  page_number      Int? // Page number within the combined subclass PDF (for SINGLE_STUDENT type)
+  student_id       Int?
+  sub_class_id     Int?
+  status           ReportStatus @default(PENDING)
+  file_path        String?
+  error_message    String?
+  page_number      Int?
   created_at       DateTime     @default(now())
   updated_at       DateTime     @updatedAt
+  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
+  exam_sequence    ExamSequence @relation(fields: [exam_sequence_id], references: [id], onDelete: Cascade)
+  student          Student?     @relation(fields: [student_id], references: [id])
+  sub_class        SubClass?    @relation(fields: [sub_class_id], references: [id])
 
-  exam_sequence ExamSequence @relation(fields: [exam_sequence_id], references: [id], onDelete: Cascade)
-  academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
-  student       Student?     @relation(fields: [student_id], references: [id])
-  sub_class     SubClass?    @relation(fields: [sub_class_id], references: [id])
-
-  @@unique([report_type, exam_sequence_id, academic_year_id, student_id], map: "student_report_unique") // Unique for single student reports
+  @@unique([report_type, exam_sequence_id, academic_year_id, student_id], map: "student_report_unique")
   @@index([status])
 }
 
+// New Models for Enhanced Functionality
+
+// VP Interview marks for new students
+model InterviewMark {
+  id         Int      @id @default(autoincrement())
+  student_id Int
+  vp_id      Int
+  marks      Float
+  notes      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  student    Student  @relation(fields: [student_id], references: [id])
+
+  @@unique([student_id])
+}
+
+// Communication system
+model Message {
+  id          Int           @id @default(autoincrement())
+  sender_id   Int
+  receiver_id Int
+  subject     String?
+  content     String
+  status      MessageStatus @default(SENT)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  sender      User          @relation("SentMessages", fields: [sender_id], references: [id])
+  receiver    User          @relation("ReceivedMessages", fields: [receiver_id], references: [id])
+}
+
+// Form creation system for Super Manager
+model FormTemplate {
+  id               Int              @id @default(autoincrement())
+  title            String
+  description      String?
+  assigned_role    Role
+  fields           Json // Dynamic form fields
+  deadline         DateTime?
+  is_active        Boolean          @default(true)
+  created_by_id    Int
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  form_submissions FormSubmission[]
+}
+
+model FormSubmission {
+  id               Int              @id @default(autoincrement())
+  form_template_id Int
+  submitted_by_id  Int
+  submission_data  Json // Form data
+  status           SubmissionStatus @default(PENDING)
+  submitted_at     DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  form_template    FormTemplate     @relation(fields: [form_template_id], references: [id])
+  submitted_by     User             @relation(fields: [submitted_by_id], references: [id])
+
+  @@unique([form_template_id, submitted_by_id])
+}
+
+// Audit trail for tracking modifications
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  action     String // CREATE, UPDATE, DELETE
+  table_name String
+  record_id  String
+  old_values Json?
+  new_values Json?
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id])
+
+  @@index([table_name, record_id])
+  @@index([user_id])
+  @@index([created_at])
+}
+
+// Enums
 enum PaymentMethod {
   EXPRESS_UNION
   CCA
@@ -532,15 +632,24 @@ enum QuestionType {
 }
 
 enum Role {
-  SUPER_MANAGER
-  MANAGER
+  SUPER_MANAGER // CEO prefix
+  MANAGER // SA prefix  
+  PRINCIPAL // SA prefix
+  VICE_PRINCIPAL // SA prefix
+  BURSAR // SA prefix
+  TEACHER // ST prefix
+  DISCIPLINE_MASTER // SDM instead of DM, SO prefix
+  GUIDANCE_COUNSELOR // SO prefix
+  PARENT // SO prefix
+  HOD // Head of Department, ST prefix
+}
+
+enum AssignmentRole {
   PRINCIPAL
   VICE_PRINCIPAL
+  DISCIPLINE_MASTER // SDM
   BURSAR
-  TEACHER
-  DISCIPLINE_MASTER
-  GUIDANCE_COUNSELOR
-  PARENT
+  HOD // Head of Department
 }
 
 enum DayOfWeek {
@@ -596,4 +705,140 @@ enum UserStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+}
+
+enum StudentStatus {
+  NOT_ENROLLED
+  ENROLLED
+  ASSIGNED_TO_CLASS
+  GRADUATED
+  TRANSFERRED
+  SUSPENDED
+}
+
+enum DisciplineType {
+  MORNING_LATENESS
+  CLASS_ABSENCE
+  MISCONDUCT
+  OTHER
+}
+
+enum AbsenceType {
+  MORNING_LATENESS
+  CLASS_ABSENCE
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+// Quiz system for children using parent accounts
+model QuizTemplate {
+  id               Int       @id @default(autoincrement())
+  title            String
+  description      String?
+  subject_id       Int
+  class_ids        Json // Array of class IDs this quiz is for
+  time_limit       Int? // Minutes
+  total_marks      Int       @default(10)
+  is_active        Boolean   @default(true)
+  start_date       DateTime?
+  end_date         DateTime?
+  created_by_id    Int
+  academic_year_id Int
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  subject       Subject          @relation(fields: [subject_id], references: [id])
+  academic_year AcademicYear     @relation(fields: [academic_year_id], references: [id])
+  created_by    User             @relation(fields: [created_by_id], references: [id])
+  questions     QuizQuestion[]
+  submissions   QuizSubmission[]
+
+  @@index([subject_id])
+  @@index([academic_year_id])
+  @@index([is_active])
+}
+
+model QuizQuestion {
+  id             Int          @id @default(autoincrement())
+  quiz_id        Int
+  question_text  String
+  question_type  QuestionType @default(MCQ)
+  options        Json? // Array of options for MCQ
+  correct_answer String
+  marks          Int          @default(1)
+  order_index    Int
+  explanation    String?
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+
+  quiz      QuizTemplate   @relation(fields: [quiz_id], references: [id], onDelete: Cascade)
+  responses QuizResponse[]
+
+  @@index([quiz_id])
+}
+
+model QuizSubmission {
+  id               Int        @id @default(autoincrement())
+  quiz_id          Int
+  student_id       Int
+  parent_id        Int // Parent who supervised the quiz
+  score            Int?
+  total_marks      Int
+  percentage       Float?
+  time_taken       Int? // Minutes taken
+  status           QuizStatus @default(IN_PROGRESS)
+  started_at       DateTime   @default(now())
+  submitted_at     DateTime?
+  academic_year_id Int
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
+
+  quiz          QuizTemplate   @relation(fields: [quiz_id], references: [id])
+  student       Student        @relation(fields: [student_id], references: [id])
+  parent        User           @relation(fields: [parent_id], references: [id])
+  academic_year AcademicYear   @relation(fields: [academic_year_id], references: [id])
+  responses     QuizResponse[]
+
+  @@unique([quiz_id, student_id, academic_year_id])
+  @@index([quiz_id])
+  @@index([student_id])
+  @@index([parent_id])
+}
+
+model QuizResponse {
+  id              Int      @id @default(autoincrement())
+  submission_id   Int
+  question_id     Int
+  selected_answer String
+  is_correct      Boolean  @default(false)
+  marks_earned    Int      @default(0)
+  time_spent      Int? // Seconds spent on this question
+  created_at      DateTime @default(now())
+
+  submission QuizSubmission @relation(fields: [submission_id], references: [id], onDelete: Cascade)
+  question   QuizQuestion   @relation(fields: [question_id], references: [id])
+
+  @@unique([submission_id, question_id])
+  @@index([submission_id])
+  @@index([question_id])
+}
+
+enum QuizStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  EXPIRED
 }
