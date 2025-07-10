@@ -200,3 +200,62 @@ export async function setCurrentAcademicYear(id: number): Promise<AcademicYear> 
         }
     });
 }
+
+/**
+ * Get academic years available for a specific user's role
+ * Global roles (SUPER_MANAGER) get access to all academic years
+ * Year-specific roles get access only to years where THIS USER has that role assigned
+ */
+export async function getAcademicYearsForUserRole(userId: number, role: string): Promise<AcademicYear[]> {
+    // Global roles have access to all academic years
+    const globalRoles = ['SUPER_MANAGER'];
+
+    if (globalRoles.includes(role)) {
+        return getAllAcademicYears();
+    }
+
+    // For year-specific roles, find academic years where THIS USER has that role assigned
+    const userRoleAssignments = await prisma.userRole.findMany({
+        where: {
+            user_id: userId,
+            role: role as any,
+            academic_year_id: {
+                not: null
+            }
+        },
+        select: {
+            academic_year_id: true
+        }
+    });
+
+    // Extract academic year IDs where this user has the role
+    const userAcademicYearIds = userRoleAssignments
+        .map(ur => ur.academic_year_id)
+        .filter((id): id is number => id !== null);
+
+    if (userAcademicYearIds.length === 0) {
+        // If this user has no role assignments for this role, return empty array
+        return [];
+    }
+
+    // Fetch the academic years where this user has the role
+    return prisma.academicYear.findMany({
+        where: {
+            id: {
+                in: userAcademicYearIds
+            }
+        },
+        include: {
+            terms: true,
+            _count: {
+                select: {
+                    enrollments: true
+                }
+            }
+        },
+        orderBy: [
+            { is_current: 'desc' }, // Current year first
+            { start_date: 'desc' }  // Then most recent years
+        ]
+    });
+}

@@ -129,7 +129,7 @@ Success Response (200):
 - **Shows:** Year name, date range, status (current/past)
 - **Default:** Current academic year pre-selected
 
-#### **API Integration:**
+#### **API Integration:** ✅ **IMPLEMENTED**
 ```http
 GET /api/v1/academic-years/available-for-role
 Authorization: Bearer {token}
@@ -150,7 +150,16 @@ Success Response (200):
         "isCurrent": true,
         "status": "ACTIVE",
         "studentCount": 1245,
-        "classCount": 24
+        "classCount": 24,
+        "terms": [
+          {
+            "id": 1,
+            "name": "First Term",
+            "startDate": "2024-09-01",
+            "endDate": "2024-12-15",
+            "feeDeadline": "2024-10-15"
+          }
+        ]
       },
       {
         "id": 2,
@@ -164,7 +173,7 @@ Success Response (200):
       }
     ],
     "currentAcademicYearId": 1,
-    "userHasAccessTo": [1, 2]  // Years user has role assignments for
+    "userHasAccessTo": [1, 2]  // Years where THIS USER has the specified role
   }
 }
 

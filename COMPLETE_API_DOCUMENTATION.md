@@ -3772,6 +3772,62 @@ GET /api/v1/academic-years/current
 Authorization: Bearer <token>
 ```
 
+### Get Available Academic Years for Role
+```http
+GET /api/v1/academic-years/available-for-role
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+```typescript
+{
+  role: string; // Required: "PRINCIPAL" | "TEACHER" | "BURSAR" | etc.
+}
+```
+
+**Description:**
+Returns academic years where the authenticated user has the specified role assigned. This endpoint is used during login workflow after role selection to show which academic years the current user can access with that role.
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    academicYears: Array<{
+      id: number;
+      name: string;              // e.g., "2024-2025"
+      startDate: string;         // "YYYY-MM-DD"
+      endDate: string;           // "YYYY-MM-DD"
+      isCurrent: boolean;
+      status: "ACTIVE" | "COMPLETED" | "UPCOMING";
+      studentCount?: number;     // Total enrolled students for context
+      classCount?: number;       // Total classes for context
+      terms?: Array<{
+        id: number;
+        name: string;
+        startDate: string;
+        endDate: string;
+        feeDeadline: string;
+      }>;
+    }>;
+    currentAcademicYearId: number | null;
+    userHasAccessTo: number[];   // Array of academic year IDs user has access to
+  };
+}
+```
+
+**Error Responses:**
+- `400`: Missing or invalid role parameter
+- `401`: Unauthorized (invalid token)
+- `500`: Server error
+
+**Usage Notes:**
+- For global roles like `SUPER_MANAGER`, returns all academic years
+- For year-specific roles, returns only years where the authenticated user has that specific role assigned
+- Current academic year is always highlighted if user has access
+- Used primarily in the login workflow after role selection
+- Requires authentication - returns 401 if user is not authenticated
+
 ---
 
 ## Student Management

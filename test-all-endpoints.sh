@@ -1092,6 +1092,13 @@ run_test "Get Academic Year by ID" "GET" "$API_URL/academic-years/$ACADEMIC_YEAR
 run_test "Update Academic Year" "PUT" "$API_URL/academic-years/$ACADEMIC_YEAR_ID_2" "${TOKENS[SUPER_MANAGER]}" '{"name":"2025-2026 Updated","isCurrent":false}' "200"
 run_test "Set Current Academic Year" "POST" "$API_URL/academic-years/$ACADEMIC_YEAR_ID_1/set-current" "${TOKENS[SUPER_MANAGER]}" "" "200"
 run_test "Get Current Academic Year" "GET" "$API_URL/academic-years/current" "${TOKENS[SUPER_MANAGER]}" "" "200"
+run_test "Get Available Academic Years for PRINCIPAL Role (User-Specific)" "GET" "$API_URL/academic-years/available-for-role?role=PRINCIPAL" "${TOKENS[PRINCIPAL]}" "" "200"
+run_test "Get Available Academic Years for TEACHER Role (User-Specific)" "GET" "$API_URL/academic-years/available-for-role?role=TEACHER" "${TOKENS[TEACHER_MATH]}" "" "200"
+run_test "Get Available Academic Years for BURSAR Role (User-Specific)" "GET" "$API_URL/academic-years/available-for-role?role=BURSAR" "${TOKENS[BURSAR]}" "" "200"
+run_test "Get Available Academic Years for SUPER_MANAGER Role (All Years)" "GET" "$API_URL/academic-years/available-for-role?role=SUPER_MANAGER" "${TOKENS[SUPER_MANAGER]}" "" "200"
+run_test "Get Available Academic Years - Missing Role Parameter" "GET" "$API_URL/academic-years/available-for-role" "${TOKENS[PRINCIPAL]}" "" "400"
+run_test "Get Available Academic Years - Unauthenticated Request" "GET" "$API_URL/academic-years/available-for-role?role=TEACHER" "" "" "401"
+run_test "Get Available Academic Years - Invalid Role" "GET" "$API_URL/academic-years/available-for-role?role=INVALID_ROLE" "${TOKENS[PRINCIPAL]}" "" "400"
 
 # ==============================================================================
 # 14. Student Management (Requires PRINCIPAL/VP access)

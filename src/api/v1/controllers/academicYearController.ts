@@ -309,7 +309,7 @@ export const getCurrentAcademicYear = async (req: Request, res: Response): Promi
 export const setCurrentAcademicYear = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
-        
+
         // Validate that the ID is a valid number
         if (isNaN(id)) {
             res.status(400).json({
@@ -351,7 +351,7 @@ export const setCurrentAcademicYear = async (req: Request, res: Response): Promi
 export const getAvailableAcademicYearsForRole = async (req: Request, res: Response): Promise<void> => {
     try {
         const role = req.query.role as string;
-        
+
         // Validate role parameter
         if (!role) {
             res.status(400).json({
@@ -364,21 +364,47 @@ export const getAvailableAcademicYearsForRole = async (req: Request, res: Respon
         // For global roles (like SUPER_MANAGER), return all academic years
         // For year-specific roles, return academic years where the user has access
         const globalRoles = ['SUPER_MANAGER'];
-        
+
         let academicYears;
-        
+
+        // Get the authenticated user ID from the request
+        const userId = (req as any).user?.id;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: 'User not authenticated'
+            });
+            return;
+        }
+
         if (globalRoles.includes(role)) {
             // Global roles can access all academic years
             academicYears = await academicYearService.getAllAcademicYears();
         } else {
-            // For other roles, return academic years with active roles
-            // This could be enhanced to check user's actual role assignments
-            academicYears = await academicYearService.getAllAcademicYears();
+            // For year-specific roles, return only academic years where THIS USER has that role
+            academicYears = await academicYearService.getAcademicYearsForUserRole(userId, role);
         }
+
+        // Get current academic year for reference
+        const currentYear = await academicYearService.getCurrentYear();
+
+        // Format response with additional context
+        const responseData = {
+            academicYears: academicYears.map(year => ({
+                ...year,
+                studentCount: year._count?.enrollments || 0,
+                classCount: year.terms?.length || 0,
+                status: year.is_current ? 'ACTIVE' :
+                    new Date(year.end_date) < new Date() ? 'COMPLETED' : 'UPCOMING'
+            })),
+            currentAcademicYearId: currentYear?.id || null,
+            userHasAccessTo: academicYears.map(year => year.id)
+        };
 
         res.status(200).json({
             success: true,
-            data: academicYears
+            data: responseData
         });
     } catch (error: any) {
         console.error('Error fetching available academic years for role:', error);
