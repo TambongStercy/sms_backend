@@ -487,3 +487,71 @@ export async function getParentsByStudentId(studentId: number): Promise<ParentSt
         }
     });
 }
+
+/**
+ * Search students by name or matricule
+ */
+export async function searchStudents(
+    searchQuery: string,
+    academicYearId?: number,
+    page: number = 1,
+    limit: number = 10
+): Promise<PaginatedResult<any>> {
+    try {
+        // Determine target academic year
+        const targetAcademicYearId = academicYearId ?? await getAcademicYearId();
+        
+        // Build search criteria
+        const searchCriteria: Prisma.StudentWhereInput = {
+            OR: [
+                { name: { contains: searchQuery, mode: 'insensitive' } },
+                { matricule: { contains: searchQuery, mode: 'insensitive' } }
+            ]
+        };
+
+        // Count total matching students
+        const total = await prisma.student.count({ where: searchCriteria });
+
+        // Calculate pagination
+        const skip = (page - 1) * limit;
+        const totalPages = Math.ceil(total / limit);
+
+        // Fetch students with pagination
+        const students = await prisma.student.findMany({
+            where: searchCriteria,
+            skip,
+            take: limit,
+            orderBy: { name: 'asc' },
+            include: {
+                enrollments: targetAcademicYearId ? {
+                    where: { academic_year_id: targetAcademicYearId },
+                    include: {
+                        sub_class: {
+                            include: {
+                                class: true
+                            }
+                        }
+                    }
+                } : undefined,
+                parents: {
+                    include: {
+                        parent: true
+                    }
+                }
+            }
+        });
+
+        return {
+            data: students,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages
+            }
+        };
+    } catch (error) {
+        console.error('Error searching students:', error);
+        throw error;
+    }
+}

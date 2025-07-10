@@ -43,6 +43,13 @@ router.get('/summary',
     studentController.getStudentsWithStatusInfo
 );
 
+// GET /students/search - Search students by name or matricule
+router.get('/search',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
+    studentController.searchStudents
+);
+
 // GET /students - List all students (with filters and optional enrollment info)
 // SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can view all students
 // TEACHER can only view students from their assigned subclasses

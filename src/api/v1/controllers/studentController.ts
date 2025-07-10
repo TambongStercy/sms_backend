@@ -131,6 +131,15 @@ export const createStudent = async (req: Request, res: Response) => {
 export const getStudentById = async (req: Request, res: Response): Promise<any> => {
     try {
         const id = parseInt(req.params.id);
+
+        // Validate that the ID is a valid number
+        if (isNaN(id)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid student ID format'
+            });
+        }
+
         const student = await studentService.getStudentById(id);
         if (!student) {
             return res.status(404).json({
@@ -488,6 +497,44 @@ export const getStudentsByParent = async (req: Request, res: Response): Promise<
         if (error.message.includes('not found')) {
             return res.status(404).json({ success: false, error: error.message });
         }
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Search students by name or matricule
+ */
+export const searchStudents = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const searchQuery = req.query.q as string;
+        
+        // Validate search query
+        if (!searchQuery || searchQuery.trim().length < 1) {
+            return res.status(400).json({
+                success: false,
+                error: 'Search query is required and must be at least 1 character'
+            });
+        }
+
+        // Get academic year from query params or use current
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
+
+        // Get pagination parameters
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+
+        const students = await studentService.searchStudents(searchQuery.trim(), academic_year_id, page, limit);
+
+        res.json({
+            success: true,
+            data: students
+        });
+    } catch (error: any) {
+        console.error('Error searching students:', error);
         res.status(500).json({
             success: false,
             error: error.message

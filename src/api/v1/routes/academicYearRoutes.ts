@@ -14,6 +14,10 @@ router.get('/', authenticate, academicYearController.getAllAcademicYears);
 // All authenticated users can view current academic year
 router.get('/current', authenticate, academicYearController.getCurrentAcademicYear);
 
+// GET /academic-years/available-for-role - Get academic years available for a specific role
+// All authenticated users can view available academic years for their role
+router.get('/available-for-role', authenticate, academicYearController.getAvailableAcademicYearsForRole);
+
 // POST /academic-years - Create a new academic year
 // Only SUPER_MANAGER, PRINCIPAL can create academic years
 router.post('/', authenticate, authorize(['SUPER_MANAGER']), academicYearController.createAcademicYear);

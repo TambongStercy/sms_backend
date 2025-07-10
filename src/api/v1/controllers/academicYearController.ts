@@ -70,6 +70,16 @@ export const createAcademicYear = async (req: Request, res: Response): Promise<v
 export const getAcademicYearById = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
+
+        // Validate that the ID is a valid number
+        if (isNaN(id)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid academic year ID format'
+            });
+            return;
+        }
+
         const year = await academicYearService.getAcademicYearById(id);
         if (!year) {
             res.status(404).json({
@@ -96,6 +106,16 @@ export const getAcademicYearById = async (req: Request, res: Response): Promise<
 export const updateAcademicYear = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
+
+        // Validate that the ID is a valid number
+        if (isNaN(id)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid academic year ID format'
+            });
+            return;
+        }
+
         const { start_date, end_date } = req.body;
         //TODO: Update other properties of academic year like year name, term properties and so o
 
@@ -121,6 +141,15 @@ export const updateAcademicYear = async (req: Request, res: Response): Promise<v
 export const deleteAcademicYear = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
+
+        // Validate that the ID is a valid number
+        if (isNaN(id)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid academic year ID format'
+            });
+            return;
+        }
 
         // Check if academic year exists
         const existingYear = await academicYearService.getAcademicYearById(id);
@@ -159,6 +188,16 @@ export const deleteAcademicYear = async (req: Request, res: Response): Promise<v
 export const addTerm = async (req: Request, res: Response): Promise<void> => {
     try {
         const yearId = parseInt(req.params.id);
+
+        // Validate that the ID is a valid number
+        if (isNaN(yearId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid academic year ID format'
+            });
+            return;
+        }
+
         const { name, start_date, end_date, fee_deadline } = req.body;
 
         // Validate required fields
@@ -206,6 +245,15 @@ export const addTerm = async (req: Request, res: Response): Promise<void> => {
 export const getTerms = async (req: Request, res: Response): Promise<void> => {
     try {
         const yearId = parseInt(req.params.id);
+
+        // Validate that the ID is a valid number
+        if (isNaN(yearId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid academic year ID format'
+            });
+            return;
+        }
 
         // Check if the academic year exists
         const year = await academicYearService.getAcademicYearById(yearId);
@@ -261,6 +309,15 @@ export const getCurrentAcademicYear = async (req: Request, res: Response): Promi
 export const setCurrentAcademicYear = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
+        
+        // Validate that the ID is a valid number
+        if (isNaN(id)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid academic year ID format'
+            });
+            return;
+        }
 
         // Check if academic year exists
         const existingYear = await academicYearService.getAcademicYearById(id);
@@ -281,6 +338,50 @@ export const setCurrentAcademicYear = async (req: Request, res: Response): Promi
         });
     } catch (error: any) {
         console.error('Error setting current academic year:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get academic years available for a specific role
+ */
+export const getAvailableAcademicYearsForRole = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const role = req.query.role as string;
+        
+        // Validate role parameter
+        if (!role) {
+            res.status(400).json({
+                success: false,
+                error: 'Role parameter is required'
+            });
+            return;
+        }
+
+        // For global roles (like SUPER_MANAGER), return all academic years
+        // For year-specific roles, return academic years where the user has access
+        const globalRoles = ['SUPER_MANAGER'];
+        
+        let academicYears;
+        
+        if (globalRoles.includes(role)) {
+            // Global roles can access all academic years
+            academicYears = await academicYearService.getAllAcademicYears();
+        } else {
+            // For other roles, return academic years with active roles
+            // This could be enhanced to check user's actual role assignments
+            academicYears = await academicYearService.getAllAcademicYears();
+        }
+
+        res.status(200).json({
+            success: true,
+            data: academicYears
+        });
+    } catch (error: any) {
+        console.error('Error fetching available academic years for role:', error);
         res.status(500).json({
             success: false,
             error: error.message
