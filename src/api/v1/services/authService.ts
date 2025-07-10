@@ -68,7 +68,8 @@ export const login = async (credentials: LoginCredentials): Promise<any> => {
         throw new Error('User account is not active');
     }
 
-    const userActiveRoles = user.user_roles.map(ur => ur.role);
+    // Get unique roles only (user might have same role across multiple academic years)
+    const userActiveRoles = [...new Set(user.user_roles.map(ur => ur.role))];
     const token = generateToken({ id: user.id, roles: userActiveRoles });
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
