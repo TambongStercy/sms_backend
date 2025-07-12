@@ -154,7 +154,7 @@ export const getStudentFees = async (req: Request, res: Response) => {
 
 export const getSubclassFeesSummary = async (req: Request, res: Response) => {
     try {
-        const sub_classId = parseInt(req.params.sub_classId);
+        const sub_classId = parseInt(req.params.sub_classId ?? req.params.id);
 
         const academic_year_id = req.finalQuery.academic_year_id ?
             parseInt(req.finalQuery.academic_year_id as string) : undefined;

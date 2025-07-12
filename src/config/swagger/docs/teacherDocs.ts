@@ -564,6 +564,143 @@ export const teacherComponents = {
           }
         }
       }
+    },
+    CurrentNextSubject: {
+      type: 'object',
+      properties: {
+        current: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            period: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer', example: 1 },
+                name: { type: 'string', example: 'Period 1' },
+                startTime: { type: 'string', example: '08:00' },
+                endTime: { type: 'string', example: '08:55' },
+                dayOfWeek: { type: 'string', example: 'MONDAY' }
+              }
+            },
+            subject: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer', example: 1 },
+                name: { type: 'string', example: 'Mathematics' },
+                category: { type: 'string', example: 'SCIENCE' }
+              }
+            },
+            subClass: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer', example: 1 },
+                name: { type: 'string', example: 'Form 1A' },
+                className: { type: 'string', example: 'Form 1' }
+              }
+            },
+            isActive: { type: 'boolean', example: true },
+            minutesRemaining: { type: 'integer', example: 25 }
+          }
+        },
+        next: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            period: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer', example: 2 },
+                name: { type: 'string', example: 'Period 2' },
+                startTime: { type: 'string', example: '09:00' },
+                endTime: { type: 'string', example: '09:55' },
+                dayOfWeek: { type: 'string', example: 'MONDAY' }
+              }
+            },
+            subject: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer', example: 2 },
+                name: { type: 'string', example: 'Physics' },
+                category: { type: 'string', example: 'SCIENCE' }
+              }
+            },
+            subClass: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer', example: 2 },
+                name: { type: 'string', example: 'Form 2A' },
+                className: { type: 'string', example: 'Form 2' }
+              }
+            },
+            minutesToStart: { type: 'integer', example: 5 },
+            isToday: { type: 'boolean', example: true }
+          }
+        },
+        requestTime: { type: 'string', format: 'date-time', example: '2024-01-22T08:30:00.000Z' },
+        currentDay: { type: 'string', example: 'MONDAY' }
+      }
+    }
+  }
+};
+
+// Add the new endpoint documentation
+teacherApiDocs['/teachers/me/timetable/current-next'] = {
+  get: {
+    tags: ['Teachers'],
+    summary: 'Get current and next subjects from timetable',
+    description: 'Returns the teacher\'s current subject (if any) and next subject based on the current time and timetable. Useful for real-time display of what the teacher is teaching now and what\'s coming up next.',
+    parameters: [
+      {
+        name: 'academicYearId',
+        in: 'query',
+        required: false,
+        schema: { type: 'integer' },
+        description: 'Filter by academic year (defaults to current academic year)'
+      }
+    ],
+    responses: {
+      200: {
+        description: 'Current and next subjects retrieved successfully',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean', example: true },
+                data: { $ref: '#/components/schemas/CurrentNextSubject' }
+              }
+            }
+          }
+        }
+      },
+      401: {
+        description: 'User not authenticated',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean', example: false },
+                error: { type: 'string', example: 'User not authenticated' }
+              }
+            }
+          }
+        }
+      },
+      500: {
+        description: 'Server error',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean', example: false },
+                error: { type: 'string', example: 'No active academic year found' }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }; 

@@ -18,6 +18,7 @@ declare module 'express' {
         json: (body: any) => void;
         status: (code: number) => Response;
         send: (body: any) => void;
+        download(path: string, filename?: string, options?: any, fn?: (err?: Error) => void): void;
     }
 
     export interface NextFunction {

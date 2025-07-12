@@ -483,13 +483,14 @@ Request Body:
 ### **Management Reports Dashboard**
 ```
 ┌─── Management Reports & Analytics ───┐
-│ [Operational Reports] [User Analytics] [System Reports] [Custom] │
+│ [Operational Reports] [User Analytics] [Report Cards] [System Reports] [Custom] │
 │                                                                  │
 │ ┌─── Quick Report Generation ───┐                                │
 │ │ [Daily Operations Summary] [Weekly User Activity]              │
 │ │ [Monthly System Performance] [Quarterly Overview]              │
 │ │ [Annual Statistics] [Custom Date Range]                        │
 │ │ [Department Analysis] [Resource Utilization]                   │
+│ │ [Student Report Card Status] [Report Generation Analytics]     │
 │ └────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 │ ┌─── Recent Generated Reports ───┐                               │
@@ -520,9 +521,318 @@ Request Body:
 │ │ 📈 Performance Analysis Template                               │
 │ │ 🎯 Goal Tracking Template                                      │
 │ │ 📝 Incident Report Template                                    │
+│ │ 📄 Report Card Status Template                                 │
 │ │ [Create Template] [Edit Templates] [Import/Export]             │
 │ └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│ ┌─── Report Card Management ───┐                                 │
+│ │ 📊 Report Card Generation Overview                             │
+│ │ Total Students: 1,245 | Current Academic Year: 2024-2025      │
+│ │ ──────────────────────────────────────────────────────────── │
+│ │ Current Sequence: Sequence 3 (January 2025)                   │
+│ │ ✅ Completed: 1,156 reports (93%)                              │
+│ │ ⏳ Generating: 67 reports (5%)                                 │
+│ │ ❌ Failed: 22 reports (2%)                                     │
+│ │ ⏸️ Pending: 0 reports (0%)                                     │
+│ │                                                                │
+│ │ Generation Success Rate: 95.2% (This Sequence)                │
+│ │ Average Generation Time: 2.3 minutes per report               │
+│ │ Parent Access Rate: 78% (Reports downloaded)                  │
+│ │                                                                │
+│ │ [View by Class] [Failed Reports] [Generation Queue]           │
+│ │ [Notify Parents] [Download Analytics] [Quality Report]        │
+│ └────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────┘
+```
+
+## Report Card Management (`/manager/report-cards`)
+
+### **API Integration**
+
+#### **Get Report Card Overview**
+**Endpoint:** `GET /api/v1/manager/report-cards/overview`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current year
+    sequenceId?: number;     // Optional, filter by specific sequence
+    classId?: number;        // Optional, filter by class
+    status?: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING"; // Optional filter
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      summary: {
+        totalStudents: number;
+        totalReports: number;
+        completedReports: number;
+        generatingReports: number;
+        failedReports: number;
+        pendingReports: number;
+        successRate: number; // Percentage
+        averageGenerationTime: string; // e.g., "2.3 minutes"
+        parentAccessRate: number; // Percentage of reports accessed
+      };
+      currentSequence: {
+        id: number;
+        name: string;
+        status: "OPEN" | "REPORTS_GENERATING" | "REPORTS_AVAILABLE" | "REPORTS_FAILED";
+        startDate: string;
+        endDate: string;
+        totalClasses: number;
+        completedClasses: number;
+      };
+      classSummary: Array<{
+        classId: number;
+        className: string;
+        subclasses: Array<{
+          subclassId: number;
+          subclassName: string;
+          totalStudents: number;
+          completedReports: number;
+          generatingReports: number;
+          failedReports: number;
+          successRate: number;
+        }>;
+      }>;
+      recentActivity: Array<{
+        timestamp: string;
+        activity: string;
+        classId: number;
+        className: string;
+        status: string;
+      }>;
+    };
+  }
+  ```
+
+#### **Get Failed Reports**
+**Endpoint:** `GET /api/v1/manager/report-cards/failed`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    sequenceId?: number;
+    page?: number;
+    limit?: number;
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      failedReports: Array<{
+        id: number;
+        studentId: number;
+        studentName: string;
+        studentMatricule: string;
+        classId: number;
+        className: string;
+        subclassId: number;
+        subclassName: string;
+        sequenceId: number;
+        sequenceName: string;
+        errorMessage: string;
+        failedAt: string;
+        attemptCount: number;
+        canRetry: boolean;
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    };
+  }
+  ```
+
+#### **Retry Failed Reports**
+**Endpoint:** `POST /api/v1/manager/report-cards/retry`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    reportIds: number[]; // Array of failed report IDs to retry
+    sequenceId?: number; // Optional, retry all failed for sequence
+    classId?: number;    // Optional, retry all failed for class
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      retriedReports: number;
+      jobsQueued: number;
+      estimatedCompletion: string;
+    };
+  }
+  ```
+
+#### **Get Parent Access Analytics**
+**Endpoint:** `GET /api/v1/manager/report-cards/parent-access`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    sequenceId?: number;
+    classId?: number;
+    startDate?: string;
+    endDate?: string;
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      accessSummary: {
+        totalReports: number;
+        accessedReports: number;
+        accessRate: number; // Percentage
+        averageAccessTime: string; // Time from generation to first access
+        multipleAccessCount: number; // Reports accessed more than once
+      };
+      classBreakdown: Array<{
+        classId: number;
+        className: string;
+        totalReports: number;
+        accessedReports: number;
+        accessRate: number;
+      }>;
+      accessTrends: Array<{
+        date: string;
+        accessCount: number;
+        downloadCount: number;
+      }>;
+      unAccessedReports: Array<{
+        studentId: number;
+        studentName: string;
+        parentName: string;
+        parentContact: string;
+        generatedAt: string;
+        daysSinceGeneration: number;
+      }>;
+    };
+  }
+  ```
+
+### **Report Card Management Dashboard**
+```
+┌─── Report Card Management & Analytics ───┐
+│ [Overview] [By Class] [Failed Reports] [Parent Access] [Analytics] │
+│                                                                     │
+│ ┌─── Current Sequence Status ───┐                                   │
+│ │ Sequence 3 (January 2025) - Reports Available                    │
+│ │ 📊 Progress: ████████████████░░ 93% Complete                      │
+│ │                                                                   │
+│ │ ✅ Completed: 1,156 reports (93%)                                 │
+│ │ ⏳ Generating: 67 reports (5%)                                    │
+│ │ ❌ Failed: 22 reports (2%)                                        │
+│ │ ⏸️ Pending: 0 reports (0%)                                        │
+│ │                                                                   │
+│ │ Success Rate: 95.2% | Avg Time: 2.3 min                          │
+│ │ Parent Access: 78% downloaded                                     │
+│ │ [View Details] [Download Summary] [Send Notifications]            │
+│ └─────────────────────────────────────────────────────────────────┘│
+│                                                                     │
+│ ┌─── Class-by-Class Breakdown ───┐                                  │
+│ │ Form 1A: 42/45 completed (93%) ✅                                 │
+│ │ Form 1B: 38/41 completed (93%) ✅                                 │
+│ │ Form 2A: 35/39 completed (90%) ⚠️ (4 failed)                     │
+│ │ Form 2B: 40/43 completed (93%) ✅                                 │
+│ │ Form 3A: 36/38 completed (95%) ✅                                 │
+│ │ Form 3B: 41/44 completed (93%) ✅                                 │
+│ │ Form 4A: 39/42 completed (93%) ✅                                 │
+│ │ Form 4B: 37/40 completed (93%) ✅                                 │
+│ │ Form 5A: 35/38 completed (92%) ✅                                 │
+│ │ Form 5B: 38/41 completed (93%) ✅                                 │
+│ │                                                                   │
+│ │ Classes with Issues: 1 | Total Issues: 4 failed reports          │
+│ │ [View Class Details] [Retry Failed] [Contact Teachers]            │
+│ └─────────────────────────────────────────────────────────────────┘│
+│                                                                     │
+│ ┌─── Failed Reports Management ───┐                                 │
+│ │ Total Failed: 22 reports requiring attention                      │
+│ │                                                                   │
+│ │ Common Failure Reasons:                                           │
+│ │ • Missing marks data: 12 reports                                 │
+│ │ • PDF generation error: 6 reports                                │
+│ │ • Student data incomplete: 3 reports                             │
+│ │ • System timeout: 1 report                                       │
+│ │                                                                   │
+│ │ Auto-retry Status: 15 eligible for retry                         │
+│ │ Manual intervention needed: 7 reports                            │
+│ │ [Retry All Eligible] [View Details] [Contact Support]            │
+│ └─────────────────────────────────────────────────────────────────┘│
+│                                                                     │
+│ ┌─── Parent Access Analytics ───┐                                   │
+│ │ Reports Available: 1,156 | Accessed: 902 (78%)                  │
+│ │ Not Yet Accessed: 254 reports (22%)                              │
+│ │ Average Access Time: 1.2 days after generation                   │
+│ │                                                                   │
+│ │ Classes with Low Access Rates:                                   │
+│ │ • Form 2A: 65% access rate (needs follow-up)                    │
+│ │ • Form 3B: 71% access rate                                      │
+│ │                                                                   │
+│ │ [Send Reminders] [Export Contact List] [Access Trends]           │
+│ └─────────────────────────────────────────────────────────────────┘│
+│                                                                     │
+│ ┌─── Quick Actions ───┐                                             │
+│ │ [📧 Notify Parents] [🔄 Retry Failed Reports]                     │
+│ │ [📊 Export Analytics] [📞 Contact Class Masters]                  │
+│ │ [⚙️ Report Settings] [📋 Quality Review]                           │
+│ └─────────────────────────────────────────────────────────────────┘│
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### **Failed Reports Detail View**
+When clicking "Failed Reports":
+```
+┌─── Failed Report Cards - Detailed View ───┐
+│ [All Failed] [By Error Type] [By Class] [Retry Options]             │
+│                                                                      │
+│ Total Failed Reports: 22 | Eligible for Retry: 15                   │
+│                                                                      │
+│ ┌─── Error Categories ───┐                                           │
+│ │ 📊 Missing Marks Data (12 reports)                                │
+│ │ Student   Class    Issue                           Action          │
+│ │ John Doe  Form 2A  No marks for Mathematics       [Contact HOD]   │
+│ │ Mary Jane Form 2A  Missing Chemistry scores       [Contact HOD]   │
+│ │ Peter Pan Form 2A  Incomplete Physics marks       [Contact HOD]   │
+│ │ [Show All 12] [Bulk Contact] [Mark Resolved]                      │
+│ │                                                                    │
+│ │ 🖥️ PDF Generation Errors (6 reports)                              │
+│ │ Student     Class    Error                         Action          │
+│ │ Alice Smith Form 3B  Template rendering failed    [Retry Auto]    │
+│ │ Bob Wilson  Form 4A  Font loading error           [Retry Auto]    │
+│ │ [Show All 6] [Retry All] [Check System]                           │
+│ │                                                                    │
+│ │ 👤 Student Data Issues (3 reports)                                │
+│ │ Student      Class    Issue                        Action          │
+│ │ Chris Brown  Form 5A  Missing profile photo       [Update Data]   │
+│ │ Dana White   Form 1B  Incomplete enrollment info  [Contact Admin] │
+│ │ [Show All 3] [Data Cleanup] [Bulk Update]                         │
+│ └──────────────────────────────────────────────────────────────────┘│
+│                                                                      │
+│ ┌─── Bulk Actions ───┐                                               │
+│ │ [☑️] Select All Eligible (15)                                      │
+│ │ [☑️] Select Missing Marks (12)                                     │
+│ │ [☐] Select PDF Errors (6)                                         │
+│ │ [☐] Select Data Issues (3)                                        │
+│ │                                                                    │
+│ │ [🔄 Retry Selected] [📧 Notify Teachers] [📋 Export Issues]        │
+│ │ [⚙️ System Check] [📞 Technical Support] [📊 Error Trends]         │
+│ └──────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Communications & Coordination (`/manager/communications`)

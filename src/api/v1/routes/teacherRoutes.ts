@@ -14,7 +14,8 @@ import {
     getMyAttendance,
     recordStudentAttendance,
     getAttendanceStatistics,
-    getSubClassAttendance
+    getSubClassAttendance,
+    getMyCurrentAndNextSubjects
 } from '../controllers/teacherController';
 
 const router = Router();
@@ -48,6 +49,9 @@ router.get('/me/subject-ids', getMySubjectIds);
 
 // GET /teachers/me/subclass-ids - Get list of subclass IDs teacher has access to
 router.get('/me/subclass-ids', getMySubClassIds);
+
+// GET /teachers/me/timetable/current-next - Get current and next subjects from timetable
+router.get('/me/timetable/current-next', getMyCurrentAndNextSubjects);
 
 // =============================
 // TEACHER ATTENDANCE MANAGEMENT ROUTES

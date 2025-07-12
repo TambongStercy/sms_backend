@@ -18,6 +18,7 @@
 │ │ 👨‍🎓 Total Students: 1,245  🏫 Total Classes: 24        │
 │ │ 📚 Subclasses: 48        💰 Total Fees: 95M FCFA      │
 │ │ 📊 Collection Rate: 78%   🚨 System Alerts: 5         │
+│ │ 📄 Report Cards: 1,156/1,245 (93%) Generated         │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
 │ ┌─── Quick Actions ───┐   ┌─── Recent Activity ───┐    │
@@ -25,13 +26,15 @@
 │ │ [👤 Create User]         │ │ • Bursar recorded 20 fees  │
 │ │ [🏫 Manage Classes]      │ │ • Teacher entered marks    │
 │ │ [📊 System Reports]      │ │ • 3 discipline issues      │
-│ │ [⚙️ System Settings]     │ │ • Parent sent message      │
+│ │ [📄 Report Card Status]  │ │ • Parent sent message      │
+│ │ [⚙️ System Settings]     │ │ • 67 reports generating    │
 │ └─────────────────────────┘ └─────────────────────────┘ │
 │                                                         │
 │ ┌─── Critical Alerts ───┐                              │
 │ │ ⚠️ 5 students awaiting VP assignment                  │
 │ │ 💰 12 fee payment conflicts need review               │
-│ │ 📊 Sequence 1 reports pending for 3 classes          │
+│ │ ❌ 22 report cards failed generation - needs review   │
+│ │ 📊 Sequence 3 reports pending for 3 classes          │
 │ │ 🔧 System backup scheduled in 2 hours                │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
@@ -111,6 +114,7 @@ Success Response (200):
 ├─ 💰 Financial Overview
 ├─ 📚 Academic Management
 ├─ 🚨 Discipline Overview
+├─ 📄 Report Card Management
 ├─ 📈 Reports & Analytics
 ├─ ⚙️ System Settings
 └─ 🔧 System Maintenance
@@ -968,7 +972,356 @@ GET /api/v1/discipline/lateness/statistics
 
 ---
 
-## 7. Reports & Analytics (`/super-manager/reports`)
+## 7. Report Card Management (`/super-manager/report-cards`)
+
+### **System-Wide Report Card Administration**
+
+#### **API Integration**
+
+#### **Get System Report Card Overview**
+**Endpoint:** `GET /api/v1/super-manager/report-cards/system-overview`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current year - super manager can see all
+    sequenceId?: number;     // Optional, filter by specific sequence
+    includeHistorical?: boolean; // Include data from previous academic years
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      systemSummary: {
+        totalAcademicYears: number;
+        activeAcademicYears: number;
+        totalStudents: number;
+        totalReportsGenerated: number;
+        overallSuccessRate: number; // Percentage across all years
+        systemEfficiency: number;   // Generation speed metrics
+        totalStorageUsed: string;   // e.g., "2.3 GB"
+      };
+      currentAcademicYear: {
+        academicYearId: number;
+        academicYearName: string;
+        totalStudents: number;
+        completedReports: number;
+        generatingReports: number;
+        failedReports: number;
+        pendingReports: number;
+        successRate: number;
+        parentAccessRate: number;
+        averageGenerationTime: string;
+      };
+      sequences: Array<{
+        sequenceId: number;
+        sequenceName: string;
+        status: "OPEN" | "REPORTS_GENERATING" | "REPORTS_AVAILABLE" | "REPORTS_FAILED";
+        totalStudents: number;
+        completedReports: number;
+        failedReports: number;
+        generationDate?: string;
+        approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
+      }>;
+      systemHealth: {
+        generationQueueStatus: "IDLE" | "PROCESSING" | "OVERLOADED";
+        activeJobs: number;
+        failureRate: number; // Last 30 days
+        averageResponseTime: string;
+        storageHealth: "GOOD" | "WARNING" | "CRITICAL";
+      };
+      crossYearAnalytics: {
+        historicalTrends: Array<{
+          academicYear: string;
+          totalReports: number;
+          successRate: number;
+          averageGenerationTime: string;
+        }>;
+        improvementMetrics: {
+          successRateImprovement: number; // Percentage improvement
+          speedImprovement: number;       // Time reduction percentage
+          parentEngagementTrend: "INCREASING" | "DECREASING" | "STABLE";
+        };
+      };
+    };
+  }
+  ```
+
+#### **Get Template Management**
+**Endpoint:** `GET /api/v1/super-manager/report-cards/templates`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      activeTemplates: Array<{
+        id: number;
+        name: string;
+        version: string;
+        isDefault: boolean;
+        academicYears: string[];
+        lastModified: string;
+        modifiedBy: string;
+        status: "ACTIVE" | "DRAFT" | "DEPRECATED";
+      }>;
+      templateHistory: Array<{
+        templateId: number;
+        version: string;
+        changeDescription: string;
+        modifiedAt: string;
+        modifiedBy: string;
+      }>;
+    };
+  }
+  ```
+
+#### **Approve Report Release**
+**Endpoint:** `POST /api/v1/super-manager/report-cards/approve-release`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    sequenceId: number;
+    academicYearId: number;
+    approvalStatus: "APPROVED" | "REJECTED";
+    approvalNotes?: string;
+    releaseToParents: boolean;
+    notificationSettings: {
+      notifyParents: boolean;
+      notifyTeachers: boolean;
+      notifyPrincipal: boolean;
+    };
+  }
+  ```
+
+#### **System Maintenance Operations**
+**Endpoint:** `POST /api/v1/super-manager/report-cards/maintenance`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    operation: "CLEANUP_FAILED" | "REBUILD_QUEUE" | "OPTIMIZE_STORAGE" | "REFRESH_CACHE";
+    parameters?: {
+      academicYearId?: number;
+      sequenceId?: number;
+      retentionDays?: number; // For cleanup operations
+    };
+  }
+  ```
+
+### **System Administration Dashboard**
+```
+┌─── Report Card System Administration ───┐
+│ [System Overview] [Templates] [Approval Queue] [Maintenance] [Analytics] │
+│                                                                           │
+│ ┌─── System Health & Performance ───┐                                    │
+│ │ 🏫 Academic Years: 3 | Active: 1                                       │
+│ │ 👨‍🎓 Total Students: 1,245 | All Years: 3,670                           │
+│ │ 📄 Reports Generated: 1,156/1,245 (93%) Current Year                   │
+│ │ 📊 Overall Success Rate: 96.2% (All Time)                              │
+│ │ ⚡ System Efficiency: 98.5% | Avg Generation: 2.1 min                  │
+│ │ 💾 Storage Used: 2.3 GB / 50 GB Available                              │
+│ │                                                                         │
+│ │ Generation Queue: 🟢 IDLE (0 jobs) | Health: 🟢 EXCELLENT              │
+│ │ [System Diagnostics] [Performance Report] [Storage Management]          │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── Current Academic Year (2024-2025) ───┐                              │
+│ │ Status: 📊 Sequence 3 Reports Available                                │
+│ │ ✅ Completed: 1,156 (93%) | ⏳ Generating: 67 (5%)                     │
+│ │ ❌ Failed: 22 (2%) | ⏸️ Pending: 0 (0%)                                │
+│ │ 👨‍👩‍👧‍👦 Parent Access: 902/1,156 (78%) reports downloaded                │
+│ │                                                                         │
+│ │ Approval Status: ⏳ Pending Review                                       │
+│ │ [📋 Review for Approval] [📧 Notify Stakeholders] [📊 Detailed View]   │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── Sequence Approval Queue ───┐                                        │
+│ │ Sequence 3 (January 2025): ⏳ Awaiting Final Approval                  │
+│ │ │ • Generation: ✅ 93% Complete                                         │
+│ │ │ • Quality Check: ✅ Passed                                            │
+│ │ │ • Principal Review: ✅ Approved                                       │
+│ │ │ • Parent Notification: ⏸️ Pending Super Manager Approval             │
+│ │ │ [✅ Approve & Release] [❌ Reject] [📝 Add Notes] [🔍 Quality Review] │
+│ │                                                                         │
+│ │ Sequence 2 (November 2024): ✅ Approved & Released                     │
+│ │ │ • Released: Nov 25, 2024 | Parent Access: 89%                       │
+│ │ │ [📊 View Analytics] [📋 Download Summary]                             │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── Template Management ───┐                                            │
+│ │ Active Templates: 3 | Draft Templates: 1                               │
+│ │                                                                         │
+│ │ 📄 Standard Report Template v2.1 (Default)                             │
+│ │ │ Used by: All classes | Last Modified: Jan 15, 2025                   │
+│ │ │ Status: ✅ Active | Academic Years: 2024-2025, 2023-2024             │
+│ │ │ [📝 Edit] [📋 Clone] [📊 Usage Stats] [🔒 Version History]            │
+│ │                                                                         │
+│ │ 📄 Enhanced Analytics Template v1.0                                     │
+│ │ │ Used by: Form 4-5 only | Status: ✅ Active                            │
+│ │ │ Features: Advanced charts, comparative analysis                       │
+│ │ │ [📝 Edit] [📋 Apply to All] [🎯 Target Classes]                       │
+│ │                                                                         │
+│ │ 📄 New Template v3.0 (Draft)                                           │
+│ │ │ Status: 🔶 Draft | Created: Jan 20, 2025                             │
+│ │ │ Changes: New layout, improved mobile support                          │
+│ │ │ [📝 Continue Editing] [🧪 Test Generate] [✅ Publish]                 │
+│ │                                                                         │
+│ │ [➕ Create New Template] [📥 Import Template] [📤 Export All]           │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── System Maintenance & Operations ───┐                                │
+│ │ Last Maintenance: Jan 20, 2025 | Next Scheduled: Feb 1, 2025          │
+│ │                                                                         │
+│ │ Quick Maintenance Actions:                                              │
+│ │ [🧹 Cleanup Failed Reports] [🔄 Rebuild Generation Queue]              │
+│ │ [🗜️ Optimize Storage] [🔄 Refresh System Cache]                        │
+│ │ [📊 Run System Diagnostics] [📈 Generate Health Report]                │
+│ │                                                                         │
+│ │ Storage Management:                                                     │
+│ │ • Current Year Reports: 1.2 GB                                         │
+│ │ • Archived Reports: 1.1 GB                                             │
+│ │ • Templates & Assets: 50 MB                                            │
+│ │ • System Backups: 200 MB                                               │
+│ │ [📁 Archive Old Reports] [🗑️ Cleanup Temporary Files]                  │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── Cross-Year Analytics ───┐                                           │
+│ │ Historical Performance Trends (Last 3 Academic Years)                  │
+│ │                                                                         │
+│ │ 📈 Success Rate Trend: 94.1% → 95.7% → 96.2% (Improving)              │
+│ │ ⚡ Speed Improvement: 3.2min → 2.7min → 2.1min (35% faster)            │
+│ │ 👨‍👩‍👧‍👦 Parent Engagement: 71% → 75% → 78% (Increasing)                  │
+│ │ 💾 Storage Efficiency: 85% → 91% → 94% (Better compression)            │
+│ │                                                                         │
+│ │ Predictive Analytics:                                                   │
+│ │ • Next Sequence ETA: Feb 15-20, 2025                                   │
+│ │ • Expected Success Rate: 96.5%                                         │
+│ │ • Storage Projection: 3.1 GB by year end                               │
+│ │                                                                         │
+│ │ [📊 Detailed Analytics] [📈 Trend Analysis] [🔮 Predictive Models]     │
+│ └───────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### **Template Management Interface**
+When clicking "Template Management":
+```
+┌─── Report Card Template Management ───┐
+│ [Active] [Draft] [Deprecated] [Create New] [Import/Export]               │
+│                                                                           │
+│ ┌─── Template Editor ───┐                                                │
+│ │ Template Name: [Standard Report Template v2.1]                         │
+│ │ Version: [2.1] Status: [Active ▼] [Draft/Active/Deprecated]           │
+│ │                                                                         │
+│ │ ┌─── Layout Configuration ───┐                                         │
+│ │ │ Page Size: [A4 ▼] Orientation: [Portrait ●] [Landscape ○]           │
+│ │ │ Header Style: [School Logo & Info ▼]                                 │
+│ │ │ Footer Style: [Principal Signature ▼]                                │
+│ │ │ Color Scheme: [Blue Professional ▼]                                  │
+│ │ └─────────────────────────────────────────────────────────────────────┘│
+│ │                                                                         │
+│ │ ┌─── Content Sections ───┐                                             │
+│ │ │ [☑️] Student Information Header                                        │
+│ │ │ [☑️] Academic Performance Table                                        │
+│ │ │ [☑️] Subject-wise Analysis                                             │
+│ │ │ [☑️] Attendance Summary                                                │
+│ │ │ [☑️] Behavioral Comments                                               │
+│ │ │ [☑️] Class Position & Rankings                                         │
+│ │ │ [☑️] Teacher Remarks Section                                           │
+│ │ │ [☑️] Principal's Comments                                              │
+│ │ │ [☐] Parent Feedback Section (Optional)                                │
+│ │ │ [☑️] Next Term Guidelines                                              │
+│ │ └─────────────────────────────────────────────────────────────────────┘│
+│ │                                                                         │
+│ │ ┌─── Advanced Features ───┐                                            │
+│ │ │ [☑️] QR Code for Digital Verification                                  │
+│ │ │ [☑️] Watermark Security                                                │
+│ │ │ [☑️] Mobile-Responsive View                                            │
+│ │ │ [☑️] Multi-language Support                                            │
+│ │ │ [☐] Interactive Charts (Beta)                                         │
+│ │ │ [☐] Parent Portal Integration                                          │
+│ │ └─────────────────────────────────────────────────────────────────────┘│
+│ │                                                                         │
+│ │ Academic Year Scope: [☑️] 2024-2025 [☑️] 2025-2026 [☐] All Years      │
+│ │ Class Scope: [☑️] All Classes [☐] Specific Classes                     │
+│ │                                                                         │
+│ │ [🧪 Test Generate] [👁️ Preview] [💾 Save Draft] [✅ Publish Template]  │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── Template Usage Statistics ───┐                                      │
+│ │ Reports Generated: 15,670 (All Time)                                   │
+│ │ Success Rate: 97.8%                                                     │
+│ │ Average Generation Time: 2.1 minutes                                   │
+│ │ Parent Satisfaction: 4.6/5.0 (Based on feedback)                      │
+│ │ [📊 Detailed Stats] [📋 Usage Report] [🔍 Error Analysis]              │
+│ └───────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### **Approval Workflow Interface**
+When clicking "Sequence Approval":
+```
+┌─── Report Card Approval Workflow ───┐
+│ Sequence 3 (January 2025) - Approval Review                              │
+│                                                                           │
+│ ┌─── Generation Summary ───┐                                             │
+│ │ Total Students: 1,245                                                   │
+│ │ ✅ Successfully Generated: 1,156 reports (92.8%)                       │
+│ │ ❌ Failed Generation: 22 reports (1.8%)                                │
+│ │ ⏳ Currently Generating: 67 reports (5.4%)                             │
+│ │                                                                         │
+│ │ Quality Metrics:                                                        │
+│ │ • Data Completeness: 98.9%                                             │
+│ │ • Template Compliance: 100%                                            │
+│ │ • PDF Integrity: 99.7%                                                 │
+│ │ • Performance Standards: ✅ Met                                         │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── Approval Checklist ───┐                                             │
+│ │ ✅ Academic Data Verification (Completed: Jan 22, 2025)                │
+│ │ ✅ Quality Assurance Review (Completed: Jan 23, 2025)                  │
+│ │ ✅ Principal Approval (Approved: Jan 24, 2025)                         │
+│ │ ✅ Template Compliance Check (Passed: Jan 24, 2025)                    │
+│ │ ⏳ Super Manager Final Approval (Pending)                               │
+│ │ ⏸️ Parent Notification (Awaiting Approval)                             │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── Review Comments ───┐                                                │
+│ │ Principal (Jan 24, 2025): "Sequence 3 reports look excellent.          │
+│ │ Academic performance data is accurate and complete. Recommend           │
+│ │ immediate release to parents."                                          │
+│ │                                                                         │
+│ │ Quality Assurance (Jan 23, 2025): "All quality checks passed.          │
+│ │ Template rendering is consistent across all reports. No data            │
+│ │ anomalies detected."                                                    │
+│ │                                                                         │
+│ │ Super Manager Notes: [Text Area for approval notes]                    │
+│ └───────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│ ┌─── Approval Actions ───┐                                               │
+│ │ Release Settings:                                                       │
+│ │ [☑️] Notify Parents via Email                                           │
+│ │ [☑️] Notify Parents via SMS                                             │
+│ │ [☑️] Notify Class Masters                                               │
+│ │ [☑️] Notify Principal                                                   │
+│ │ [☐] Schedule Release (Date/Time Picker)                                │
+│ │                                                                         │
+│ │ Approval Decision:                                                      │
+│ │ [✅ Approve & Release Immediately] [⏰ Approve & Schedule Release]       │
+│ │ [❌ Reject (Specify Reasons)] [⏸️ Request Additional Review]           │
+│ │                                                                         │
+│ │ [📧 Send Notifications] [📋 Generate Approval Report] [🔙 Back]         │
+│ └───────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 8. Reports & Analytics (`/super-manager/reports`)
 
 ### **Comprehensive Reports Dashboard**
 ```

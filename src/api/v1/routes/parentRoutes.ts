@@ -7,7 +7,8 @@ import {
     getChildrenQuizResults,
     getSchoolAnnouncements,
     getChildQuizResults,
-    getChildAnalytics
+    getChildAnalytics,
+    checkChildReportCardAvailability
 } from '../controllers/parentController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -46,6 +47,13 @@ router.get('/children/:studentId/analytics',
     authenticate,
     authorize(['PARENT']),
     getChildAnalytics
+);
+
+// GET /parents/children/:studentId/report-card/availability - Check if child's report card is available
+router.get('/children/:studentId/report-card/availability',
+    authenticate,
+    authorize(['PARENT']),
+    checkChildReportCardAvailability
 );
 
 // Get quiz results for all children

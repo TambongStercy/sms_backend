@@ -32,7 +32,7 @@ router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRIN
 router.get('/student/:studentId', authenticate, feeController.getStudentFees);
 
 // GET /fees/sub_class/:sub_classId/summary - Get fee summary for a sub_class
-router.get('/sub_class/:sub_classId/summary', authenticate, feeController.getSubclassFeesSummary);
+router.get('/sub_class/:id/summary', authenticate, feeController.getSubclassFeesSummary);
 
 // GET /fees/subclass/:id/summary - Alias for subclass fees summary (for backward compatibility)
 router.get('/subclass/:id/summary', authenticate, feeController.getSubclassFeesSummary);

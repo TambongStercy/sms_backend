@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { authorize } from '../middleware/auth.middleware';
 import * as managerController from '../controllers/managerController';
+import * as examController from '../controllers/examController';
 
 const router = express.Router();
 
@@ -126,6 +127,26 @@ router.get('/maintenance-schedule',
 router.get('/inventory',
     authorize(['MANAGER', 'PRINCIPAL', 'SUPER_MANAGER']),
     managerController.getInventoryStatus
+);
+
+/**
+ * @route GET /api/v1/manager/report-cards/student/:studentId/availability
+ * @desc Check if a student's report card is available
+ * @access Private (MANAGER, PRINCIPAL, SUPER_MANAGER only)
+ */
+router.get('/report-cards/student/:studentId/availability',
+    authorize(['MANAGER', 'PRINCIPAL', 'SUPER_MANAGER']),
+    examController.checkStudentReportCardAvailability
+);
+
+/**
+ * @route GET /api/v1/manager/report-cards/subclass/:subClassId/availability
+ * @desc Check if a subclass's report cards are available
+ * @access Private (MANAGER, PRINCIPAL, SUPER_MANAGER only)
+ */
+router.get('/report-cards/subclass/:subClassId/availability',
+    authorize(['MANAGER', 'PRINCIPAL', 'SUPER_MANAGER']),
+    examController.checkSubclassReportCardAvailability
 );
 
 export default router; 

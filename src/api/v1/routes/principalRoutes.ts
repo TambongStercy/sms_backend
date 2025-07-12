@@ -1,6 +1,7 @@
 import express from 'express';
 import * as principalController from '../controllers/principalController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import * as examController from '../controllers/examController';
 
 const router = express.Router();
 
@@ -91,5 +92,19 @@ router.get('/reports/financial-performance', principalController.getFinancialPer
  * @query academicYearId
  */
 router.get('/overview/summary', principalController.getSchoolOverviewSummary);
+
+/**
+ * @route GET /api/v1/principal/report-cards/student/:studentId/availability
+ * @desc Check if a student's report card is available
+ * @access PRINCIPAL only
+ */
+router.get('/report-cards/student/:studentId/availability', examController.checkStudentReportCardAvailability);
+
+/**
+ * @route GET /api/v1/principal/report-cards/subclass/:subClassId/availability
+ * @desc Check if a subclass's report cards are available
+ * @access PRINCIPAL only
+ */
+router.get('/report-cards/subclass/:subClassId/availability', examController.checkSubclassReportCardAvailability);
 
 export default router; 

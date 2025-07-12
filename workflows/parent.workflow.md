@@ -160,11 +160,21 @@ Each child gets a card showing:
       reports: {
         availableReports: Array<{
           id: number;
+          reportType: "SINGLE_STUDENT" | "SUBCLASS";
           sequenceName: string;
           academicYear: string;
-          generatedAt: string;
-          downloadUrl: string;
+          status: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING";
+          generatedAt?: string;
+          downloadUrl?: string;
+          pageNumber?: number; // For individual pages in subclass reports
+          errorMessage?: string; // If generation failed
         }>;
+        reportSummary: {
+          totalReports: number;
+          completedReports: number;
+          pendingReports: number;
+          failedReports: number;
+        };
       };
     };
   }
@@ -172,7 +182,7 @@ Each child gets a card showing:
 
 ### **Navigation Tabs**
 ```
-[📊 Overview] [💰 Fees] [📚 Academics] [🎯 Quizzes] [⚠️ Discipline] [📊 Analytics]
+[📊 Overview] [💰 Fees] [📚 Academics] [📄 Report Cards] [🎯 Quizzes] [⚠️ Discipline] [📊 Analytics]
 ```
 
 ### **1. Overview Tab**
@@ -307,13 +317,213 @@ Each child gets a card showing:
 │ [View Detailed Marks]                        │
 └────────────────────────────────────────────┘
 
-┌─── Available Reports ───┐
-│ 📄 Sequence 1 Report - 2024      [Download] │
-│ 📄 Sequence 2 Report - 2024      [Download] │
-└─────────────────────────────────────────────┘
+┌─── Available Report Cards ───┐
+│ 📄 Sequence 1 Report Card - 2024-2025  [Download] [View] │
+│ 📄 Sequence 2 Report Card - 2024-2025  [Download] [View] │
+│ 📄 Sequence 3 Report Card - 2024-2025  [Generating...] │
+│ 📄 Mid-Year Report - 2024-2025         [Download] [View] │
+│ 📄 Final Report - 2023-2024           [Download] [View] │
+│ [View All Academic Years] [Request Missing Reports]     │
+└────────────────────────────────────────────────────────┘
 ```
 
-### **4. Quizzes Tab**
+### **4. Report Cards Tab**
+**API Integration:**
+
+#### **Get Student Report Cards**
+**Endpoint:** `GET /api/v1/parents/children/:studentId/report-cards`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): Student ID
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current year
+    sequenceId?: number;     // Optional, filter by specific sequence
+    status?: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING"; // Optional filter
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      studentInfo: {
+        id: number;
+        name: string;
+        matricule: string;
+        className?: string;
+        subclassName?: string;
+      };
+      reportSummary: {
+        totalReports: number;
+        completedReports: number;
+        generatingReports: number;
+        failedReports: number;
+        lastGeneratedDate?: string;
+      };
+      availableReports: Array<{
+        id: number;
+        reportType: "SINGLE_STUDENT";
+        examSequence: {
+          id: number;
+          name: string;
+          academicYear: string;
+        };
+        status: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING";
+        generatedAt?: string;
+        filePath?: string;
+        downloadUrl?: string;
+        pageNumber?: number;
+        errorMessage?: string;
+        fileSize?: string; // e.g., "2.5 MB"
+        lastAccessedAt?: string;
+      }>;
+      historicalReports: Array<{
+        academicYear: string;
+        reportCount: number;
+        latestReportDate?: string;
+      }>;
+    };
+  }
+  ```
+
+#### **Download Report Card**
+**Endpoint:** `GET /api/v1/parents/children/:studentId/report-cards/:reportId/download`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** 
+  - `studentId` (number): Student ID
+  - `reportId` (number): Generated report ID
+- **Response:** PDF file download with proper headers
+
+#### **Get Report Card Status**
+**Endpoint:** `GET /api/v1/parents/children/:studentId/report-cards/:reportId/status`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      status: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING";
+      progress?: number; // 0-100 for generating reports
+      estimatedCompletion?: string; // For generating reports
+      errorMessage?: string;
+      lastUpdated: string;
+    };
+  }
+  ```
+
+### **Report Cards Tab Layout**
+```
+┌─── Report Card Management ───┐
+│ [🏠 Current Year] [📅 All Years] [🔄 Refresh Status]     │
+│                                                          │
+│ ┌─── Report Summary ───┐                                 │
+│ │ 📊 Total Reports: 6        📥 Completed: 4            │
+│ │ ⏳ Generating: 1           ❌ Failed: 0               │
+│ │ 📅 Last Generated: 2024-01-20                          │
+│ └────────────────────────────────────────────────────── │
+│                                                          │
+│ ┌─── Current Academic Year (2024-2025) ───┐              │
+│ │                                                        │
+│ │ 📄 Sequence 1 Report Card                             │
+│ │ │  Status: ✅ Completed | Generated: 2024-01-15       │
+│ │ │  Size: 2.1 MB | Last Accessed: 2024-01-16          │
+│ │ │  [📥 Download] [👁️ View] [📤 Share]                │
+│ │                                                        │
+│ │ 📄 Sequence 2 Report Card                             │
+│ │ │  Status: ✅ Completed | Generated: 2024-03-20       │
+│ │ │  Size: 2.3 MB | Last Accessed: Never               │
+│ │ │  [📥 Download] [👁️ View] [📤 Share]                │
+│ │                                                        │
+│ │ 📄 Sequence 3 Report Card                             │
+│ │ │  Status: ⏳ Generating... (Progress: 75%)           │
+│ │ │  Estimated completion: 5 minutes                    │
+│ │ │  [🔄 Check Status] [ℹ️ Details]                     │
+│ │                                                        │
+│ │ 📄 Mid-Year Report                                     │
+│ │ │  Status: ⏳ Pending Generation                       │
+│ │ │  Expected: After Sequence 3 completion             │
+│ │ │  [📧 Notify When Ready]                             │
+│ │                                                        │
+│ │ 📄 Final Year Report                                   │
+│ │ │  Status: ⏸️ Not Available (End of year)             │
+│ │ │  Expected: June 2025                               │
+│ └──────────────────────────────────────────────────────┘│
+│                                                          │
+│ ┌─── Previous Academic Years ───┐                        │
+│ │ 📂 2023-2024 Academic Year (6 reports available)      │
+│ │ │  📄 Final Report - Form 4 | [Download] [View]       │
+│ │ │  📄 Mid-Year Report - Form 4 | [Download] [View]    │
+│ │ │  📄 Sequence 6 Report | [Download] [View]          │
+│ │ │  📄 Sequence 5 Report | [Download] [View]          │
+│ │ │  [▼ Show All 2023-2024 Reports]                    │
+│ │                                                        │
+│ │ 📂 2022-2023 Academic Year (6 reports available)      │
+│ │ │  [▼ Show 2022-2023 Reports]                        │
+│ └──────────────────────────────────────────────────────┘│
+│                                                          │
+│ ┌─── Quick Actions ───┐                                  │
+│ │ [📧 Request Missing Report] [❓ Report Issue]           │
+│ │ [📞 Contact Class Master] [💬 Ask Question]            │
+│ └──────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────┘
+```
+
+### **Report Card Download Modal**
+When user clicks "Download" or "View":
+```
+┌─── Report Card Download ───┐
+│ 📄 Sequence 1 Report Card - John Doe                    │
+│ ─────────────────────────────────────────              │
+│ 📊 Academic Year: 2024-2025                             │
+│ 📅 Sequence: Sequence 1 (Sept-Oct 2024)                │
+│ 📝 Generated: January 15, 2024 at 2:30 PM              │
+│ 📏 File Size: 2.1 MB                                    │
+│ 📋 Pages: 1 page                                        │
+│                                                          │
+│ ┌─── Download Options ───┐                              │
+│ │ [📥 Download PDF] [👁️ View in Browser]                │
+│ │ [📧 Email Copy] [📤 Share Link]                       │
+│ │ [🖨️ Print] [💾 Save to Cloud]                         │
+│ └──────────────────────────────────────────────────────┘│
+│                                                          │
+│ 💡 Tip: Report cards are automatically generated after  │
+│    each examination sequence is completed.               │
+│                                                          │
+│ [Close] [Download Now]                                   │
+└────────────────────────────────────────────────────────┘
+```
+
+### **Report Generation Status Modal**
+For reports being generated:
+```
+┌─── Report Generation Status ───┐
+│ 📄 Sequence 3 Report Card - John Doe                    │
+│ ─────────────────────────────────────────              │
+│ Status: ⏳ Generating Report Card...                     │
+│                                                          │
+│ ████████████████░░░░ 75% Complete                       │
+│                                                          │
+│ Current Step: Calculating subject averages              │
+│ Estimated Time Remaining: 3-5 minutes                   │
+│ Started: 10:30 AM                                       │
+│                                                          │
+│ ℹ️ Your report card is being generated in the           │
+│    background. You'll receive a notification when       │
+│    it's ready for download.                             │
+│                                                          │
+│ ✅ Marks collected and verified                          │
+│ ✅ Attendance calculated                                 │
+│ ⏳ Generating performance analytics                      │
+│ ⏸️ Creating PDF document                                 │
+│ ⏸️ Final quality checks                                  │
+│                                                          │
+│ [🔄 Refresh Status] [📧 Notify Me] [Close]              │
+└────────────────────────────────────────────────────────┘
+```
+
+### **5. Quizzes Tab**
 **API Integration:**
 - `GET /api/v1/parents/children/:studentId/quiz-results`
 - Query Parameters: `{ academicYearId?: number }`

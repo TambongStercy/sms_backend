@@ -151,8 +151,8 @@ router.get('/:id/status',
     studentController.getStudentStatusInfo
 );
 
-// GET /students/subclass/:subClassId - Get all students in a specific subclass
-router.get('/subclass/:subClassId',
+// GET /students/subclass/:id - Get all students in a specific subclass
+router.get('/subclass/:id',
     authenticate,
     authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
     (req: any, res: any, next: any) => {

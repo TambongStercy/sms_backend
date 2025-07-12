@@ -447,4 +447,32 @@ export const getSubClassAttendance = async (req: AuthenticatedRequest, res: Resp
             error: error.message
         });
     }
+};
+
+/**
+ * GET /teachers/me/timetable/current-next
+ * Get current and next subjects from timetable based on request time
+ */
+export const getMyCurrentAndNextSubjects = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const teacherId = req.user?.id;
+        if (!teacherId) {
+            res.status(401).json({ success: false, error: 'User not authenticated' });
+            return;
+        }
+
+        const academicYearId = req.query.academicYearId ? parseInt(req.query.academicYearId as string) : undefined;
+        const result = await teacherService.getTeacherCurrentAndNextSubjects(teacherId, academicYearId);
+
+        res.json({
+            success: true,
+            data: result
+        });
+    } catch (error: any) {
+        console.error('Error fetching teacher current and next subjects:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 }; 

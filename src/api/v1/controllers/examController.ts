@@ -3,11 +3,11 @@ import { Request, Response } from 'express';
 import * as examService from '../services/examService';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
 import path from 'path';
-import fs from 'fs';
 // import { ReportStatus, ReportType } from '@prisma/client';
 import prisma, { ReportStatus, ReportType } from '../../../config/db';
-import { ExamSequenceStatus } from '@prisma/client'; // Import enum
+import { Mark, ExamSequenceStatus } from '@prisma/client'; // Import enum
 import { PDFDocument } from 'pdf-lib'; // Added import
+import fs from 'fs';
 
 // Helper function to transform mark data
 const transformMark = (mark: any) => {
@@ -327,6 +327,7 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
                         success: false,
                         error: 'Report generation completed, but file path or page number is missing.'
                     });
+                    //TODO: Generate the report again
                     return;
                 }
                 const absolutePath = path.join(process.cwd(), reportRecord.file_path);
@@ -336,6 +337,7 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
                         success: false,
                         error: `Source report file (${reportRecord.file_path}) not found. Please try again later or contact support.`
                     });
+                    //TODO: Generate the report again
                     return;
                 }
 
@@ -409,7 +411,7 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
  */
 export const generateSubclassReportCards = async (req: Request, res: Response): Promise<void> => {
     try {
-        const sub_classId = parseInt(req.params.sub_classId);
+        const sub_classId = parseInt(req.params.sub_classId ?? req.params.subClassId);
         const academic_year_id = parseInt(req.finalQuery.academic_year_id as string);
         const exam_sequence_id = parseInt(req.finalQuery.exam_sequence_id as string);
 
@@ -773,5 +775,159 @@ export const deleteExamPaper = async (req: Request, res: Response): Promise<any>
                 error: error.message
             });
         }
+    }
+};
+
+/**
+ * Controller to trigger the regeneration and download of a single student's report card.
+ * @route POST /report-cards/student/:studentId/generate
+ */
+export const regenerateStudentReportCard = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const studentId = parseInt(req.params.studentId);
+        const { academic_year_id, exam_sequence_id } = req.body;
+
+        if (isNaN(studentId) || !academic_year_id || !exam_sequence_id) {
+            res.status(400).json({ success: false, error: 'Valid studentId, academicYearId, and examSequenceId must be provided.' });
+            return;
+        }
+
+        const filePath = await examService.generateReportCard({
+            studentId,
+            academicYearId: parseInt(academic_year_id),
+            examSequenceId: parseInt(exam_sequence_id)
+        });
+
+        res.download(filePath, `report-card-student-${studentId}.pdf`, async (err) => {
+            if (err) {
+                console.error('Error sending file for download:', err);
+            }
+            try {
+                // await fs.promises.unlink(filePath);
+            } catch (cleanupError) {
+                console.error(`Error cleaning up report file ${filePath}:`, cleanupError);
+            }
+        });
+
+    } catch (error: any) {
+        console.error('Error regenerating student report card:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error while regenerating student report card.'
+        });
+    }
+};
+
+/**
+ * Controller to trigger the regeneration and download of a subclass's combined report card.
+ * @route POST /report-cards/subclass/:subClassId/generate
+ */
+export const regenerateSubclassReportCards = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const subClassId = parseInt(req.params.subclassId ?? req.params.subClassId ?? req.params.id);
+        const academicYearId = Number(req.body.academicYearId ?? req.body.academic_year_id);
+        const examSequenceId = Number(req.body.examSequenceId ?? req.body.exam_sequence_id);
+
+        if (isNaN(subClassId) || isNaN(academicYearId) || isNaN(examSequenceId)) {
+            return res.status(400).json({ success: false, error: 'Valid subClassId, academicYearId, and examSequenceId must be provided.' });
+        }
+
+        const filePath = await examService.generateReportCard({
+            sub_classId: subClassId,
+            academicYearId: academicYearId,
+            examSequenceId: examSequenceId
+        });
+
+        res.download(filePath, `report-cards-subclass-${subClassId}.pdf`, async (err) => {
+            if (err) {
+                console.error('Error sending file for download:', err);
+            }
+            try {
+                // await fs.promises.unlink(filePath);
+            } catch (cleanupError) {
+                console.error(`Error cleaning up report file ${filePath}:`, cleanupError);
+            }
+        });
+
+    } catch (error: any) {
+        console.error('Error regenerating subclass report cards:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error while regenerating subclass report cards.'
+        });
+    }
+};
+
+/**
+ * Controller to check student report card availability
+ * @route GET /api/v1/report-cards/student/:studentId/availability
+ */
+export const checkStudentReportCardAvailability = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const studentId = parseInt(req.params.studentId);
+        const academicYearId = parseInt(req.finalQuery.academicYearId as string) || parseInt(req.finalQuery.academic_year_id as string);
+        const examSequenceId = parseInt(req.finalQuery.examSequenceId as string) || parseInt(req.finalQuery.exam_sequence_id as string);
+
+        if (isNaN(studentId) || isNaN(academicYearId) || isNaN(examSequenceId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Valid studentId, academicYearId, and examSequenceId must be provided'
+            });
+            return;
+        }
+
+        const result = await examService.checkStudentReportCardAvailability(
+            studentId,
+            academicYearId,
+            examSequenceId
+        );
+
+        res.json({
+            success: true,
+            data: result
+        });
+    } catch (error: any) {
+        console.error('Error checking student report card availability:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error while checking report card availability'
+        });
+    }
+};
+
+/**
+ * Controller to check subclass report card availability
+ * @route GET /api/v1/report-cards/subclass/:subClassId/availability
+ */
+export const checkSubclassReportCardAvailability = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const subClassId = parseInt(req.params.subClassId);
+        const academicYearId = parseInt(req.finalQuery.academicYearId as string) || parseInt(req.finalQuery.academic_year_id as string);
+        const examSequenceId = parseInt(req.finalQuery.examSequenceId as string) || parseInt(req.finalQuery.exam_sequence_id as string);
+
+        if (isNaN(subClassId) || isNaN(academicYearId) || isNaN(examSequenceId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Valid subClassId, academicYearId, and examSequenceId must be provided'
+            });
+            return;
+        }
+
+        const result = await examService.checkSubclassReportCardAvailability(
+            subClassId,
+            academicYearId,
+            examSequenceId
+        );
+
+        res.json({
+            success: true,
+            data: result
+        });
+    } catch (error: any) {
+        console.error('Error checking subclass report card availability:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error while checking subclass report card availability'
+        });
     }
 };

@@ -1166,3 +1166,222 @@ export async function getSubClassAttendance(
         }
     };
 } 
+
+export interface CurrentNextSubject {
+    current: {
+        period: {
+            id: number;
+            name: string;
+            startTime: string;
+            endTime: string;
+            dayOfWeek: string;
+        };
+        subject: {
+            id: number;
+            name: string;
+            category: string;
+        };
+        subClass: {
+            id: number;
+            name: string;
+            className: string;
+        };
+        isActive: boolean;
+        minutesRemaining?: number;
+    } | null;
+    next: {
+        period: {
+            id: number;
+            name: string;
+            startTime: string;
+            endTime: string;
+            dayOfWeek: string;
+        };
+        subject: {
+            id: number;
+            name: string;
+            category: string;
+        };
+        subClass: {
+            id: number;
+            name: string;
+            className: string;
+        };
+        minutesToStart?: number;
+        isToday: boolean;
+    } | null;
+    requestTime: string;
+    currentDay: string;
+}
+
+/**
+ * Get teacher's current and next subjects based on timetable and current time
+ */
+export async function getTeacherCurrentAndNextSubjects(teacherId: number, academicYearId?: number): Promise<CurrentNextSubject> {
+    // Get current academic year if not provided
+    const currentAcademicYear = academicYearId ? 
+        await prisma.academicYear.findUnique({ where: { id: academicYearId } }) :
+        await getCurrentAcademicYear();
+
+    if (!currentAcademicYear) {
+        throw new Error('No active academic year found');
+    }
+
+    const now = new Date();
+    const currentTime = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
+    const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const currentDay = dayNames[now.getDay()];
+
+    // Get all teacher periods for current academic year
+    const teacherPeriods = await prisma.teacherPeriod.findMany({
+        where: {
+            teacher_id: teacherId,
+            academic_year_id: currentAcademicYear.id
+        },
+        include: {
+            period: true,
+            subject: true,
+            sub_class: {
+                include: {
+                    class: true
+                }
+            }
+        },
+        orderBy: [
+            { period: { day_of_week: 'asc' } },
+            { period: { start_time: 'asc' } }
+        ]
+    });
+
+    if (teacherPeriods.length === 0) {
+        return {
+            current: null,
+            next: null,
+            requestTime: now.toISOString(),
+            currentDay
+        };
+    }
+
+    // Find current period (if any)
+    const todayPeriods = teacherPeriods.filter(tp => tp.period.day_of_week === currentDay);
+    let currentPeriod = null;
+    let nextPeriod = null;
+
+    // Check for current period
+    for (const tp of todayPeriods) {
+        const startTime = tp.period.start_time;
+        const endTime = tp.period.end_time;
+        
+        if (currentTime >= startTime && currentTime <= endTime) {
+            // Calculate minutes remaining
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+            const [currentHour, currentMinuteNum] = currentTime.split(':').map(Number);
+            const endMinutes = endHour * 60 + endMinute;
+            const currentMinutes = currentHour * 60 + currentMinuteNum;
+            const minutesRemaining = endMinutes - currentMinutes;
+
+            currentPeriod = {
+                period: {
+                    id: tp.period.id,
+                    name: tp.period.name,
+                    startTime: tp.period.start_time,
+                    endTime: tp.period.end_time,
+                    dayOfWeek: tp.period.day_of_week
+                },
+                subject: {
+                    id: tp.subject.id,
+                    name: tp.subject.name,
+                    category: tp.subject.category
+                },
+                subClass: {
+                    id: tp.sub_class.id,
+                    name: tp.sub_class.name,
+                    className: tp.sub_class.class.name
+                },
+                isActive: true,
+                minutesRemaining: Math.max(0, minutesRemaining)
+            };
+            break;
+        }
+    }
+
+    // Find next period
+    // First, check for remaining periods today
+    const upcomingTodayPeriods = todayPeriods.filter(tp => tp.period.start_time > currentTime);
+    
+    if (upcomingTodayPeriods.length > 0) {
+        const nextTp = upcomingTodayPeriods[0];
+        
+        // Calculate minutes to start
+        const [startHour, startMinute] = nextTp.period.start_time.split(':').map(Number);
+        const [currentHour, currentMinuteNum] = currentTime.split(':').map(Number);
+        const startMinutes = startHour * 60 + startMinute;
+        const currentMinutes = currentHour * 60 + currentMinuteNum;
+        const minutesToStart = startMinutes - currentMinutes;
+
+        nextPeriod = {
+            period: {
+                id: nextTp.period.id,
+                name: nextTp.period.name,
+                startTime: nextTp.period.start_time,
+                endTime: nextTp.period.end_time,
+                dayOfWeek: nextTp.period.day_of_week
+            },
+            subject: {
+                id: nextTp.subject.id,
+                name: nextTp.subject.name,
+                category: nextTp.subject.category
+            },
+            subClass: {
+                id: nextTp.sub_class.id,
+                name: nextTp.sub_class.name,
+                className: nextTp.sub_class.class.name
+            },
+            minutesToStart: Math.max(0, minutesToStart),
+            isToday: true
+        };
+    } else {
+        // Look for next period in upcoming days
+        const dayOrder = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+        const currentDayIndex = dayOrder.indexOf(currentDay);
+        
+        for (let i = 1; i <= 7; i++) {
+            const nextDayIndex = (currentDayIndex + i) % 7;
+            const nextDay = dayOrder[nextDayIndex];
+            
+            const nextDayPeriods = teacherPeriods.filter(tp => tp.period.day_of_week === nextDay);
+            if (nextDayPeriods.length > 0) {
+                const nextTp = nextDayPeriods[0]; // First period of the day
+                
+                nextPeriod = {
+                    period: {
+                        id: nextTp.period.id,
+                        name: nextTp.period.name,
+                        startTime: nextTp.period.start_time,
+                        endTime: nextTp.period.end_time,
+                        dayOfWeek: nextTp.period.day_of_week
+                    },
+                    subject: {
+                        id: nextTp.subject.id,
+                        name: nextTp.subject.name,
+                        category: nextTp.subject.category
+                    },
+                    subClass: {
+                        id: nextTp.sub_class.id,
+                        name: nextTp.sub_class.name,
+                        className: nextTp.sub_class.class.name
+                    },
+                    isToday: false
+                };
+                break;
+            }
+        }
+    }
+
+    return {
+        current: currentPeriod,
+        next: nextPeriod,
+        requestTime: now.toISOString(),
+        currentDay
+    };
+}

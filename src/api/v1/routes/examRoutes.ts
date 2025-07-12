@@ -57,11 +57,33 @@ router.post('/papers/:id/generate', authenticate, examController.generateExam);
 
 export const reportCardsRouter = Router();
 
-// GET /report-cards/student/:studentId - Generate report card for a student
+// GET /report-cards/student/:studentId - Downloads a generated report card for a student
 reportCardsRouter.get('/student/:studentId', authenticate, examController.generateStudentReportCard);
 
-// GET /report-cards/sub_class/:sub_classId - Generate report cards for a sub_class
-reportCardsRouter.get('/sub_class/:sub_classId', authenticate, examController.generateSubclassReportCards);
+// GET /report-cards/student/:studentId/availability - Check if a student's report card is available
+reportCardsRouter.get('/student/:studentId/availability', authenticate, examController.checkStudentReportCardAvailability);
+
+// POST /report-cards/student/:studentId/generate - Triggers the regeneration of a student's report card
+reportCardsRouter.post(
+    '/student/:studentId/generate',
+    authenticate,
+    authorize([Role.SUPER_MANAGER, Role.PRINCIPAL, Role.VICE_PRINCIPAL]),
+    examController.regenerateStudentReportCard
+);
+
+// GET /report-cards/subclass/:subClassId - Downloads a generated combined report for a sub_class
+reportCardsRouter.get('/subclass/:subClassId', authenticate, examController.generateSubclassReportCards);
+
+// GET /report-cards/subclass/:subClassId/availability - Check if a subclass's report cards are available
+reportCardsRouter.get('/subclass/:subClassId/availability', authenticate, examController.checkSubclassReportCardAvailability);
+
+// POST /report-cards/subclass/:subClassId/generate - Triggers the regeneration of a subclass's combined report
+reportCardsRouter.post(
+    '/subclass/:subClassId/generate',
+    authenticate,
+    authorize([Role.SUPER_MANAGER, Role.PRINCIPAL, Role.VICE_PRINCIPAL]),
+    examController.regenerateSubclassReportCards
+);
 
 // Marks router (will be mounted at /marks)
 export const marksRouter = Router();

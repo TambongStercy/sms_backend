@@ -85,6 +85,12 @@
 │ │ 📈 Attendance Rate: 95%    🎯 Active Quizzes: 2       │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
+│ ┌─── Current & Next Classes ───┐                       │
+│ │ 🕐 NOW: Math - Form 5A (25 mins left)               │
+│ │ 🕑 NEXT: Physics - Form 2A (in 5 mins)              │
+│ │ [Real-time view updates every minute]                │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
 │ ┌─── Today's Schedule ───┐                              │
 │ │ 8:00-9:00   Math - Form 5A   Room 201               │
 │ │ 9:00-10:00  Math - Form 4B   Room 201               │
@@ -100,6 +106,113 @@
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
+
+## Real-Time Timetable (`/teacher/timetable/current-next`)
+
+### **API Integration**
+**Primary Endpoint:** `GET /api/v1/teachers/me/timetable/current-next`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current academic year
+  }
+  ```
+- **Response Data:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      current: {
+        period: {
+          id: number;
+          name: string;           // "Period 1"
+          startTime: string;      // "08:00"
+          endTime: string;        // "08:55"
+          dayOfWeek: string;      // "MONDAY"
+        };
+        subject: {
+          id: number;
+          name: string;           // "Mathematics"
+          category: string;       // "SCIENCE"
+        };
+        subClass: {
+          id: number;
+          name: string;           // "Form 1A"
+          className: string;      // "Form 1"
+        };
+        isActive: boolean;        // true if currently in this period
+        minutesRemaining: number; // Minutes left in current period
+      } | null;
+      next: {
+        period: {
+          id: number;
+          name: string;           // "Period 2"
+          startTime: string;      // "09:00"
+          endTime: string;        // "09:55"
+          dayOfWeek: string;      // "MONDAY"
+        };
+        subject: {
+          id: number;
+          name: string;           // "Physics"
+          category: string;       // "SCIENCE"
+        };
+        subClass: {
+          id: number;
+          name: string;           // "Form 2A"
+          className: string;      // "Form 2"
+        };
+        minutesToStart: number;   // Minutes until this period starts
+        isToday: boolean;         // true if this is today's schedule
+      } | null;
+      requestTime: string;        // ISO timestamp of request
+      currentDay: string;         // "MONDAY", "TUESDAY", etc.
+    };
+  }
+  ```
+
+### **Real-Time Timetable Feature**
+```
+┌─── Live Timetable Widget ───┐
+│ 🕐 Current Time: 8:30 AM     │
+│ 📅 Monday, January 22, 2025  │
+│                               │
+│ ┌─── NOW TEACHING ───┐       │
+│ │ 📚 Mathematics              │
+│ │ 👥 Form 5A (30 students)    │
+│ │ ⏰ Period 1: 8:00-8:55      │
+│ │ ⏱️  25 minutes remaining     │
+│ │ [Take Attendance] [Enter]   │
+│ └─────────────────────────────┘ │
+│                               │
+│ ┌─── UP NEXT ───┐             │
+│ │ 🧪 Physics                  │
+│ │ 👥 Form 2A (28 students)    │
+│ │ ⏰ Period 2: 9:00-9:55      │
+│ │ ⏱️  Starting in 5 minutes    │
+│ │ [Prepare Materials]         │
+│ └─────────────────────────────┘ │
+│                               │
+│ 🔄 Auto-refresh: Every minute │
+└─────────────────────────────────┘
+```
+
+### **Key Features:**
+- **Real-time updates:** Widget refreshes automatically every minute
+- **Current period tracking:** Shows active class with countdown timer
+- **Next period preview:** Displays upcoming class with preparation time
+- **Quick actions:** Direct access to attendance and materials
+- **Context-aware:** Only shows periods where teacher has assignments
+- **Day-aware:** Adapts to current day of week and schedule
+- **Academic year filtering:** Works with selected academic year context
+
+### **Implementation Notes:**
+- **Frontend:** JavaScript interval polling every 60 seconds
+- **Backend:** Time-based calculations using current server time
+- **Timezone:** Uses school's configured timezone
+- **Caching:** Timetable data cached for performance
+- **Fallback:** Graceful handling when no current/next periods exist
+- **Weekend/holiday handling:** Shows appropriate message when no school day
 
 ## My Subjects Page (`/teacher/subjects`)
 

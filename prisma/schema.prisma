@@ -204,6 +204,7 @@ model Enrollment {
   student_sequence_averages StudentSequenceAverage[]
 
   @@unique([student_id, academic_year_id])
+  @@index([sub_class_id, academic_year_id])
 }
 
 model SchoolFees {
@@ -358,6 +359,8 @@ model Mark {
   teacher              User            @relation("RecordedByUser", fields: [teacher_id], references: [id])
 
   @@unique([exam_sequence_id, enrollment_id, sub_class_subject_id])
+  @@index([enrollment_id, exam_sequence_id])
+  @@index([sub_class_subject_id, exam_sequence_id])
 }
 
 model Period {
@@ -528,7 +531,12 @@ model GeneratedReport {
   sub_class        SubClass?    @relation(fields: [sub_class_id], references: [id])
 
   @@unique([report_type, exam_sequence_id, academic_year_id, student_id], map: "student_report_unique")
+  @@unique([report_type, exam_sequence_id, academic_year_id, sub_class_id], map: "subclass_report_unique")
+  @@index([exam_sequence_id])
+  @@index([student_id])
   @@index([status])
+  @@index([report_type, exam_sequence_id, academic_year_id, student_id], map: "generated_report_student_idx")
+  @@index([report_type, exam_sequence_id, academic_year_id, sub_class_id], map: "generated_report_subclass_idx")
 }
 
 // New Models for Enhanced Functionality

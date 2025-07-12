@@ -4,6 +4,7 @@ import * as parentService from '../services/parentService';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
 import * as quizService from '../services/quizService';
+import * as examService from '../services/examService';
 
 const prisma = new PrismaClient();
 
@@ -338,3 +339,65 @@ export const getChildAnalytics = async (req: Request, res: Response): Promise<an
         });
     }
 }; 
+/**
+ * Check if a child's report card is available (for parents)
+ */
+export const checkChildReportCardAvailability = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const authReq = req as AuthenticatedRequest;
+        const parentId = authReq.user?.id;
+
+        if (!parentId) {
+            res.status(401).json({
+                success: false,
+                error: 'Unauthorized'
+            });
+            return;
+        }
+
+        const studentId = parseInt(req.params.studentId);
+        const academicYearId = parseInt(req.finalQuery.academicYearId as string) || parseInt(req.finalQuery.academic_year_id as string);
+        const examSequenceId = parseInt(req.finalQuery.examSequenceId as string) || parseInt(req.finalQuery.exam_sequence_id as string);
+
+        if (isNaN(studentId) || isNaN(academicYearId) || isNaN(examSequenceId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Valid studentId, academicYearId, and examSequenceId must be provided'
+            });
+            return;
+        }
+
+        // Verify that the parent is linked to this student
+        const parentStudent = await prisma.parentStudent.findFirst({
+            where: {
+                parent_id: parentId,
+                student_id: studentId
+            }
+        });
+
+        if (!parentStudent) {
+            res.status(403).json({
+                success: false,
+                error: 'You do not have permission to access this student\'s report card'
+            });
+            return;
+        }
+
+        const result = await examService.checkStudentReportCardAvailability(
+            studentId,
+            academicYearId,
+            examSequenceId
+        );
+
+        res.json({
+            success: true,
+            data: result
+        });
+    } catch (error: any) {
+        console.error('Error checking child report card availability:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error while checking report card availability'
+        });
+    }
+};

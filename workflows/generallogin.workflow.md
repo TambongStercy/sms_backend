@@ -28,26 +28,44 @@ Success Response (200):
   "success": true,
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresIn": "24h",
     "user": {
       "id": 1,
       "name": "John Doe",
       "email": "john.doe@school.com",
-      "profilePhoto": "/uploads/profiles/john_doe.jpg",
-      "roles": [
+      "matricule": "USR001",
+      "gender": "MALE",
+      "dateOfBirth": "1985-05-15",
+      "phone": "+237600000000",
+      "address": "123 Main Street",
+      "photo": "/uploads/profiles/john_doe.jpg",
+      "status": "ACTIVE",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-12-15T10:30:00Z",
+      "userRoles": [
         {
+          "id": 1,
+          "userId": 1,
           "role": "TEACHER",
           "academicYearId": 1,
-          "academicYearName": "2024-2025"
+          "createdAt": "2024-01-01T00:00:00Z",
+          "updatedAt": "2024-01-01T00:00:00Z"
         },
         {
+          "id": 2,
+          "userId": 1,
           "role": "HOD",
           "academicYearId": 1,
-          "academicYearName": "2024-2025"
+          "createdAt": "2024-01-01T00:00:00Z",
+          "updatedAt": "2024-01-01T00:00:00Z"
         },
         {
+          "id": 3,
+          "userId": 1,
           "role": "PARENT",
           "academicYearId": null,
-          "academicYearName": null
+          "createdAt": "2024-01-01T00:00:00Z",
+          "updatedAt": "2024-01-01T00:00:00Z"
         }
       ]
     }
@@ -63,71 +81,41 @@ Error Response (401):
 
 **Frontend Implementation Notes:**
 - Store JWT token in secure storage (httpOnly cookie preferred)
-- Check if user has multiple roles to determine next step
+- Extract unique roles from user.userRoles array for role selection UI
+- Check if user has multiple roles to determine if role selection is needed
 - Handle "remember me" by setting longer token expiration
 - Show loading spinner during authentication
 - Display user-friendly error messages
 
-### 2. **Role Selection Page** (`/select-role`) 
-*Appears only if user has multiple roles*
+### 2. **Role Selection** (Frontend Only)
+*Client-side logic only - no API endpoint needed*
+
+If user has multiple unique roles, show role selection interface:
 - **Display:** User's name and profile photo
-- **Role Cards:** Show each role with:
+- **Role Cards:** Show each unique role with:
   - Role name and description
   - Role-specific icon
-  - Academic year context (if applicable)
   - "Select" button
-- **Example roles shown:**
-  ```
-  👨‍🏫 TEACHER - Manage classes and student marks
-        Academic Year: 2024-2025
-  
-  👨‍💼 HOD - Head of Mathematics Department  
-        Academic Year: 2024-2025
-  
-  👨‍💼 PARENT - Monitor your children's progress
-        All Academic Years
-  ```
 
-#### **API Integration:**
-```http
-POST /api/v1/auth/select-role
-Content-Type: application/json
-Authorization: Bearer {token}
+**Frontend Implementation:**
+```javascript
+// Extract unique roles from login response
+const uniqueRoles = [...new Set(user.userRoles.map(ur => ur.role))];
 
-Request Body:
-{
-  "role": "TEACHER",
-  "academicYearId": 1    // null for global roles like PARENT
-}
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "sessionToken": "new_session_token_with_role_context",
-    "selectedRole": {
-      "role": "TEACHER",
-      "academicYearId": 1,
-      "academicYearName": "2024-2025",
-      "permissions": ["VIEW_STUDENTS", "MANAGE_MARKS", "VIEW_TIMETABLE"]
-    },
-    "nextStep": "academic-year-selection" // or "dashboard-redirect"
-  }
+// If multiple roles, show selection UI
+if (uniqueRoles.length > 1) {
+  // Show role selection interface
+  // Store selected role in session/localStorage
+  // Proceed to academic year selection or dashboard
+} else {
+  // Single role - automatically proceed
+  const selectedRole = uniqueRoles[0];
+  // Proceed to academic year selection or dashboard
 }
 ```
 
-**Frontend Implementation Notes:**
-- Use role icons and descriptions for better UX
-- Show academic year context where relevant
-- Highlight recommended role if user typically uses one
-- Store selected role context in session
-
-### 3. **Academic Year Selection** (`/select-academic-year`)
-*Skipped for SUPER_MANAGER (they manage all years) and global roles*
-- **Display:** Available academic years for the selected role
-- **Current year highlighted**
-- **Shows:** Year name, date range, status (current/past)
-- **Default:** Current academic year pre-selected
+### 3. **Academic Year Selection** 
+*For roles that are tied to specific academic years*
 
 #### **API Integration:** ✅ **IMPLEMENTED**
 ```http
@@ -170,34 +158,10 @@ Success Response (200):
         "status": "COMPLETED",
         "studentCount": 1180,
         "classCount": 22
-      }
+      }s
     ],
     "currentAcademicYearId": 1,
-    "userHasAccessTo": [1, 2]  // Years where THIS USER has the specified role
-  }
-}
-
-POST /api/v1/auth/select-academic-year
-Content-Type: application/json
-Authorization: Bearer {token}
-
-Request Body:
-{
-  "academicYearId": 1
-}
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "finalToken": "final_token_with_full_context",
-    "context": {
-      "userId": 1,
-      "role": "TEACHER",
-      "academicYearId": 1,
-      "academicYearName": "2024-2025"
-    },
-    "dashboardUrl": "/teacher/dashboard"
+    "userHasAccessTo": [1, 2]
   }
 }
 ```
@@ -205,11 +169,11 @@ Success Response (200):
 **Frontend Implementation Notes:**
 - Auto-select current academic year if user has access
 - Show year statistics for context
-- Disable years user doesn't have access to
-- Cache selection for faster future logins
+- Store selected academic year in session/localStorage
+- Proceed directly to dashboard
 
 ### 4. **Dashboard Redirect**
-Based on selected role, redirect to appropriate dashboard:
+Based on selected role and academic year (if applicable), redirect to appropriate dashboard:
 
 #### **Dashboard URLs by Role:**
 ```javascript
@@ -221,56 +185,64 @@ const DASHBOARD_ROUTES = {
   'HOD': '/hod/dashboard',
   'BURSAR': '/bursar/dashboard',
   'DISCIPLINE_MASTER': '/discipline-master/dashboard',
-  'GUIDANCE_COUNSELOR': '/counselor/dashboard',
   'PARENT': '/parent/dashboard',
   'STUDENT': '/student/dashboard'
 };
 ```
 
-#### **Pre-Dashboard Data Loading:**
+#### **Get User Profile (for dashboard data):**
 ```http
-GET /api/v1/users/me/dashboard-data
-Authorization: Bearer {final_token}
+GET /api/v1/auth/me
+Authorization: Bearer {token}
 
 Success Response (200):
 {
   "success": true,
   "data": {
-    "user": {
-      "id": 1,
-      "name": "John Doe",
-      "role": "TEACHER",
-      "profilePhoto": "/uploads/profiles/john_doe.jpg",
-      "academicYear": {
-        "id": 1,
-        "name": "2024-2025"
-      }
-    },
-    "quickStats": {
-      // Role-specific statistics for dashboard
-      "assignedClasses": 3,
-      "totalStudents": 89,
-      "pendingMarks": 15
-    },
-    "notifications": [
-      {
-        "id": 1,
-        "type": "REMINDER",
-        "message": "Marks submission deadline tomorrow",
-        "priority": "HIGH",
-        "createdAt": "2024-01-22T08:00:00Z"
-      }
+    "id": 1,
+    "name": "John Doe",
+    "email": "john.doe@school.com",
+    "matricule": "USR001",
+    "gender": "MALE",
+    "dateOfBirth": "1985-05-15",
+    "phone": "+237600000000",
+    "address": "123 Main Street",
+    "photo": "/uploads/profiles/john_doe.jpg",
+    "status": "ACTIVE",
+    "userRoles": [
+      // ... user roles array
     ]
   }
 }
 ```
 
 **Frontend Implementation Notes:**
-- Store final authentication context globally
-- Pre-load dashboard data for faster initial render
-- Set up notification polling/websocket connection
+- Store authentication context globally (selected role + academic year)
+- Use role-specific API endpoints based on selected role
 - Initialize role-specific navigation menu
 - Cache user preferences and settings
+
+---
+
+## **Simplified Login Flow:**
+
+### **Single Role User:**
+1. Login → Get token + user data
+2. Check user.userRoles for unique roles
+3. If single role: Auto-proceed to step 4
+4. If role needs academic year: Call `/academic-years/available-for-role`
+5. Redirect to appropriate dashboard
+
+### **Multi-Role User:**
+1. Login → Get token + user data
+2. Show role selection UI (frontend only)
+3. User selects role → Store in session
+4. If role needs academic year: Call `/academic-years/available-for-role`
+5. Redirect to appropriate dashboard
+
+### **Global Roles (SUPER_MANAGER, PARENT):**
+- Skip academic year selection
+- Proceed directly to dashboard
 
 ---
 

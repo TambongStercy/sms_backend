@@ -16,7 +16,8 @@
 13. [Exam and Marks Management](#exam-and-marks-management)
 14. [Class and Subject Management](#class-and-subject-management)
 15. [Dashboard Endpoints](#dashboard-endpoints)
-16. [Authorization Testing](#authorization-testing)
+16. [Report Card Management](#report-card-management)
+17. [Authorization Testing](#authorization-testing)
 
 ---
 
@@ -3153,6 +3154,79 @@ GET /api/v1/teachers/me/subclass-ids
 Authorization: Bearer <token>
 ```
 
+### Get Current and Next Subjects from Timetable
+```http
+GET /api/v1/teachers/me/timetable/current-next
+Authorization: Bearer <token>
+```
+
+**Description:**
+Returns the teacher's current subject (if any) and next subject based on the current time and timetable. Useful for real-time display of what the teacher is teaching now and what's coming up next.
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional, defaults to current academic year
+}
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    current: {
+      period: {
+        id: number;
+        name: string;           // "Period 1"
+        startTime: string;      // "08:00"
+        endTime: string;        // "08:55"
+        dayOfWeek: string;      // "MONDAY"
+      };
+      subject: {
+        id: number;
+        name: string;           // "Mathematics"
+        category: string;       // "SCIENCE"
+      };
+      subClass: {
+        id: number;
+        name: string;           // "Form 1A"
+        className: string;      // "Form 1"
+      };
+      isActive: boolean;        // true if currently in this period
+      minutesRemaining: number; // Minutes left in current period
+    } | null;
+    next: {
+      period: {
+        id: number;
+        name: string;           // "Period 2"
+        startTime: string;      // "09:00"
+        endTime: string;        // "09:55"
+        dayOfWeek: string;      // "MONDAY"
+      };
+      subject: {
+        id: number;
+        name: string;           // "Physics"
+        category: string;       // "SCIENCE"
+      };
+      subClass: {
+        id: number;
+        name: string;           // "Form 2A"
+        className: string;      // "Form 2"
+      };
+      minutesToStart: number;   // Minutes until this period starts
+      isToday: boolean;         // true if this is today's schedule
+    } | null;
+    requestTime: string;        // ISO timestamp of request
+    currentDay: string;         // "MONDAY", "TUESDAY", etc.
+  };
+}
+```
+
+**Error Responses:**
+- `401`: User not authenticated
+- `500`: Server error (e.g., "No active academic year found")
+
 ### Get My Attendance Records (NEW - Teacher Attendance Management)
 ```http
 GET /api/v1/teachers/me/attendance
@@ -5270,3 +5344,372 @@ All endpoints return standardized error responses:
 - Times are in "HH:mm" format
 
 This documentation reflects the actual frontend interface using camelCase. The middleware handles automatic conversion to/from the backend's snake_case implementation. 
+---
+
+## Report Card Management
+
+The Report Card Management system handles PDF report card generation for students and subclasses. It supports both individual student reports and combined subclass reports with background processing for large operations.
+
+### Get Student Report Card
+```http
+GET /api/v1/report-cards/student/:studentId
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `studentId` (number): Student ID
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId: number;    // Required
+  examSequenceId: number;    // Required
+}
+```
+
+**Response (200 - Report Ready):**
+- Returns PDF file for download
+- Content-Type: application/pdf
+- Content-Disposition: attachment; filename="report-student-{matricule}-seq-{sequenceId}.pdf"
+
+**Response (202 - Processing):**
+```typescript
+{
+  success: true;
+  message: "Report generation is currently processing. Please try again later.";
+  status: "PROCESSING"  < /dev/null |  "PENDING";
+}
+```
+
+**Response (404 - Not Found):**
+```typescript
+{
+  success: false;
+  error: "Report record not found for this student. Generation might be pending, failed, or parameters incorrect.";
+}
+```
+
+**Response (500 - Generation Failed):**
+```typescript
+{
+  success: false;
+  error: "Report generation failed for this student.";
+  message: string;
+  status: "FAILED";
+}
+```
+
+### Generate Student Report Card
+```http
+POST /api/v1/report-cards/student/:studentId/generate
+Authorization: Bearer <token>
+Roles: SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL
+```
+
+**Path Parameters:**
+- `studentId` (number): Student ID
+
+**Request Body:**
+```typescript
+{
+  academicYearId: number;   // Required
+  examSequenceId: number;   // Required
+}
+```
+
+**Response (200):**
+- Triggers immediate report generation and download
+- Returns PDF file for download
+- Content-Type: application/pdf
+- Content-Disposition: attachment; filename="report-card-student-{studentId}.pdf"
+
+**Error Responses:**
+```typescript
+{
+  success: false;
+  error: "Valid studentId, academicYearId, and examSequenceId must be provided.";
+}
+```
+
+### Get Subclass Report Cards
+```http
+GET /api/v1/report-cards/subclass/:subClassId
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `subClassId` (number): Subclass ID
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId: number;    // Required
+  examSequenceId: number;    // Required
+}
+```
+
+**Response (200 - Report Ready):**
+- Returns combined PDF file for download containing all students in the subclass
+- Content-Type: application/pdf
+- Content-Disposition: attachment; filename="report-subclass-{className}-{subclassName}-seq-{sequenceId}.pdf"
+
+**Response (202 - Processing):**
+```typescript
+{
+  success: true;
+  message: "Combined subclass report generation is currently processing. Please try again later.";
+  status: "PROCESSING" | "PENDING";
+}
+```
+
+**Response (404 - Not Found):**
+```typescript
+{
+  success: false;
+  error: "Combined subclass report record not found. It might not have been generated yet or the parameters are incorrect.";
+}
+```
+
+### Generate Subclass Report Cards
+```http
+POST /api/v1/report-cards/subclass/:subClassId/generate
+Authorization: Bearer <token>
+Roles: SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL
+```
+
+**Path Parameters:**
+- `subClassId` (number): Subclass ID
+
+**Request Body:**
+```typescript
+{
+  academicYearId: number;   // Required
+  examSequenceId: number;   // Required
+}
+```
+
+**Response (200):**
+- Triggers immediate report generation and download for entire subclass
+- Returns combined PDF file for download
+- Content-Type: application/pdf
+- Content-Disposition: attachment; filename="report-cards-subclass-{subClassId}.pdf"
+
+**Error Responses:**
+```typescript
+{
+  success: false;
+  error: "Valid subClassId, academicYearId, and examSequenceId must be provided.";
+}
+```
+
+### Report Card Features
+
+**Individual Student Reports Include:**
+- Student personal information (name, matricule, photo, class info)
+- Subject-wise marks with coefficients and weighted calculations
+- Category summaries (by subject category)
+- Overall average and class ranking
+- Class statistics (min, max, average, success rates)
+- Teacher assignments for each subject
+- Exam sequence information
+
+**Subclass Combined Reports Include:**
+- All individual student reports combined into a single PDF
+- Each student report on a separate page
+- Consistent formatting and styling
+- Automatic page breaks between students
+
+**Background Processing:**
+- Large report generation is handled via BullMQ job queues
+- Report status tracking: PENDING → PROCESSING → COMPLETED/FAILED
+- Individual student reports can be extracted from combined subclass PDFs
+- Automatic retry mechanisms for failed generations
+
+**Report Status Tracking:**
+Reports are tracked in the GeneratedReport table with statuses:
+- `PENDING`: Report generation queued
+- `PROCESSING`: Report currently being generated
+- `COMPLETED`: Report successfully generated and available
+- `FAILED`: Report generation failed
+
+**File Management:**
+- PDF files are stored in the server filesystem
+- Individual student reports are extracted from combined PDFs using pdf-lib
+- Generated reports are cached until regenerated
+- File paths are stored in database for efficient retrieval
+
+**Error Handling:**
+- Validates required parameters (academicYearId, examSequenceId)
+- Checks student enrollment and marks availability
+- Handles missing files and corrupted PDFs
+- Provides detailed error messages for debugging
+
+
+### Check Student Report Card Availability (General)
+```http
+GET /api/v1/report-cards/student/:studentId/availability
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `studentId` (number): Student ID
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId: number;    // Required
+  examSequenceId: number;    // Required
+}
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    available: boolean;
+    status: "COMPLETED"  < /dev/null |  "PENDING" | "PROCESSING" | "FAILED" | "NOT_ENROLLED" | "SEQUENCE_NOT_FOUND" | "NO_MARKS" | "NOT_GENERATED";
+    message: string;
+    reportData?: {
+      studentName: string;
+      matricule: string;
+      className: string;
+      examSequence: number;
+      termName: string;
+      filePath?: string;
+      generatedAt?: string;
+      errorMessage?: string;
+      marksCount?: number;
+    };
+  };
+}
+```
+
+### Check Subclass Report Card Availability (General)
+```http
+GET /api/v1/report-cards/subclass/:subClassId/availability
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `subClassId` (number): Subclass ID
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId: number;    // Required
+  examSequenceId: number;    // Required
+}
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    available: boolean;
+    status: "COMPLETED" | "PENDING" | "PROCESSING" | "FAILED" | "SUBCLASS_NOT_FOUND" | "SEQUENCE_NOT_FOUND" | "NO_STUDENTS" | "NO_MARKS" | "NOT_GENERATED";
+    message: string;
+    reportData?: {
+      subClassName: string;
+      enrolledStudents: number;
+      examSequence: number;
+      termName: string;
+      filePath?: string;
+      generatedAt?: string;
+      errorMessage?: string;
+      marksCount?: number;
+    };
+  };
+}
+```
+
+### Check Child Report Card Availability (Parent)
+```http
+GET /api/v1/parent/children/:studentId/report-card/availability
+Authorization: Bearer <token>
+Roles: PARENT
+```
+
+**Path Parameters:**
+- `studentId` (number): Child's student ID
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId: number;    // Required
+  examSequenceId: number;    // Required
+}
+```
+
+**Response (200):**
+Same as general student report card availability check above.
+
+**Response (403):**
+```typescript
+{
+  success: false;
+  error: "You do not have permission to access this student's report card";
+}
+```
+
+### Check Student Report Card Availability (Manager)
+```http
+GET /api/v1/manager/report-cards/student/:studentId/availability
+Authorization: Bearer <token>
+Roles: MANAGER, PRINCIPAL, SUPER_MANAGER
+```
+
+Same parameters and responses as general student availability check.
+
+### Check Subclass Report Card Availability (Manager)
+```http
+GET /api/v1/manager/report-cards/subclass/:subClassId/availability
+Authorization: Bearer <token>
+Roles: MANAGER, PRINCIPAL, SUPER_MANAGER
+```
+
+Same parameters and responses as general subclass availability check.
+
+### Check Student Report Card Availability (Principal)
+```http
+GET /api/v1/principal/report-cards/student/:studentId/availability
+Authorization: Bearer <token>
+Roles: PRINCIPAL
+```
+
+Same parameters and responses as general student availability check.
+
+### Check Subclass Report Card Availability (Principal)
+```http
+GET /api/v1/principal/report-cards/subclass/:subClassId/availability
+Authorization: Bearer <token>
+Roles: PRINCIPAL
+```
+
+Same parameters and responses as general subclass availability check.
+
+### Report Card Availability Status Codes
+
+**Available Status Codes:**
+- `COMPLETED`: Report card is ready for download
+- `PENDING`: Report generation is queued
+- `PROCESSING`: Report is currently being generated
+- `FAILED`: Report generation failed
+- `NOT_ENROLLED`: Student not enrolled for the academic year
+- `SEQUENCE_NOT_FOUND`: Exam sequence not found
+- `NO_MARKS`: No marks available for the student/subclass
+- `NOT_GENERATED`: Report can be generated but hasn't been created yet
+- `SUBCLASS_NOT_FOUND`: Subclass not found
+- `NO_STUDENTS`: No students enrolled in the subclass
+
+**Parent-Specific Features:**
+- Parents can only check availability for their own children
+- System verifies parent-child relationship before allowing access
+- Returns 403 Forbidden if parent tries to access unrelated student's report
+
+**Manager/Principal Features:**
+- Full access to all students and subclasses
+- Can check availability for any student or subclass in the system
+- Same response format as general endpoints
+

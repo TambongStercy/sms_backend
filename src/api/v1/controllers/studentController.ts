@@ -445,7 +445,7 @@ export const getStudentsWithStatusInfo = async (req: Request, res: Response): Pr
  */
 export const getStudentsBySubclass = async (req: Request, res: Response): Promise<any> => {
     try {
-        const subclassId = parseInt(req.params.subclassId);
+        const subclassId = parseInt(req.params.id);
         if (isNaN(subclassId)) {
             return res.status(400).json({ success: false, error: 'Invalid Subclass ID format' });
         }
