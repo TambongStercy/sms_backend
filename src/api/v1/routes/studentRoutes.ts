@@ -74,7 +74,7 @@ router.get('/',
 );
 
 // POST /students - Create a new student
-router.post('/', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), studentController.createStudent);
+router.post('/', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.createStudent);
 
 // Performance Analytics (Commenting out until implementation complete)
 // router.get('/:id/performance/detailed', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'PARENT', 'STUDENT']), getDetailedStudentPerformance);
@@ -107,16 +107,16 @@ router.get('/:id',
 );
 
 // PUT /students/:id - Update student information
-router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), studentController.updateStudent);
+router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.updateStudent);
 
 // POST /students/:id/parents - Link parent to student (alternative endpoint)
-router.post('/:id/parents', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), studentController.linkParent);
+router.post('/:id/parents', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.linkParent);
 
 // POST /students/:id/link-parent - Link parent to student 
-router.post('/:id/link-parent', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), studentController.linkParent);
+router.post('/:id/link-parent', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.linkParent);
 
 // DELETE /students/:studentId/parents/:parentId - Remove parent-student relationship
-router.delete('/:studentId/parents/:parentId', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), studentController.unlinkParent);
+router.delete('/:studentId/parents/:parentId', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.unlinkParent);
 
 // GET /students/:studentId/parents - Get all parents linked to a student
 router.get('/:studentId/parents',
@@ -126,7 +126,7 @@ router.get('/:studentId/parents',
 );
 
 // POST /students/:id/enroll - Enroll student into a subclass
-router.post('/:id/enroll', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), studentController.enrollStudent);
+router.post('/:id/enroll', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.enrollStudent);
 
 // GET /students/:id/status - Get student status information (new/old/repeater)
 // SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can view any student status
@@ -174,7 +174,7 @@ router.get('/subclass/:id',
 // GET /students/class/:classId - Get all students in a class
 router.get('/class/:classId',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']),
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
     (req: any, res: any, next: any) => {
         const userRoles = req.user?.roles || [];
         const isTeacher = userRoles.includes('TEACHER');
@@ -196,7 +196,7 @@ router.get('/class/:classId',
 // PARENT can only view their own students
 router.get('/parent/:parentId',
     authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'PARENT']),
+    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'PARENT', 'BURSAR']),
     studentController.getStudentsByParent
 );
 
