@@ -9,7 +9,7 @@ const router = express.Router();
 router.use(authenticate);
 
 // Apply PRINCIPAL authorization to all routes
-router.use(authorize(['PRINCIPAL']));
+router.use(authorize(['PRINCIPAL', 'SUPER_MANAGER']));
 
 /**
  * @route GET /api/v1/principal/dashboard
