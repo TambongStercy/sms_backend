@@ -329,7 +329,11 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
                     });
                     return;
                 }
-                const absolutePath = path.join(process.cwd(), reportRecord.file_path);
+
+                const absolutePath = path.isAbsolute(reportRecord.file_path)
+                    ? reportRecord.file_path
+                    : path.join(process.cwd(), reportRecord.file_path);
+
                 if (!fs.existsSync(absolutePath)) {
                     console.error(`File not found for COMPLETED report: ${absolutePath}`);
                     res.status(404).json({
@@ -476,7 +480,10 @@ export const generateSubclassReportCards = async (req: Request, res: Response): 
                     });
                     return;
                 }
-                const absolutePath = path.join(process.cwd(), reportRecord.file_path);
+                const absolutePath = path.isAbsolute(reportRecord.file_path)
+                    ? reportRecord.file_path
+                    : path.join(process.cwd(), reportRecord.file_path);
+
                 if (!fs.existsSync(absolutePath)) {
                     console.error(`File not found for COMPLETED subclass report: ${absolutePath}`);
                     res.status(404).json({
