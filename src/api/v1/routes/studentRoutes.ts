@@ -46,7 +46,6 @@ router.get('/summary',
 // GET /students/search - Search students by name or matricule
 router.get('/search',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
     studentController.searchStudents
 );
 
