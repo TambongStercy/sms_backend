@@ -785,11 +785,11 @@ export const deleteExamPaper = async (req: Request, res: Response): Promise<any>
 export const regenerateStudentReportCard = async (req: Request, res: Response): Promise<void> => {
     try {
         const studentId = parseInt(req.params.studentId, 10);
-        const academicYearId = req.query.academicYearId ? parseInt(req.query.academicYearId as string, 10) : undefined;
-        const examSequenceId = req.query.examSequenceId ? parseInt(req.query.examSequenceId as string, 10) : undefined;
+        const academicYearId = Number(req.body.academicYearId ?? req.body.academic_year_id);
+        const examSequenceId = Number(req.body.examSequenceId ?? req.body.exam_sequence_id);
 
         if (!academicYearId || !examSequenceId) {
-            res.status(400).json({ success: false, error: 'academicYearId and examSequenceId are required query parameters.' });
+            res.status(400).json({ success: false, error: 'academicYearId and examSequenceId are required in the request body.' });
             return;
         }
 
