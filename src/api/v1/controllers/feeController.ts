@@ -5,21 +5,21 @@ import { PaginationOptions, FilterOptions } from '../../../utils/pagination';
 
 export const getAllFees = async (req: Request, res: Response) => {
     try {
-        const academic_year_id = req.finalQuery.academic_year_id ?
-            parseInt(req.finalQuery.academic_year_id as string) : undefined;
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
 
         const paginationOptions: PaginationOptions = {
-            page: req.finalQuery.page ? parseInt(req.finalQuery.page as string) : undefined,
-            limit: req.finalQuery.limit ? parseInt(req.finalQuery.limit as string) : undefined,
+            page: req.query.page ? parseInt(req.query.page as string) : undefined,
+            limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
         };
 
         const filterOptions: FilterOptions = {
-            search: req.finalQuery.search as string, // Consolidated search
-            className: req.finalQuery.className as string,
-            subclassName: req.finalQuery.subclassName as string,
-            dueDate: req.finalQuery.dueDate as string,
-            dueBeforeDate: req.finalQuery.dueBeforeDate as string,
-            dueAfterDate: req.finalQuery.dueAfterDate as string,
+            search: req.query.search as string, // Consolidated search
+            className: req.query.className as string,
+            subclassName: req.query.subclassName as string,
+            dueDate: req.query.dueDate as string,
+            dueBeforeDate: req.query.dueBeforeDate as string,
+            dueAfterDate: req.query.dueAfterDate as string,
         };
 
         const fees = await feeService.getAllFees(paginationOptions, filterOptions, academic_year_id);
@@ -148,8 +148,8 @@ export const getStudentFees = async (req: Request, res: Response) => {
     try {
         const studentId = parseInt(req.params.studentId);
 
-        const academic_year_id = req.finalQuery.academic_year_id ?
-            parseInt(req.finalQuery.academic_year_id as string) : undefined;
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
 
         const fees = await feeService.getStudentFees(studentId, academic_year_id);
 
@@ -170,8 +170,8 @@ export const getSubclassFeesSummary = async (req: Request, res: Response) => {
     try {
         const sub_classId = parseInt(req.params.sub_classId ?? req.params.id);
 
-        const academic_year_id = req.finalQuery.academic_year_id ?
-            parseInt(req.finalQuery.academic_year_id as string) : undefined;
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
 
         const summary = await feeService.getSubclassFeesSummary(sub_classId, academic_year_id);
 
@@ -242,13 +242,13 @@ export const getFeePayments = async (req: Request, res: Response): Promise<any> 
 export const exportFeeReports = async (req: Request, res: Response) => {
     try {
         // Use snake_case directly - middleware handles the conversion
-        const academic_year_id = req.finalQuery.academic_year_id ?
-            parseInt(req.finalQuery.academic_year_id as string) : undefined;
+        const academic_year_id = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) : undefined;
 
-        const format = req.finalQuery.format as string || 'excel';
+        const format = req.query.format as string || 'excel';
 
-        const sub_class_id = req.finalQuery.sub_class_id ?
-            parseInt(req.finalQuery.sub_class_id as string) : undefined;
+        const sub_class_id = req.query.sub_class_id ?
+            parseInt(req.query.sub_class_id as string) : undefined;
 
         const report = await feeService.exportFeeReports(academic_year_id);
 

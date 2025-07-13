@@ -338,197 +338,37 @@ Each child gets a card showing:
 **API Integration:**
 
 #### **Get Student Report Cards**
-**Endpoint:** `GET /api/v1/parents/children/:studentId/report-cards`
+**Endpoint:** `GET /api/v1/exams/report-cards/student/:studentId`
 - **Headers:** `Authorization: Bearer <token>`
-- **Path Parameters:** `studentId` (number): Student ID
+- **Path Parameters:** `studentId` (number): The ID of the student.
 - **Query Parameters:**
   ```typescript
   {
-    academicYearId?: number; // Optional, defaults to current year
-    sequenceId?: number;     // Optional, filter by specific sequence
-    status?: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING"; // Optional filter
+    academicYearId?: number; // Optional: Filters reports for a specific academic year. Defaults to the current year.
+    sequenceId?: number;     // Optional: Filters for a specific examination sequence.
   }
   ```
+- **Note:** This endpoint triggers the generation of the report card if it's not already available or outdated. The response will indicate the status.
+
+#### **Check Report Card Availability / Status**
+**Endpoint:** `GET /api/v1/parents/children/:studentId/report-card/availability`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): The ID of the student.
 - **Response:**
   ```typescript
   {
-    success: true;
+    success: true,
     data: {
-      studentInfo: {
-        id: number;
-        name: string;
-        matricule: string;
-        className?: string;
-        subclassName?: string;
-      };
-      reportSummary: {
-        totalReports: number;
-        completedReports: number;
-        generatingReports: number;
-        failedReports: number;
-        lastGeneratedDate?: string;
-      };
-      availableReports: Array<{
-        id: number;
-        reportType: "SINGLE_STUDENT";
-        examSequence: {
-          id: number;
-          name: string;
-          academicYear: string;
-        };
-        status: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING";
-        generatedAt?: string;
-        filePath?: string;
-        downloadUrl?: string;
-        pageNumber?: number;
-        errorMessage?: string;
-        fileSize?: string; // e.g., "2.5 MB"
-        lastAccessedAt?: string;
-      }>;
-      historicalReports: Array<{
-        academicYear: string;
-        reportCount: number;
-        latestReportDate?: string;
-      }>;
-    };
+      isAvailable: boolean; // True if a recent, valid report exists
+      status: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING" | "NOT_FOUND";
+      lastGeneratedAt?: string;
+      downloadUrl?: string; // Provided if isAvailable is true
+    }
   }
   ```
 
 #### **Download Report Card**
-**Endpoint:** `GET /api/v1/parents/children/:studentId/report-cards/:reportId/download`
-- **Headers:** `Authorization: Bearer <token>`
-- **Path Parameters:** 
-  - `studentId` (number): Student ID
-  - `reportId` (number): Generated report ID
-- **Response:** PDF file download with proper headers
-
-#### **Get Report Card Status**
-**Endpoint:** `GET /api/v1/parents/children/:studentId/report-cards/:reportId/status`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:**
-  ```typescript
-  {
-    success: true;
-    data: {
-      id: number;
-      status: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING";
-      progress?: number; // 0-100 for generating reports
-      estimatedCompletion?: string; // For generating reports
-      errorMessage?: string;
-      lastUpdated: string;
-    };
-  }
-  ```
-
-### **Report Cards Tab Layout**
-```
-┌─── Report Card Management ───┐
-│ [🏠 Current Year] [📅 All Years] [🔄 Refresh Status]     │
-│                                                          │
-│ ┌─── Report Summary ───┐                                 │
-│ │ 📊 Total Reports: 6        📥 Completed: 4            │
-│ │ ⏳ Generating: 1           ❌ Failed: 0               │
-│ │ 📅 Last Generated: 2024-01-20                          │
-│ └────────────────────────────────────────────────────── │
-│                                                          │
-│ ┌─── Current Academic Year (2024-2025) ───┐              │
-│ │                                                        │
-│ │ 📄 Sequence 1 Report Card                             │
-│ │ │  Status: ✅ Completed | Generated: 2024-01-15       │
-│ │ │  Size: 2.1 MB | Last Accessed: 2024-01-16          │
-│ │ │  [📥 Download] [👁️ View] [📤 Share]                │
-│ │                                                        │
-│ │ 📄 Sequence 2 Report Card                             │
-│ │ │  Status: ✅ Completed | Generated: 2024-03-20       │
-│ │ │  Size: 2.3 MB | Last Accessed: Never               │
-│ │ │  [📥 Download] [👁️ View] [📤 Share]                │
-│ │                                                        │
-│ │ 📄 Sequence 3 Report Card                             │
-│ │ │  Status: ⏳ Generating... (Progress: 75%)           │
-│ │ │  Estimated completion: 5 minutes                    │
-│ │ │  [🔄 Check Status] [ℹ️ Details]                     │
-│ │                                                        │
-│ │ 📄 Mid-Year Report                                     │
-│ │ │  Status: ⏳ Pending Generation                       │
-│ │ │  Expected: After Sequence 3 completion             │
-│ │ │  [📧 Notify When Ready]                             │
-│ │                                                        │
-│ │ 📄 Final Year Report                                   │
-│ │ │  Status: ⏸️ Not Available (End of year)             │
-│ │ │  Expected: June 2025                               │
-│ └──────────────────────────────────────────────────────┘│
-│                                                          │
-│ ┌─── Previous Academic Years ───┐                        │
-│ │ 📂 2023-2024 Academic Year (6 reports available)      │
-│ │ │  📄 Final Report - Form 4 | [Download] [View]       │
-│ │ │  📄 Mid-Year Report - Form 4 | [Download] [View]    │
-│ │ │  📄 Sequence 6 Report | [Download] [View]          │
-│ │ │  📄 Sequence 5 Report | [Download] [View]          │
-│ │ │  [▼ Show All 2023-2024 Reports]                    │
-│ │                                                        │
-│ │ 📂 2022-2023 Academic Year (6 reports available)      │
-│ │ │  [▼ Show 2022-2023 Reports]                        │
-│ └──────────────────────────────────────────────────────┘│
-│                                                          │
-│ ┌─── Quick Actions ───┐                                  │
-│ │ [📧 Request Missing Report] [❓ Report Issue]           │
-│ │ [📞 Contact Class Master] [💬 Ask Question]            │
-│ └──────────────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────┘
-```
-
-### **Report Card Download Modal**
-When user clicks "Download" or "View":
-```
-┌─── Report Card Download ───┐
-│ 📄 Sequence 1 Report Card - John Doe                    │
-│ ─────────────────────────────────────────              │
-│ 📊 Academic Year: 2024-2025                             │
-│ 📅 Sequence: Sequence 1 (Sept-Oct 2024)                │
-│ 📝 Generated: January 15, 2024 at 2:30 PM              │
-│ 📏 File Size: 2.1 MB                                    │
-│ 📋 Pages: 1 page                                        │
-│                                                          │
-│ ┌─── Download Options ───┐                              │
-│ │ [📥 Download PDF] [👁️ View in Browser]                │
-│ │ [📧 Email Copy] [📤 Share Link]                       │
-│ │ [🖨️ Print] [💾 Save to Cloud]                         │
-│ └──────────────────────────────────────────────────────┘│
-│                                                          │
-│ 💡 Tip: Report cards are automatically generated after  │
-│    each examination sequence is completed.               │
-│                                                          │
-│ [Close] [Download Now]                                   │
-└────────────────────────────────────────────────────────┘
-```
-
-### **Report Generation Status Modal**
-For reports being generated:
-```
-┌─── Report Generation Status ───┐
-│ 📄 Sequence 3 Report Card - John Doe                    │
-│ ─────────────────────────────────────────              │
-│ Status: ⏳ Generating Report Card...                     │
-│                                                          │
-│ ████████████████░░░░ 75% Complete                       │
-│                                                          │
-│ Current Step: Calculating subject averages              │
-│ Estimated Time Remaining: 3-5 minutes                   │
-│ Started: 10:30 AM                                       │
-│                                                          │
-│ ℹ️ Your report card is being generated in the           │
-│    background. You'll receive a notification when       │
-│    it's ready for download.                             │
-│                                                          │
-│ ✅ Marks collected and verified                          │
-│ ✅ Attendance calculated                                 │
-│ ⏳ Generating performance analytics                      │
-│ ⏸️ Creating PDF document                                 │
-│ ⏸️ Final quality checks                                  │
-│                                                          │
-│ [🔄 Refresh Status] [📧 Notify Me] [Close]              │
-└────────────────────────────────────────────────────────┘
-```
+- **Note:** The download URL is provided by the `availability` endpoint. There is no separate download endpoint for parents.
 
 ### **5. Quizzes Tab**
 **API Integration:**
@@ -536,32 +376,11 @@ For reports being generated:
 #### **Get Available Quizzes for Student**
 **Endpoint:** `GET /api/v1/quiz/student/:studentId/available`
 - **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): The ID of the student.
 - **Query Parameters:**
   ```typescript
   {
     academicYearId?: number; // Optional, defaults to current year
-  }
-  ```
-- **Response Data:**
-  ```typescript
-  {
-    success: true;
-    data: Array<{
-      id: number;
-      quizTitle: string;
-      description?: string;
-      subject: string;
-      timeLimit?: number;
-      totalMarks: number;
-      questionCount: number;
-      startDate?: string;
-      endDate?: string;
-      status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
-      lastAttempt?: {
-        score: number;
-        percentage: number;
-      };
-    }>;
   }
   ```
 
@@ -575,114 +394,21 @@ For reports being generated:
     studentId: number;
   }
   ```
-- **Response (201):**
-  ```typescript
-  {
-    success: true;
-    message: "Quiz started successfully";
-    data: {
-      id: number;
-      quizId: number;
-      studentId: number;
-      parentId: number;
-      status: "IN_PROGRESS";
-      startedAt: string;
-    };
-  }
-  ```
 
 #### **Submit Quiz**
-**Endpoint:** `POST /api/v1/quiz/submissions/:submissionId/submit`
+**Endpoint:** `POST /api/v1/quiz/submission/:submissionId/submit`
 - **Headers:** `Authorization: Bearer <token>`
-- **Path Parameters:** `submissionId` (number): Quiz submission ID
-- **Request Body:**
-  ```typescript
-  {
-    responses: Array<{
-      questionId: number;
-      selectedAnswer: string;
-      timeSpent?: number; // Seconds
-    }>;
-  }
-  ```
-- **Response (200):**
-  ```typescript
-  {
-    success: true;
-    message: "Quiz submitted successfully";
-    data: {
-      id: number;
-      quizId: number;
-      studentId: number;
-      score: number;
-      percentage: number;
-      status: "COMPLETED";
-      submittedAt: string;
-    };
-  }
-  ```
+- **Path Parameters:** `submissionId` (number): The ID of the quiz submission attempt.
 
-#### **Get Quiz Results (Detailed)**
-**Endpoint:** `GET /api/v1/quiz/student/:studentId/results`
+#### **Get Quiz Results for a specific child**
+**Endpoint:** `GET /api/v1/parents/children/:studentId/quiz-results`
 - **Headers:** `Authorization: Bearer <token>`
-- **Path Parameters:** `studentId` (number): Student ID
-- **Query Parameters:**
-  ```typescript
-  {
-    academicYearId?: number; // Optional, defaults to current year
-    quizId?: number;         // Optional, filter by specific quiz
-  }
-  ```
-- **Response (200):**
-  ```typescript
-  {
-    success: true;
-    data: Array<{
-      id: number;
-      quizTitle: string;
-      subjectName: string;
-      completedAt: string;
-      score: number;
-      totalMarks: number;
-      percentage: number;
-      status: "COMPLETED" | "PENDING" | "OVERDUE";
-      submissionId: number; // Link to detailed submission
-    }>;
-  }
-  ```
+- **Path Parameters:** `studentId` (number): The ID of the student.
 
 #### **Get Detailed Quiz Submission**
-**Endpoint:** `GET /api/v1/quiz/submissions/:submissionId/detailed`
+**Endpoint:** `GET /api/v1/quiz/submission/:submissionId/detailed`
 - **Headers:** `Authorization: Bearer <token>`
-- **Path Parameters:** `submissionId` (number): Quiz submission ID
-- **Response (200):**
-  ```typescript
-  {
-    success: true;
-    data: {
-      submissionId: number;
-      quizTitle: string;
-      studentName: string;
-      score: number;
-      totalMarks: number;
-      percentage: number;
-      submittedAt: string;
-      timeTaken: number; // Minutes
-      questions: Array<{
-        questionId: number;
-        questionText: string;
-        questionType: "MCQ" | "LONG_ANSWER";
-        options?: string[];
-        correctAnswer: string;
-        selectedAnswer: string;
-        isCorrect: boolean;
-        marksEarned: number;
-        maxMarks: number;
-        explanation?: string;
-      }>;
-    };
-  }
-  ```
+- **Path Parameters:** `submissionId` (number): The ID of the quiz submission attempt.
 
 ```
 ┌─── Quiz Summary ───┐
@@ -733,6 +459,7 @@ For reports being generated:
 ### **6. Analytics Tab**
 **API Integration:**
 - `GET /api/v1/parents/children/:studentId/analytics`
+- **Path Parameters:** `studentId` (number): The ID of the student.
 - Query Parameters: `{ academicYearId?: number }`
 - **Response Data:**
   ```typescript
@@ -819,6 +546,7 @@ For reports being generated:
 ### **API Integration**
 **Primary Endpoint:** `GET /api/v1/parents/children/quiz-results`
 - **Headers:** `Authorization: Bearer <token>`
+- **Note:** This fetches a summary of quiz results for all of the parent's children.
 - **Query Parameters:**
   ```typescript
   {
