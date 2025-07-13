@@ -1165,7 +1165,7 @@ export async function getSubClassAttendance(
             totalPages: 1
         }
     };
-} 
+}
 
 export interface CurrentNextSubject {
     current: {
@@ -1219,7 +1219,7 @@ export interface CurrentNextSubject {
  */
 export async function getTeacherCurrentAndNextSubjects(teacherId: number, academicYearId?: number): Promise<CurrentNextSubject> {
     // Get current academic year if not provided
-    const currentAcademicYear = academicYearId ? 
+    const currentAcademicYear = academicYearId ?
         await prisma.academicYear.findUnique({ where: { id: academicYearId } }) :
         await getCurrentAcademicYear();
 
@@ -1271,7 +1271,7 @@ export async function getTeacherCurrentAndNextSubjects(teacherId: number, academ
     for (const tp of todayPeriods) {
         const startTime = tp.period.start_time;
         const endTime = tp.period.end_time;
-        
+
         if (currentTime >= startTime && currentTime <= endTime) {
             // Calculate minutes remaining
             const [endHour, endMinute] = endTime.split(':').map(Number);
@@ -1308,10 +1308,10 @@ export async function getTeacherCurrentAndNextSubjects(teacherId: number, academ
     // Find next period
     // First, check for remaining periods today
     const upcomingTodayPeriods = todayPeriods.filter(tp => tp.period.start_time > currentTime);
-    
+
     if (upcomingTodayPeriods.length > 0) {
         const nextTp = upcomingTodayPeriods[0];
-        
+
         // Calculate minutes to start
         const [startHour, startMinute] = nextTp.period.start_time.split(':').map(Number);
         const [currentHour, currentMinuteNum] = currentTime.split(':').map(Number);
@@ -1344,15 +1344,15 @@ export async function getTeacherCurrentAndNextSubjects(teacherId: number, academ
         // Look for next period in upcoming days
         const dayOrder = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
         const currentDayIndex = dayOrder.indexOf(currentDay);
-        
+
         for (let i = 1; i <= 7; i++) {
             const nextDayIndex = (currentDayIndex + i) % 7;
             const nextDay = dayOrder[nextDayIndex];
-            
+
             const nextDayPeriods = teacherPeriods.filter(tp => tp.period.day_of_week === nextDay);
             if (nextDayPeriods.length > 0) {
                 const nextTp = nextDayPeriods[0]; // First period of the day
-                
+
                 nextPeriod = {
                     period: {
                         id: nextTp.period.id,

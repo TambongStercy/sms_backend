@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../../config/db';
+import { getCurrentAcademicYear } from '../../../utils/academicYear';
 
 /**
  * Get timetable for a specific sub_class
@@ -45,14 +46,8 @@ export const getSubclassTimetable = async (req: Request, res: Response): Promise
             parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         if (!academicYearId) {
-            // Get current academic year
-            const currentYear = await prisma.academicYear.findFirst({
-                where: {
-                    start_date: { lte: new Date() },
-                    end_date: { gte: new Date() }
-                },
-                orderBy: { start_date: 'desc' }
-            });
+            // Get current academic year using the proper utility function
+            const currentYear = await getCurrentAcademicYear();
 
             if (!currentYear) {
                 res.status(404).json({
@@ -69,7 +64,7 @@ export const getSubclassTimetable = async (req: Request, res: Response): Promise
         const teacherPeriods = await prisma.teacherPeriod.findMany({
             where: {
                 sub_class_id: parsedSubclassId,
-                academic_year_id: academicYearId
+                academicYearId: academicYearId
             },
             include: {
                 period: true,
@@ -170,13 +165,7 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
         // Get current academic year if not specified
         let academicYearId = req.body.academic_year_id;
         if (!academicYearId) {
-            const currentYear = await prisma.academicYear.findFirst({
-                where: {
-                    start_date: { lte: new Date() },
-                    end_date: { gte: new Date() }
-                },
-                orderBy: { start_date: 'desc' }
-            });
+            const currentYear = await getCurrentAcademicYear();
 
             if (!currentYear) {
                 res.status(404).json({
@@ -246,7 +235,7 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
                         where: {
                             sub_class_id: parsedSubclassId,
                             period_id: period.id, // Use the found period's ID
-                            academic_year_id: academicYearId
+                            academicYearId: academicYearId
                         }
                     });
 
@@ -302,7 +291,7 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
                     where: {
                         teacher_id: parsedTeacherId,
                         period_id: period.id,
-                        academic_year_id: academicYearId,
+                        academicYearId: academicYearId,
                         sub_class_id: { not: parsedSubclassId }
                     },
                     include: {
@@ -324,7 +313,7 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
                     where: {
                         sub_class_id: parsedSubclassId,
                         period_id: period.id,
-                        academic_year_id: academicYearId
+                        academicYearId: academicYearId
                     }
                 });
 
@@ -356,7 +345,7 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
                             subject_id: parsedSubjectId,
                             sub_class_id: parsedSubclassId,
                             period_id: period.id,
-                            academic_year_id: academicYearId,
+                            academicYearId: academicYearId,
                             assigned_by_id: assignedById
                         }
                     });
