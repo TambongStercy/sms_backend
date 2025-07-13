@@ -161,19 +161,26 @@ Each child gets a card showing:
         availableReports: Array<{
           id: number;
           reportType: "SINGLE_STUDENT" | "SUBCLASS";
-          sequenceName: string;
-          academicYear: string;
+          examSequence: {
+            id: number;
+            name: string;
+            academicYear: string;
+          };
           status: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING";
           generatedAt?: string;
+          filePath?: string;
           downloadUrl?: string;
-          pageNumber?: number; // For individual pages in subclass reports
-          errorMessage?: string; // If generation failed
+          pageNumber?: number;
+          errorMessage?: string;
+          fileSize?: string; // e.g., "2.5 MB"
+          lastAccessedAt?: string;
         }>;
         reportSummary: {
           totalReports: number;
           completedReports: number;
-          pendingReports: number;
+          generatingReports: number;
           failedReports: number;
+          lastGeneratedDate?: string;
         };
       };
     };
@@ -525,9 +532,108 @@ For reports being generated:
 
 ### **5. Quizzes Tab**
 **API Integration:**
-- `GET /api/v1/parents/children/:studentId/quiz-results`
-- Query Parameters: `{ academicYearId?: number }`
+
+#### **Get Available Quizzes for Student**
+**Endpoint:** `GET /api/v1/quiz/student/:studentId/available`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current year
+  }
+  ```
 - **Response Data:**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      quizTitle: string;
+      description?: string;
+      subject: string;
+      timeLimit?: number;
+      totalMarks: number;
+      questionCount: number;
+      startDate?: string;
+      endDate?: string;
+      status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+      lastAttempt?: {
+        score: number;
+        percentage: number;
+      };
+    }>;
+  }
+  ```
+
+#### **Start Quiz**
+**Endpoint:** `POST /api/v1/quiz/start`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    quizId: number;
+    studentId: number;
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: "Quiz started successfully";
+    data: {
+      id: number;
+      quizId: number;
+      studentId: number;
+      parentId: number;
+      status: "IN_PROGRESS";
+      startedAt: string;
+    };
+  }
+  ```
+
+#### **Submit Quiz**
+**Endpoint:** `POST /api/v1/quiz/submissions/:submissionId/submit`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `submissionId` (number): Quiz submission ID
+- **Request Body:**
+  ```typescript
+  {
+    responses: Array<{
+      questionId: number;
+      selectedAnswer: string;
+      timeSpent?: number; // Seconds
+    }>;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Quiz submitted successfully";
+    data: {
+      id: number;
+      quizId: number;
+      studentId: number;
+      score: number;
+      percentage: number;
+      status: "COMPLETED";
+      submittedAt: string;
+    };
+  }
+  ```
+
+#### **Get Quiz Results (Detailed)**
+**Endpoint:** `GET /api/v1/quiz/student/:studentId/results`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): Student ID
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number; // Optional, defaults to current year
+    quizId?: number;         // Optional, filter by specific quiz
+  }
+  ```
+- **Response (200):**
   ```typescript
   {
     success: true;
@@ -540,7 +646,41 @@ For reports being generated:
       totalMarks: number;
       percentage: number;
       status: "COMPLETED" | "PENDING" | "OVERDUE";
+      submissionId: number; // Link to detailed submission
     }>;
+  }
+  ```
+
+#### **Get Detailed Quiz Submission**
+**Endpoint:** `GET /api/v1/quiz/submissions/:submissionId/detailed`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `submissionId` (number): Quiz submission ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      submissionId: number;
+      quizTitle: string;
+      studentName: string;
+      score: number;
+      totalMarks: number;
+      percentage: number;
+      submittedAt: string;
+      timeTaken: number; // Minutes
+      questions: Array<{
+        questionId: number;
+        questionText: string;
+        questionType: "MCQ" | "LONG_ANSWER";
+        options?: string[];
+        correctAnswer: string;
+        selectedAnswer: string;
+        isCorrect: boolean;
+        marksEarned: number;
+        maxMarks: number;
+        explanation?: string;
+      }>;
+    };
   }
   ```
 
@@ -709,34 +849,283 @@ For reports being generated:
 ## Messaging (`/parent/messages`)
 
 ### **API Integration**
-**Send Message Endpoint:** `POST /api/v1/parents/message-staff`
+
+#### **Send Message to Staff**
+**Endpoint:** `POST /api/v1/messaging/threads`
 - **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
   ```typescript
   {
-    recipientId: number;    // Staff member ID
-    subject: string;        // Required
-    message: string;        // Required
-    priority?: "LOW" | "MEDIUM" | "HIGH";
-    studentId?: number;     // Optional - if about specific child
+    subject: string;
+    participants: Array<number>; // Staff member IDs (e.g., [recipientId])
+    category?: "GENERAL" | "ACADEMIC" | "DISCIPLINARY" | "FINANCIAL" | "ADMINISTRATIVE" | "EMERGENCY"; // Default: "GENERAL"
+    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT"; // Default: "MEDIUM"
+    initialMessage: string; // The message content
+    tags?: Array<string>;
   }
   ```
-- **Response:**
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: "Message thread created successfully";
+    data: {
+      id: number;
+      subject: string;
+      participants: Array<{
+        userId: number;
+        userName: string;
+        userRole: string;
+      }>;
+      messageCount: number;
+      lastMessageAt: string;
+      lastMessagePreview: string;
+      priority: string;
+      category: string;
+      status: string;
+      tags: Array<string>;
+      createdAt: string;
+      createdBy: {
+        id: number;
+        name: string;
+        role: string;
+      };
+    };
+  }
+  ```
+
+#### **Get Message Threads**
+**Endpoint:** `GET /api/v1/messaging/threads`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    category?: string;     // "GENERAL" | "ACADEMIC" | "DISCIPLINARY" | "FINANCIAL" | "ADMINISTRATIVE" | "EMERGENCY"
+    priority?: string;     // "LOW" | "MEDIUM" | "HIGH" | "URGENT"
+    status?: string;       // "ACTIVE" | "RESOLVED" | "ARCHIVED"
+    search?: string;       // Search in subject, preview, tags
+    page?: number;         // Default: 1
+    limit?: number;        // Default: 20
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      subject: string;
+      participants: Array<{
+        userId: number;
+        userName: string;
+        userRole: string;
+        isActive: boolean;
+        lastReadAt?: string;
+      }>;
+      messageCount: number;
+      lastMessageAt: string;
+      lastMessagePreview: string;
+      priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+      category: "GENERAL" | "ACADEMIC" | "DISCIPLINARY" | "FINANCIAL" | "ADMINISTRATIVE" | "EMERGENCY";
+      status: "ACTIVE" | "RESOLVED" | "ARCHIVED";
+      tags: Array<string>;
+      createdAt: string;
+      createdBy: {
+        id: number;
+        name: string;
+        role: string;
+      };
+    }>;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }
+  ```
+
+#### **Get Thread Messages**
+**Endpoint:** `GET /api/v1/messaging/threads/:threadId/messages`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `threadId` (number): Thread ID
+- **Query Parameters:**
+  ```typescript
+  {
+    page?: number;         // Default: 1
+    limit?: number;        // Default: 50
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      threadId: number;
+      senderId: number;
+      senderName: string;
+      senderRole: string;
+      content: string;
+      messageType: "TEXT" | "ANNOUNCEMENT" | "ALERT" | "REMINDER" | "URGENT";
+      priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+      isRead: boolean;
+      readAt?: string;
+      readBy: Array<{
+        userId: number;
+        userName: string;
+        readAt: string;
+      }>;
+      attachments: Array<{
+        id: number;
+        fileName: string;
+        fileUrl: string;
+        fileSize: number;
+        uploadedAt: string;
+      }>;
+      reactions: Array<{
+        userId: number;
+        userName: string;
+        reaction: "👍" | "👎" | "❤️" | "😂" | "😮" | "😢" | "😡";
+        reactedAt: string;
+      }>;
+      mentions: Array<{
+        userId: number;
+        userName: string;
+        position: number;
+      }>;
+      deliveryStatus: "SENT" | "DELIVERED" | "READ" | "FAILED";
+      sentAt: string;
+      editedAt?: string;
+      isEdited: boolean;
+    }>;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }
+  ```
+
+#### **Send Message to Thread**
+**Endpoint:** `POST /api/v1/messaging/threads/:threadId/messages`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `threadId` (number): Thread ID
+- **Request Body:**
+  ```typescript
+  {
+    content: string;
+    messageType?: string;          // Default: "TEXT"
+    priority?: string;             // Default: "MEDIUM"
+    mentions?: Array<number>;      // User IDs to mention
+    attachments?: Array<{
+      fileName: string;
+      fileUrl: string;
+      fileSize: number;
+    }>;
+  }
+  ```
+- **Response (201):**
   ```typescript
   {
     success: true;
     message: "Message sent successfully";
     data: {
       id: number;
-      subject: string;
+      threadId: number;
+      senderId: number;
+      senderName: string;
+      content: string;
       sentAt: string;
-      recipientName: string;
     };
   }
   ```
 
-**Get Messages Endpoint:** `GET /api/v1/messaging/threads`
-- Query parameters for filtering and pagination
+#### **Get Notification Preferences**
+**Endpoint:** `GET /api/v1/messaging/preferences`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      userId: number;
+      emailNotifications: boolean;
+      pushNotifications: boolean;
+      smsNotifications: boolean;
+      priority: {
+        low: boolean;
+        medium: boolean;
+        high: boolean;
+        urgent: boolean;
+      };
+      categories: {
+        general: boolean;
+        academic: boolean;
+        disciplinary: boolean;
+        financial: boolean;
+        administrative: boolean;
+        emergency: boolean;
+      };
+      quietHours: {
+        enabled: boolean;
+        startTime: string;
+        endTime: string;
+      };
+      digestFrequency: "IMMEDIATE" | "HOURLY" | "DAILY" | "WEEKLY" | "DISABLED";
+    };
+  }
+  ```
+
+#### **Update Notification Preferences**
+**Endpoint:** `PUT /api/v1/messaging/preferences`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    emailNotifications?: boolean;
+    pushNotifications?: boolean;
+    smsNotifications?: boolean;
+    priority?: {
+      low?: boolean;
+      medium?: boolean;
+      high?: boolean;
+      urgent?: boolean;
+    };
+    categories?: {
+      general?: boolean;
+      academic?: boolean;
+      disciplinary?: boolean;
+      financial?: boolean;
+      administrative?: boolean;
+      emergency?: boolean;
+    };
+    quietHours?: {
+      enabled?: boolean;
+      startTime?: string;
+      endTime?: string;
+    };
+    digestFrequency?: "IMMEDIATE" | "HOURLY" | "DAILY" | "WEEKLY" | "DISABLED";
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Notification preferences updated successfully";
+    data: {
+      userId: number;
+      emailNotifications: boolean;
+      pushNotifications: boolean;
+      smsNotifications: boolean;
+    };
+  }
+  ```
 
 ```
 ┌─── Parent Messaging Center ───┐
@@ -773,25 +1162,57 @@ For reports being generated:
 ## School Announcements (`/parent/announcements`)
 
 ### **API Integration**
-**Primary Endpoint:** `GET /api/v1/parents/announcements`
+**Primary Endpoint:** `GET /api/v1/communications/announcements`
 - **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    page?: number;
+    limit?: number;
+    audience?: "ALL" | "STUDENTS" | "PARENTS" | "TEACHERS" | "STAFF";
+    academicYearId?: number;
+    startDate?: string; // "YYYY-MM-DD"
+    endDate?: string; // "YYYY-MM-DD"
+    active?: boolean;
+  }
+  ```
 - **Response:**
   ```typescript
   {
     success: true;
-    data: Array<{
-      id: number;
-      title: string;
-      content: string;
-      priority: "LOW" | "MEDIUM" | "HIGH";
-      publishedAt: string;
-      author: string;
-      category: string;
-      attachments?: Array<{
-        fileName: string;
-        fileUrl: string;
+    data: {
+      announcements: Array<{
+        id: number;
+        title: string;
+        content: string;
+        audience: "ALL" | "STUDENTS" | "PARENTS" | "TEACHERS" | "STAFF";
+        priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+        isActive: boolean;
+        publishDate: string;
+        expiryDate?: string;
+        academicYearId?: number;
+        authorId: number;
+        createdAt: string;
+        updatedAt: string;
+        author: {
+          id: number;
+          name: string;
+          email: string;
+        };
+        academicYear?: {
+          id: number;
+          name: string;
+          startDate: string;
+          endDate: string;
+        };
       }>;
-    }>;
+      pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+      };
+    };
   }
   ```
 

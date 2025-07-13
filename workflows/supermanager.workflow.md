@@ -14,91 +14,81 @@
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │ ┌─── System Overview ───┐                              │
-│ │ 🏫 Academic Years: 3     👥 Total Personnel: 52      │
-│ │ 👨‍🎓 Total Students: 1,245  🏫 Total Classes: 24        │
-│ │ 📚 Subclasses: 48        💰 Total Fees: 95M FCFA      │
-│ │ 📊 Collection Rate: 78%   🚨 System Alerts: 5         │
-│ │ 📄 Report Cards: 1,156/1,245 (93%) Generated         │
+│ │ 👥 Total Users: [Total Users]      👨‍🎓 Students: [Total Students] │
+│ │ 👨‍🏫 Teachers: [Total Teachers]   🏫 Classes: [Total Classes] │
+│ │ 📅 Academic Years: [Active Academic Years]                 │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Quick Actions ───┐   ┌─── Recent Activity ───┐    │
-│ │ [➕ Add Academic Year]   │ │ • VP assigned 5 students   │
-│ │ [👤 Create User]         │ │ • Bursar recorded 20 fees  │
-│ │ [🏫 Manage Classes]      │ │ • Teacher entered marks    │
-│ │ [📊 System Reports]      │ │ • 3 discipline issues      │
-│ │ [📄 Report Card Status]  │ │ • Parent sent message      │
-│ │ [⚙️ System Settings]     │ │ • 67 reports generating    │
+│ ┌─── Academic Progress ───┐   ┌─── Financial Summary ───┐ │
+│ │ Total Enrolled: [Total Enrolled] │ Total Revenue: [Total Revenue] FCFA │
+│ │ Pending Interviews: [Pending Interviews] │ Outstanding Fees: [Outstanding Fees] FCFA │
+│ │ Unassigned Students: [Unassigned Students] │ Collection Rate: [Collection Rate]%       │
+│ │ Avg. Attendance Rate: [Average Attendance Rate]% │ [View Financial Trends]                 │
+│ │ Overall Grades: [Overall Grades]              │                                         │
 │ └─────────────────────────┘ └─────────────────────────┘ │
 │                                                         │
-│ ┌─── Critical Alerts ───┐                              │
-│ │ ⚠️ 5 students awaiting VP assignment                  │
-│ │ 💰 12 fee payment conflicts need review               │
-│ │ ❌ 22 report cards failed generation - needs review   │
-│ │ 📊 Sequence 3 reports pending for 3 classes          │
-│ │ 🔧 System backup scheduled in 2 hours                │
+│ ┌─── Operational Insights ───┐                          │
+│ │ Recent Audit Activities: [Recent Audit Activities Count] │
+│ │ System Health: [System Health Performance]            │
+│ │ Last Backup: [Last Backup Date]                        │
+│ │ Uptime: [Uptime]                                      │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
 
 #### **API Integration:**
-```http
-GET /api/v1/manager/dashboard
-Authorization: Bearer {token}
-
-Query Parameters:
-?role=SUPER_MANAGER&academicYearId=all  // SUPER_MANAGER can see all years
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "systemOverview": {
-      "academicYears": 3,
-      "totalPersonnel": 52,
-      "totalStudents": 1245,
-      "totalClasses": 24,
-      "totalSubclasses": 48,
-      "totalFees": "95000000 FCFA",
-      "collectionRate": 78,
-      "systemAlerts": 5
-    },
-    "criticalAlerts": [
-      {
-        "priority": "HIGH",
-        "message": "5 students awaiting VP assignment",
-        "type": "ACADEMIC",
-        "actionRequired": true
-      },
-      {
-        "priority": "MEDIUM",
-        "message": "12 fee payment conflicts need review",
-        "type": "FINANCIAL",
-        "actionRequired": true
-      }
-    ],
-    "recentActivity": [
-      {
-        "action": "VP assigned 5 students",
-        "user": "Vice Principal",
-        "timestamp": "2024-01-22T10:30:00Z",
-        "type": "ACADEMIC"
-      }
-    ],
-    "quickActions": [
-      {
-        "action": "ADD_ACADEMIC_YEAR",
-        "label": "Add Academic Year",
-        "enabled": true
-      },
-      {
-        "action": "CREATE_USER", 
-        "label": "Create User",
-        "enabled": true
-      }
-    ]
+**Primary Endpoint:** `GET /api/v1/dashboard/super-manager/enhanced`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      systemOverview: {
+        totalUsers: number;
+        totalStudents: number;
+        totalTeachers: number;
+        totalClasses: number;
+        activeAcademicYears: number;
+      };
+      academicProgress: {
+        enrollmentStats: {
+          totalEnrolled: number;
+          pendingInterviews: number;
+          unassignedStudents: number;
+        };
+        performanceMetrics: {
+          averageAttendanceRate: number;
+          overallGrades: Record<string, number>;
+        };
+      };
+      financialSummary: {
+        totalRevenue: number;
+        outstandingFees: number;
+        collectionRate: number;
+        monthlyTrends: Array<{
+          month: string;
+          collected: number;
+          outstanding: number;
+        }>;
+      };
+      operationalInsights: {
+        recentAuditActivities: Array<{
+          id: number;
+          action: string;
+          entityType: string;
+          userId: number;
+          createdAt: string;
+        }>;
+        systemHealth: {
+          uptime: string;
+          performance: "GOOD" | "FAIR" | "POOR";
+          lastBackup: string;
+        };
+      };
+    };
   }
-}
-```
+  ```
 
 ---
 
@@ -131,16 +121,16 @@ Success Response (200):
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │ ┌─── Academic Years List ───┐                          │
-│ │ 🟢 2024-2025 (Current)     [📊] [⚙️] [Set Current]    │
-│ │    Sep 1, 2024 - Jul 31, 2025                        │
-│ │    Students: 1,245 | Personnel: 52                   │
+│ │ 🟢 [Current Academic Year Name] (Current)     [📊 View Details] [⚙️ Edit] [Set Current]    │
+│ │    [Current Year Start Date] - [Current Year End Date]                        │
+│ │    Students: [Current Year Student Count] | Personnel: [Current Year Personnel Count]                   │
 │ │                                                       │
-│ │ ⚪ 2023-2024 (Previous)     [📊] [⚙️] [Archive]       │
-│ │    Sep 1, 2023 - Jul 31, 2024                        │
-│ │    Students: 1,180 | Personnel: 48                   │
+│ │ ⚪ [Previous Academic Year Name] (Previous)     [📊 View Details] [⚙️ Edit] [Archive/Delete]       │
+│ │    [Previous Year Start Date] - [Previous Year End Date]                        │
+│ │    Students: [Previous Year Student Count] | Personnel: [Previous Year Personnel Count]                   │
 │ │                                                       │
-│ │ ⚪ 2022-2023 (Archived)     [📊] [⚙️] [Delete]        │
-│ │    Sep 1, 2022 - Jul 31, 2023                        │
+│ │ ⚪ [Archived Academic Year Name] (Archived)     [📊 View Details] [⚙️ Edit] [Delete]        │
+│ │    [Archived Year Start Date] - [Archived Year End Date]                        │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -148,1277 +138,2577 @@ Success Response (200):
 ### **Create New Academic Year Modal**
 - **Form Fields:**
   - Name (e.g., "2025-2026")
-  - Start Date
-  - End Date
-  - Set as Current checkbox
+  - Start Date (YYYY-MM-DD)
+  - End Date (YYYY-MM-DD)
+  - Set as Current (checkbox)
+  - Terms (Optional - Name, Start Date, End Date, Fee Deadline per term)
 
 #### **API Integration:**
-```http
-GET /api/v1/academic-years
-Authorization: Bearer {token}
 
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "academicYears": [
-      {
-        "id": 1,
-        "name": "2024-2025",
-        "startDate": "2024-09-01",
-        "endDate": "2025-07-31",
-        "isCurrent": true,
-        "status": "ACTIVE",
-        "studentCount": 1245,
-        "personnelCount": 52,
-        "classCount": 24,
-        "createdAt": "2024-01-01T00:00:00Z"
-      },
-      {
-        "id": 2,
-        "name": "2023-2024", 
-        "startDate": "2023-09-01",
-        "endDate": "2024-07-31",
-        "isCurrent": false,
-        "status": "COMPLETED",
-        "studentCount": 1180,
-        "personnelCount": 48,
-        "classCount": 22,
-        "createdAt": "2023-01-01T00:00:00Z"
-      }
-    ],
-    "summary": {
-      "totalYears": 3,
-      "currentYear": "2024-2025",
-      "activeStudents": 1245,
-      "archivedYears": 1
-    }
+#### **Get All Academic Years**
+**Endpoint:** `GET /api/v1/academic-years`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      name: string;
+      startDate: string;
+      endDate: string;
+      isCurrent: boolean;
+      terms: Array<{
+        id: number;
+        name: string;
+        startDate: string;
+        endDate: string;
+        feeDeadline: string;
+      }>;
+      examSequences: Array<object>;
+    }>;
   }
-}
+  ```
 
-POST /api/v1/academic-years
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "name": "2025-2026",
-  "startDate": "2025-09-01",
-  "endDate": "2026-07-31",
-  "isCurrent": false,
-  "description": "Academic year 2025-2026"
-}
-
-Success Response (201):
-{
-  "success": true,
-  "data": {
-    "id": 3,
-    "name": "2025-2026",
-    "status": "CREATED",
-    "message": "Academic year created successfully"
+#### **Create Academic Year**
+**Endpoint:** `POST /api/v1/academic-years`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    name: string;
+    startDate: string; // "YYYY-MM-DD"
+    endDate: string;   // "YYYY-MM-DD"
+    terms?: Array<{
+      name: string;
+      startDate: string; // "YYYY-MM-DD"
+      endDate: string;   // "YYYY-MM-DD"
+      feeDeadline?: string; // "YYYY-MM-DD"
+    }>;
   }
-}
-
-PUT /api/v1/academic-years/:id
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "name": "2025-2026 Updated",
-  "isCurrent": false,
-  "description": "Updated academic year description"
-}
-
-POST /api/v1/academic-years/:id/set-current
-Authorization: Bearer {token}
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "message": "Academic year set as current",
-    "previousCurrent": "2024-2025",
-    "newCurrent": "2025-2026",
-    "affectedRecords": {
-      "users": 52,
-      "enrollments": 0
-    }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      startDate: string;
+      endDate: string;
+      isCurrent: boolean;
+      terms: Array<object>;
+    };
   }
-}
-```
+  ```
+
+#### **Update Academic Year**
+**Endpoint:** `PUT /api/v1/academic-years/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Academic Year ID
+- **Request Body:**
+  ```typescript
+  {
+    name?: string;
+    startDate?: string; // "YYYY-MM-DD"
+    endDate?: string;   // "YYYY-MM-DD"
+    isCurrent?: boolean;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      startDate: string;
+      endDate: string;
+      isCurrent: boolean;
+    };
+  }
+  ```
+
+#### **Set Academic Year as Current**
+**Endpoint:** `POST /api/v1/academic-years/:id/set-current`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Academic Year ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: string;
+    data: {
+      id: number;
+      name: string;
+      startDate: string;
+      endDate: string;
+      isCurrent: boolean;
+    };
+  }
+  ```
+
+#### **Delete Academic Year**
+**Endpoint:** `DELETE /api/v1/academic-years/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Academic Year ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Academic year deleted successfully";
+  }
+  ```
+- **Error Response (409 Conflict):**
+  ```typescript
+  {
+    success: false;
+    error: string; // e.g., "Cannot delete academic year. It is referenced by: X enrollment(s), Y user role(s)"
+  }
+  ```
 
 ---
 
 ## 2. User Management (`/super-manager/users`)
 
-### **User Management Dashboard**
+### **User Management Page**
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ User Management                         [➕ Create User] │
+│ User Management                       [➕ Create User]   │
 ├─────────────────────────────────────────────────────────┤
-│                                                         │
-│ ┌─── Filter & Search ───┐                              │
-│ │ [🔍 Search Name/Email] [📋 Role Filter] [📅 Year]     │
-│ │ [🟢 Active] [🔴 Inactive] [⭐ Recent]                  │
-│ └─────────────────────────────────────────────────────┘ │
+│ [Filter: All Roles] [Filter: Active] [Search: Name/Email/Matricule] │
 │                                                         │
 │ ┌─── Users List ───┐                                   │
-│ │ 👤 John Principal (PRINCIPAL)           [👁️] [✏️] [🗑️] │
-│ │    📧 john@school.com | 📱 +237123456789              │
-│ │    🟢 Active | Created: Jan 15, 2024                 │
-│ │                                                       │
-│ │ 👩 Mary Bursar (BURSAR)                 [👁️] [✏️] [🗑️] │
-│ │    📧 mary@school.com | 📱 +237987654321              │
-│ │    🟢 Active | Last Login: 2 hours ago               │
-│ │                                                       │
-│ │ 👨 Paul Teacher (TEACHER, HOD-MATH)     [👁️] [✏️] [🗑️] │
-│ │    📧 paul@school.com | 📱 +237456789123              │
-│ │    🟢 Active | Multiple Roles                        │
+│ │ 👤 John Doe (SUPER_MANAGER)  john.doe@school.com   │
+│ │    Active | Phone: 677xxxxxxx | Last Login: 2024-01-20 │
+│ │    [View Details] [⚙️ Edit] [🔒 Reset Password] [🗑️ Delete] │
+│ │ ─────────────────────────────────────              │
+│ │ 👤 Jane Smith (TEACHER, 2024-2025) jane.smith@school.com │
+│ │    Active | Phone: 678xxxxxxx | Last Login: 2024-01-19 │
+│ │    [View Details] [⚙️ Edit] [Assign Role]            │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### **Create User Form**
-- **Personal Information:**
-  - Name, Email, Phone, Gender
-  - Date of Birth, Address, ID Card Number
-  - Profile Photo Upload
-
-- **Role Assignment:**
-  - Multiple role selection
-  - Academic year context for roles
-  - Permission preview
+### **Create New User Modal / User Details Page**
+- **Form Fields:**
+  - Name, Email, Password, Gender, Date of Birth, Phone, Address, ID Card Number, Photo
+  - Roles (with Academic Year selection for year-specific roles)
 
 #### **API Integration:**
-```http
-GET /api/v1/users
-Authorization: Bearer {token}
 
-Query Parameters:
-?role=TEACHER&status=ACTIVE&page=1&limit=50&search=john&academicYearId=1
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "users": [
-      {
-        "id": 1,
-        "name": "John Principal",
-        "email": "john@school.com",
-        "phone": "+237123456789",
-        "status": "ACTIVE",
-        "roles": [
-          {
-            "role": "PRINCIPAL",
-            "academicYearId": 1,
-            "academicYearName": "2024-2025"
-          }
-        ],
-        "lastLogin": "2024-01-22T08:00:00Z",
-        "createdAt": "2024-01-15T00:00:00Z",
-        "profilePhoto": "/uploads/profiles/john.jpg"
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 50,
-      "total": 298,
-      "totalPages": 6
-    },
-    "summary": {
-      "totalUsers": 298,
-      "byRole": {
-        "PRINCIPAL": 1,
-        "VICE_PRINCIPAL": 2,
-        "TEACHER": 45,
-        "HOD": 8,
-        "BURSAR": 2,
-        "PARENT": 201,
-        "STUDENT": 39
-      },
-      "byStatus": {
-        "ACTIVE": 285,
-        "INACTIVE": 13
-      }
-    }
+#### **1. Get All Users**
+**Endpoint:** `GET /api/v1/users`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    name?: string;
+    email?: string;
+    role?: "SUPER_MANAGER" | "MANAGER" | "PRINCIPAL" | "VICE_PRINCIPAL" | "BURSAR" | "DISCIPLINE_MASTER" | "TEACHER" | "HOD" | "PARENT" | "STUDENT";
+    status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+    academicYearId?: number; // Filter users by roles in a specific academic year
+    page?: number;
+    limit?: number;
+    sortBy?: "name" | "email" | "matricule" | "createdAt";
+    sortOrder?: "asc" | "desc";
   }
-}
-
-POST /api/v1/users
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "name": "New Principal",
-  "email": "principal@school.com", 
-  "phone": "+237987654321",
-  "gender": "FEMALE",
-  "dateOfBirth": "1980-03-15",
-  "address": "456 School Road",
-  "idCardNumber": "ID987654321",
-  "profilePhoto": "base64_encoded_image_data",
-  "roles": [
-    {
-      "role": "PRINCIPAL",
-      "academicYearId": 1
-    },
-    {
-      "role": "TEACHER", 
-      "academicYearId": 1
-    }
-  ],
-  "password": "SecurePassword123!",
-  "sendCredentials": true
-}
-
-Success Response (201):
-{
-  "success": true,
-  "data": {
-    "userId": 299,
-    "name": "New Principal",
-    "status": "CREATED",
-    "rolesAssigned": 2,
-    "credentialsSent": true
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      name: string;
+      email: string;
+      matricule?: string;
+      gender: "MALE" | "FEMALE";
+      dateOfBirth: string;
+      phone: string;
+      address: string;
+      idCardNum?: string;
+      photo?: string;
+      status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+      createdAt: string;
+      updatedAt: string;
+      userRoles: Array<{
+        id: number;
+        role: "SUPER_MANAGER" | "MANAGER" | "PRINCIPAL" | "VICE_PRINCIPAL" | "BURSAR" | "DISCIPLINE_MASTER" | "TEACHER" | "HOD" | "PARENT" | "STUDENT";
+        academicYearId?: number;
+      }>;
+    }>;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
   }
-}
+  ```
 
-PUT /api/v1/users/:id
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "name": "Updated Name",
-  "phone": "+237111222333",
-  "status": "ACTIVE",
-  "address": "Updated Address"
-}
-
-DELETE /api/v1/users/:id
-Authorization: Bearer {token}
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "message": "User deleted successfully",
-    "affectedRecords": {
-      "enrollments": 0,
-      "marks": 0,
-      "messages": 5
-    }
+#### **2. Create User**
+**Endpoint:** `POST /api/v1/users`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    name: string;
+    email: string;
+    password: string;
+    gender: "MALE" | "FEMALE";
+    dateOfBirth: string; // "YYYY-MM-DD"
+    phone: string;
+    address: string;
+    idCardNum?: string;
+    photo?: string;
+    roles: Array<{
+      role: "SUPER_MANAGER" | "MANAGER" | "PRINCIPAL" | "VICE_PRINCIPAL" | "BURSAR" | "DISCIPLINE_MASTER" | "TEACHER" | "HOD" | "PARENT" | "STUDENT";
+      academicYearId?: number; // null for global roles
+    }>;
   }
-}
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      email: string;
+      matricule: string;
+      // ... other created user details
+    };
+  }
+  ```
 
-POST /api/v1/users/:id/roles
-Authorization: Bearer {token}
-Content-Type: application/json
+#### **3. Get User by ID**
+**Endpoint:** `GET /api/v1/users/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): User ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      email: string;
+      matricule?: string;
+      // ... full user details including userRoles array
+    };
+  }
+  ```
 
-Request Body:
-{
-  "roles": [
-    {
-      "role": "HOD",
-      "academicYearId": 1
-    }
-  ]
-}
+#### **4. Update User**
+**Endpoint:** `PUT /api/v1/users/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): User ID
+- **Request Body:**
+  ```typescript
+  {
+    name?: string;
+    email?: string;
+    password?: string;
+    phone?: string;
+    address?: string;
+    status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+    // ... any other updatable fields
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      // ... updated user details
+    };
+  }
+  ```
 
-DELETE /api/v1/users/:id/roles
-Authorization: Bearer {token}
-Content-Type: application/json
+#### **5. Delete User**
+**Endpoint:** `DELETE /api/v1/users/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): User ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "User deleted successfully";
+  }
+  ```
 
-Request Body:
-{
-  "role": "TEACHER",
-  "academicYearId": 1
-}
-```
+#### **6. Assign Role to User**
+**Endpoint:** `POST /api/v1/users/:id/roles`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): User ID
+- **Request Body:**
+  ```typescript
+  {
+    role: "SUPER_MANAGER" | "MANAGER" | "PRINCIPAL" | "VICE_PRINCIPAL" | "BURSAR" | "DISCIPLINE_MASTER" | "TEACHER" | "HOD" | "PARENT" | "STUDENT";
+    academicYearId?: number; // Required for year-specific roles, null for global
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      userId: number;
+      role: string;
+      academicYearId?: number;
+    };
+  }
+  ```
+
+#### **7. Remove Role from User**
+**Endpoint:** `DELETE /api/v1/users/:id/roles`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): User ID
+- **Request Body:**
+  ```typescript
+  {
+    role: "SUPER_MANAGER" | "MANAGER" | "PRINCIPAL" | "VICE_PRINCIPAL" | "BURSAR" | "DISCIPLINE_MASTER" | "TEACHER" | "HOD" | "PARENT" | "STUDENT";
+    academicYearId?: number; // Required for year-specific roles, null for global
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Role removed successfully";
+  }
+  ```
 
 ---
 
-## 3. School Structure (`/super-manager/structure`)
+## 3. School Structure Management (`/super-manager/school-structure`)
 
-### **School Structure Management**
+### **Classes & Subclasses Page**
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ School Structure Management                             │
+│ School Structure: Classes & Subjects  [➕ New Class]    │
 ├─────────────────────────────────────────────────────────┤
+│ [Filter: All Levels] [Search: Class/Subclass Name]      │
 │                                                         │
-│ ┌─── Classes & Subclasses ───┐   ┌─── Subjects ───┐    │
-│ │ 🏫 FORM 1 (120 students)     │   │ 📚 Mathematics    │
-│ │   ├─ FORM 1A (30/30)        │   │ 📖 English        │
-│ │   ├─ FORM 1B (30/30)        │   │ 🧪 Physics        │
-│ │   ├─ FORM 1C (30/30)        │   │ 🔬 Chemistry      │
-│ │   └─ FORM 1D (30/30)        │   │ 🌍 Geography      │
-│ │                              │   │ 📜 History        │
-│ │ 🏫 FORM 2 (135 students)     │   │ [➕ Add Subject]  │
-│ │   ├─ FORM 2A (30/30)        │   │                   │
-│ │   ├─ FORM 2B (30/30)        │   └─────────────────  │
-│ │   ├─ FORM 2C (30/30)        │                       │
-│ │   ├─ FORM 2D (30/30)        │                       │
-│ │   └─ FORM 2E (15/30)        │                       │
-│ │                              │                       │
-│ │ [➕ Add Class/Subclass]      │                       │
-│ └──────────────────────────────┘                       │
+│ ┌─── Classes List ───┐                                 │
+│ │ 🏫 [Class Name] (Level [Class Level])                                   │
+│ │    Students: [Total Students] | Subclasses: [Total Subclasses] │
+│ │    Base Fee: [Base Fee] FCFA | New Student Fee: [New Student Fee] FCFA │
+│ │    [View Details] [⚙️ Edit] [🗑️ Delete]               │
+│ │ ─────────────────────────────────────              │
+│ │  ┌─── Subclasses: [Subclass Name] ───┐                     │
+│ │  │ Master: [Class Master Name] | Students: [Student Count] │
+│ │  │ Subjects: [Subject Name 1] (Coeff [Coefficient 1]), [Subject Name 2] (Coeff [Coefficient 2])     │
+│ │  │ [View Details] [⚙️ Edit] [Assign Master] [➕ Subject] [🗑️ Delete] │
+│ │  └─────────────────────────────┘                     │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Subjects List ───┐                                 │
+│ │ 📚 [Subject Name] ([Subject Category])                             │
+│ │    Teachers: [Teacher Count] | Linked Classes: [Linked Class Count] │
+│ │    [View Details] [⚙️ Edit] [Assign Teacher] [➕ Class Link] [🗑️ Delete] │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### **Create/Update Class Modal**
+- **Form Fields:**
+  - Name, Level, Base Fee, Miscellaneous Fee, New Student Fee, Old Student Fee, First Term Fee, Second Term Fee, Third Term Fee
+
+### **Create/Update Subclass Modal**
+- **Form Fields:**
+  - Name, Class Master (User ID)
+
+### **Assign Subject to Subclass Modal**
+- **Form Fields:**
+  - Subject, Coefficient
+
+#### **API Integration:**
+
+#### **1. Get All Classes**
+**Endpoint:** `GET /api/v1/classes`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    name?: string;
+    id?: number;
+    level?: number;
+    legacy?: "true" | "false"; // Use "true" for nested subclasses and student counts
+    page?: number;
+    limit?: number;
+    sortBy?: "name" | "id";
+    sortOrder?: "asc" | "desc";
+  }
+  ```
+- **Response (200 - Paginated):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      name: string;
+      level: number;
+      baseFee: number;
+      newStudentFee: number;
+      oldStudentFee: number;
+      miscellaneousFee: number;
+      firstTermFee: number;
+      secondTermFee: number;
+      thirdTermFee: number;
+      createdAt: string;
+      updatedAt: string;
+      studentCount: number;
+      academicYearId: number;
+    }>;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }
+  ```
+- **Response (200 - Legacy `legacy=true`):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      name: string;
+      maxStudents: number;
+      level: number;
+      baseFee: number;
+      newStudentFee: number;
+      oldStudentFee: number;
+      miscellaneousFee: number;
+      firstTermFee: number;
+      secondTermFee: number;
+      thirdTermFee: number;
+      createdAt: string;
+      updatedAt: string;
+      studentCount: number;
+      academicYearId: number;
+      subClasses: Array<{
+        id: number;
+        name: string;
+        classId: number;
+        classMasterId?: number;
+        studentCount: number;
+        subClassSubjects: Array<{
+          subjectId: number;
+        }>;
+      }>;
+    }>;
+  }
+  ```
+
+#### **2. Create Class**
+**Endpoint:** `POST /api/v1/classes`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    name: string;
+    level?: number;
+    baseFee?: number;
+    newStudentFee?: number;
+    oldStudentFee?: number;
+    miscellaneousFee?: number;
+    firstTermFee?: number;
+    secondTermFee?: number;
+    thirdTermFee?: number;
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: "Class created successfully";
+    data: {
+      id: number;
+      name: string;
+      level: number;
+      baseFee: number;
+      newStudentFee: number;
+      oldStudentFee: number;
+      miscellaneousFee: number;
+      firstTermFee: number;
+      secondTermFee: number;
+      thirdTermFee: number;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }
+  ```
+
+#### **3. Get Class by ID**
+**Endpoint:** `GET /api/v1/classes/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Class ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      level: number;
+      baseFee: number;
+      newStudentFee: number;
+      oldStudentFee: number;
+      miscellaneousFee: number;
+      firstTermFee: number;
+      secondTermFee: number;
+      thirdTermFee: number;
+      createdAt: string;
+      updatedAt: string;
+      studentCount: number;
+      academicYearId: number;
+      subClasses: Array<{
+        id: number;
+        name: string;
+        classMasterId?: number;
+        createdAt: string;
+        updatedAt: string;
+        studentCount: number;
+        classMaster?: { // Class master user object if assigned
+          id: number;
+          name: string;
+          matricule: string;
+          email: string;
+        };
+      }>;
+    };
+  }
+  ```
+
+#### **4. Update Class Details**
+**Endpoint:** `PUT /api/v1/classes/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Class ID
+- **Request Body:**
+  ```typescript
+  {
+    name?: string;
+    level?: number;
+    baseFee?: number;
+    newStudentFee?: number;
+    oldStudentFee?: number;
+    miscellaneousFee?: number;
+    firstTermFee?: number;
+    secondTermFee?: number;
+    thirdTermFee?: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Class updated successfully";
+    data: {
+      id: number;
+      name: string;
+      level: number;
+      baseFee: number;
+      newStudentFee: number;
+      oldStudentFee: number;
+      miscellaneousFee: number;
+      firstTermFee: number;
+      secondTermFee: number;
+      thirdTermFee: number;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }
+  ```
+
+#### **5. Delete Class**
+**Endpoint:** `DELETE /api/v1/classes/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Class ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Class deleted successfully";
+  }
+  ```
+- **Error Response (409 Conflict):**
+  ```typescript
+  {
+    success: false;
+    error: string; // e.g., "Cannot delete class, it has associated subclasses"
+  }
+  ```
+
+#### **6. Get All Subclasses**
+**Endpoint:** `GET /api/v1/classes/sub-classes`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    name?: string;
+    id?: number;
+    classId?: number;
+    includeSubjects?: "true" | "false";
+    page?: number;
+    limit?: number;
+    sortBy?: "name" | "id";
+    sortOrder?: "asc" | "desc";
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      name: string;
+      classId: number;
+      classMasterId?: number;
+      createdAt: string;
+      updatedAt: string;
+      class: { // Parent class details
+        id: number;
+        name: string;
+        level: number;
+      };
+      classMaster?: { // Class master user object if assigned
+        id: number;
+        name: string;
+        matricule: string;
+        email: string;
+      };
+      studentCount: number;
+      academicYearId: number;
+      subjects?: Array<{
+        id: number;
+        name: string;
+        category: string;
+        coefficient: number;
+      }>;
+    }>;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }
+  ```
+
+#### **7. Add New Subclass to a Class**
+**Endpoint:** `POST /api/v1/classes/:id/sub-classes`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Class ID
+- **Request Body:**
+  ```typescript
+  {
+    name: string;
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: "Subclass created successfully";
+    data: {
+      id: number;
+      name: string;
+      classId: number;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }
+  ```
+
+#### **8. Update Subclass**
+**Endpoint:** `PUT /api/v1/classes/:id/sub-classes/:subClassId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Class ID, `subClassId` (number): Subclass ID
+- **Request Body:**
+  ```typescript
+  {
+    name: string;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Subclass updated successfully";
+    data: {
+      id: number;
+      name: string;
+      classId: number;
+      classMasterId?: number;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }
+  ```
+
+#### **9. Delete Subclass**
+**Endpoint:** `DELETE /api/v1/classes/:id/sub-classes/:subClassId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Class ID, `subClassId` (number): Subclass ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Subclass deleted successfully";
+  }
+  ```
+- **Error Response (409 Conflict):**
+  ```typescript
+  {
+    success: false;
+    error: string; // e.g., "Cannot be deleted, subclass already has students"
+  }
+  ```
+
+#### **10. Assign Class Master to a Subclass**
+**Endpoint:** `POST /api/v1/classes/sub-classes/:subClassId/class-master`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `subClassId` (number): Subclass ID
+- **Request Body:**
+  ```typescript
+  {
+    userId: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      classId: number;
+      classMasterId: number;
+      createdAt: string;
+      updatedAt: string;
+      class: { /* ... parent class details ... */ };
+      classMaster: { // assigned teacher user details
+        id: number;
+        name: string;
+        matricule: string;
+        email: string;
+      };
+    };
+  }
+  ```
+
+#### **11. Get the Class Master of a Subclass**
+**Endpoint:** `GET /api/v1/classes/sub-classes/:subClassId/class-master`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `subClassId` (number): Subclass ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      email: string;
+      matricule: string;
+      gender: "MALE" | "FEMALE";
+      dateOfBirth: string;
+      phone: string;
+      address: string;
+      idCardNum?: string;
+      photo?: string;
+      status: string;
+      createdAt: string;
+      updatedAt: string;
+      userRoles: Array<{
+        id: number;
+        userId: number;
+        role: "TEACHER";
+        academicYearId?: number;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    } | null;
+  }
+  ```
+
+#### **12. Remove the Class Master from a Subclass**
+**Endpoint:** `DELETE /api/v1/classes/sub-classes/:subClassId/class-master`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `subClassId` (number): Subclass ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      classId: number;
+      classMasterId: null; // Class master is now null
+      createdAt: string;
+      updatedAt: string;
+      class: { /* ... parent class details ... */ };
+    };
+  }
+  ```
+
+#### **13. Get All Subjects**
+**Endpoint:** `GET /api/v1/subjects`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    name?: string;
+    category?: "SCIENCE" | "ARTS" | "COMMERCIAL" | "LANGUAGES" | "OTHER";
+    id?: number;
+    includeTeachers?: "true" | "false";
+    includeSubClasses?: "true" | "false";
+    page?: number;
+    limit?: number;
+    sortBy?: "name" | "id" | "category";
+    sortOrder?: "asc" | "desc";
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      name: string;
+      code?: string;
+      category: "SCIENCE" | "ARTS" | "COMMERCIAL" | "LANGUAGES" | "OTHER";
+      createdAt: string;
+      updatedAt: string;
+      teachers?: Array<{
+        id: number;
+        name: string;
+        email: string;
+        matricule: string;
+      }>;
+      subClasses?: Array<{
+        id: number;
+        name: string;
+        className: string;
+        classId: number;
+        coefficient: number;
+      }>;
+    }>;
+    meta: { // ... pagination details ...
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }
+  ```
+
+#### **14. Create New Subject**
+**Endpoint:** `POST /api/v1/subjects`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    name: string;
+    category: "SCIENCE" | "ARTS" | "COMMERCIAL" | "LANGUAGES" | "OTHER";
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      category: "SCIENCE" | "ARTS" | "COMMERCIAL" | "LANGUAGES" | "OTHER";
+      createdAt: string;
+      updatedAt: string;
+    };
+  }
+  ```
+
+#### **15. Get Subject by ID**
+**Endpoint:** `GET /api/v1/subjects/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Subject ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      name: string;
+      code?: string;
+      category: "SCIENCE" | "ARTS" | "COMMERCIAL" | "LANGUAGES" | "OTHER";
+      createdAt: string;
+      updatedAt: string;
+      teachers: Array<{
+        id: number;
+        name: string;
+        email: string;
+        matricule: string;
+      }>;
+      subClasses: Array<{
+        id: number;
+        name: string;
+        className: string;
+        classId: number;
+        coefficient: number;
+      }>;
+    };
+  }
+  ```
+
+#### **16. Update Subject Details**
+**Endpoint:** `PUT /api/v1/subjects/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Subject ID
+- **Request Body:**
+  ```typescript
+  {
+    name?: string;
+    category?: "SCIENCE" | "ARTS" | "COMMERCIAL" | "LANGUAGES" | "OTHER";
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Subject updated successfully";
+    data: {
+      id: number;
+      name: string;
+      category: string;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }
+  ```
+
+#### **17. Delete Subject**
+**Endpoint:** `DELETE /api/v1/subjects/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Subject ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Subject deleted successfully";
+  }
+  ```
+
+#### **18. Assign Teacher to a Subject**
+**Endpoint:** `POST /api/v1/subjects/:id/teachers`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Subject ID
+- **Request Body:**
+  ```typescript
+  {
+    teacherId: number;
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: "Teacher assigned successfully";
+    data: {
+      teacher: {
+        id: number;
+        subjectId: number;
+        teacherId: number;
+        createdAt: string;
+        updatedAt: string;
+      };
+    };
+  }
+  ```
+
+#### **19. Link Subject to a Subclass (with Coefficient)**
+**Endpoint:** `POST /api/v1/subjects/:id/sub-classes`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `id` (number): Subject ID
+- **Request Body:**
+  ```typescript
+  {
+    subClassId: number;
+    coefficient: number;
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      id: number;
+      subjectId: number;
+      subClassId: number;
+      coefficient: number;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }
+  ```
+
+#### **20. Unlink Subject from a Subclass**
+**Endpoint:** `DELETE /api/v1/subjects/:subjectId/sub-classes/:subClassId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `subjectId` (number): Subject ID, `subClassId` (number): Subclass ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Subject ID X successfully unlinked from subclass ID Y";
+  }
+  ```
+
+#### **21. Assign a Subject to All Subclasses of a Class**
+**Endpoint:** `POST /api/v1/subjects/:subjectId/classes/:classId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `subjectId` (number): Subject ID, `classId` (number): Class ID
+- **Request Body:**
+  ```typescript
+  {
+    coefficient: number;
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: string; // e.g., "Subject successfully assigned to all subclasses of class ID X"
+    data: Array<{
+      id: number;
+      subjectId: number;
+      subClassId: number;
+      coefficient: number;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }
+  ```
+
+---
+
+## 4. Financial Overview (`/super-manager/financial-overview`)
+
+### **Financial Overview Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Financial Overview                    [📈 View Reports] │
+├─────────────────────────────────────────────────────────┤
+│ [Filter: Academic Year] [Filter: Timeframe]             │
+│                                                         │
+│ ┌─── Key Financial Metrics ───┐                        │
+│ │ Total Expected Revenue: [Total Expected Revenue] FCFA │
+│ │ Total Collected Revenue: [Total Collected Revenue] FCFA │
+│ │ Outstanding Amount: [Outstanding Amount] FCFA         │
+│ │ Collection Rate: [Collection Rate]%                   │
+│ │ Total Students: [Total Students] | Paid Students: [Paid Students] │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Monthly Collection Trends ───┐                    │
+│ │ [Chart showing monthly revenue, target, collections, outstanding] │
+│ │ For [Month 1]: Collected [Collected 1] / Expected [Expected 1] (Rate: [Rate 1]%) │
+│ │ For [Month 2]: Collected [Collected 2] / Expected [Expected 2] (Rate: [Rate 2]%) │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Fee Categories Breakdown ───┐                      │
+│ │ School Fees: Collected [Collected School Fees] / Total [Total School Fees] (Rate: [Rate School Fees]%) │
+│ │ Miscellaneous Fees: Collected [Collected Misc Fees] / Total [Total Misc Fees] (Rate: [Rate Misc Fees]%) │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Top Defaulters ───┐                                │
+│ │ 👤 [Student 1 Name] (Class [Class 1 Name]): [Amount Owed 1] FCFA ([Days Past Due 1] days overdue) │
+│ │ 👤 [Student 2 Name] (Class [Class 2 Name]): [Amount Owed 2] FCFA ([Days Past Due 2] days overdue) │
+│ │ [View All Defaulters] [Send Reminders]                │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### **API Integration:**
+
+#### **1. Get Financial Overview**
+**Endpoint:** `GET /api/v1/dashboard/financial-overview`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    timeframe?: "month" | "quarter" | "year";
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      summary: {
+        totalRevenue: number;
+        outstandingAmount: number;
+        collectionRate: number;
+        totalStudents: number;
+        paidStudents: number;
+      };
+      monthlyTrends: Array<{
+        month: string;
+        revenue: number;
+        target: number;
+        collections: number;
+        outstanding: number;
+      }>;
+      feeCategories: Array<{
+        category: string;
+        totalAmount: number;
+        collectedAmount: number;
+        outstandingAmount: number;
+        collectionRate: number;
+      }>;
+      defaultersAnalysis: {
+        totalDefaulters: number;
+        amountInDefault: number;
+        topDefaulters: Array<{
+          studentId: number;
+          studentName: string;
+          outstandingAmount: number;
+          daysPastDue: number;
+        }>;
+      };
+    };
+  }
+  ```
+
+#### **2. Get Student Registration Analytics**
+**Endpoint:** `GET /api/v1/dashboard/student-registration`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    timeframe?: "week" | "month" | "quarter";
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      registrationStats: {
+        totalRegistrations: number;
+        completedRegistrations: number;
+        pendingPayments: number;
+        rejectedApplications: number;
+      };
+      dailyRegistrations: Array<{
+        date: string;
+        newRegistrations: number;
+        completedPayments: number;
+        pendingCount: number;
+      }>;
+      classDistribution: Array<{
+        classId: number;
+        className: string;
+        registeredStudents: number;
+        capacity: number;
+        waitingList: number;
+      }>;
+      paymentAnalysis: {
+        totalFeesCollected: number;
+        averagePaymentTime: number;
+        paymentMethods: Record<string, number>;
+        installmentPlans: number;
+      };
+    };
+  }
+  ```
+
+#### **3. Get Interview Management Analytics**
+**Endpoint:** `GET /api/v1/dashboard/interview-management`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    status?: "SCHEDULED" | "COMPLETED" | "PENDING";
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      interviewStats: {
+        totalScheduled: number;
+        completedToday: number;
+        pendingThisWeek: number;
+        averageInterviewDuration: number;
+      };
+      scheduleOverview: Array<{
+        date: string;
+        scheduledCount: number;
+        completedCount: number;
+        rescheduledCount: number;
+        noShowCount: number;
+      }>;
+      interviewOutcomes: {
+        accepted: number;
+        rejected: number;
+        pending: number;
+        waitlisted: number;
+      };
+      interviewerWorkload: Array<{
+        interviewerId: number;
+        interviewerName: string;
+        scheduledInterviews: number;
+        completedInterviews: number;
+        averageRating: number;
+      }>;
+    };
+  }
+  ```
+
+---
+
+## 5. Academic Management (`/super-manager/academic-management`)
+
+### **Academic Management Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Academic Management                     [📚 New Exam]   │
+├─────────────────────────────────────────────────────────┤
+│ [Filter: Academic Year]                                 │
+│                                                         │
+│ ┌─── Teacher Analytics Overview ───┐                    │
+│ │ Total Teachers: [Total Teachers] | Active: [Active Teachers] │
+│ │ Avg. Attendance Rate: [Average Attendance Rate]%     │
+│ │ Teachers on Leave: [Teachers On Leave]               │
+│ │ [View Detailed Teacher Analytics]                     │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Class Profiles Overview ───┐                      │
+│ │ Total Classes: [Total Classes] | Total Subclasses: [Total SubClasses] │
+│ │ Avg. Class Size: [Average Class Size]                │
+│ │ Overall Utilization: [Overall Utilization]%          │
+│ │ [View Detailed Class Profiles]                        │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Reports Analytics Overview ───┐                   │
+│ │ Total Reports Generated: [Total Reports Generated]    │
+│ │ Reports This Month: [Reports This Month]             │
+│ │ Avg. Generation Time: [Avg Generation Time]s         │
+│ │ Success Rate: [Success Rate]%                        │
+│ │ [View Detailed Reports Analytics]                     │
+│ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
 
 #### **API Integration:**
-```http
-GET /api/v1/classes
-Authorization: Bearer {token}
 
-Query Parameters:
-?academicYearId=1&includeSubclasses=true&includeEnrollments=true
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "classes": [
-      {
-        "id": 1,
-        "name": "FORM 1",
-        "level": 1,
-        "academicYearId": 1,
-        "capacity": 120,
-        "enrolledCount": 120,
-        "subclasses": [
-          {
-            "id": 1,
-            "name": "FORM 1A",
-            "capacity": 30,
-            "enrolledCount": 30,
-            "classTeacherId": 15,
-            "classTeacher": "Mrs. Johnson"
-          },
-          {
-            "id": 2,
-            "name": "FORM 1B",
-            "capacity": 30,
-            "enrolledCount": 30,
-            "classTeacherId": 16,
-            "classTeacher": "Mr. Brown"
-          }
-        ]
-      }
-    ],
-    "summary": {
-      "totalClasses": 6,
-      "totalSubclasses": 24,
-      "totalCapacity": 720,
-      "totalEnrolled": 645,
-      "utilizationRate": 89.6
-    }
+#### **1. Get Teacher Analytics**
+**Endpoint:** `GET /api/v1/dashboard/teacher-analytics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    departmentId?: number;
+    startDate?: string; // "YYYY-MM-DD"
+    endDate?: string; // "YYYY-MM-DD"
   }
-}
-
-GET /api/v1/subjects
-Authorization: Bearer {token}
-
-Query Parameters:
-?category=CORE&level=1
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "subjects": [
-      {
-        "id": 1,
-        "name": "Mathematics",
-        "code": "MTH", 
-        "category": "CORE",
-        "coefficient": 4,
-        "level": "ALL",
-        "description": "Core mathematics curriculum",
-        "teacherCount": 8,
-        "classCount": 24
-      },
-      {
-        "id": 2,
-        "name": "English Language",
-        "code": "ENG",
-        "category": "CORE", 
-        "coefficient": 4,
-        "level": "ALL",
-        "description": "English language and literature",
-        "teacherCount": 6,
-        "classCount": 24
-      }
-    ],
-    "summary": {
-      "totalSubjects": 12,
-      "byCategory": {
-        "CORE": 6,
-        "ELECTIVE": 4,
-        "PRACTICAL": 2
-      }
-    }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      overview: {
+        totalTeachers: number;
+        activeTeachers: number;
+        teachersOnLeave: number;
+        averageAttendanceRate: number;
+      };
+      performanceMetrics: Array<{
+        teacherId: number;
+        teacherName: string;
+        subjectsCount: number;
+        studentsCount: number;
+        attendanceRate: number;
+        averageStudentPerformance: number;
+        lastLogin: string;
+      }>;
+      departmentBreakdown: Array<{
+        department: string;
+        teacherCount: number;
+        avgPerformance: number;
+        attendanceRate: number;
+      }>;
+      workloadAnalysis: Array<{
+        teacherId: number;
+        teacherName: string;
+        totalClasses: number;
+        totalStudents: number;
+        workloadScore: number;
+        recommendation: string;
+      }>;
+    };
   }
-}
+  ```
 
-POST /api/v1/classes
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "name": "FORM 7",
-  "level": 7,
-  "capacity": 60,
-  "academicYearId": 1,
-  "description": "Advanced level class",
-  "subclasses": [
-    {
-      "name": "FORM 7A",
-      "capacity": 30
-    },
-    {
-      "name": "FORM 7B", 
-      "capacity": 30
-    }
-  ]
-}
-
-Success Response (201):
-{
-  "success": true,
-  "data": {
-    "classId": 7,
-    "name": "FORM 7",
-    "subclassesCreated": 2,
-    "message": "Class and subclasses created successfully"
+#### **2. Get Class Profiles**
+**Endpoint:** `GET /api/v1/dashboard/class-profiles`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    classId?: number;
   }
-}
-
-POST /api/v1/subjects
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "name": "Computer Science",
-  "code": "CSC",
-  "category": "ELECTIVE",
-  "coefficient": 3,
-  "level": "UPPER",
-  "description": "Introduction to computer science and programming"
-}
-
-Success Response (201):
-{
-  "success": true,
-  "data": {
-    "subjectId": 13,
-    "name": "Computer Science",
-    "code": "CSC",
-    "message": "Subject created successfully"
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      classOverview: Array<{
+        classId: number;
+        className: string;
+        totalSubClasses: number;
+        totalStudents: number;
+        averageAttendance: number;
+        averagePerformance: number;
+        teacherCount: number;
+      }>;
+      performanceRankings: Array<{
+        rank: number;
+        classId: number;
+        className: string;
+        averageGrade: number;
+        improvementRate: number;
+        totalStudents: number;
+      }>;
+      capacityUtilization: Array<{
+        classId: number;
+        className: string;
+        maxCapacity: number;
+        currentStudents: number;
+        utilizationRate: number;
+        status: "UNDER_UTILIZED" | "OPTIMAL" | "OVER_CAPACITY";
+      }>;
+    };
   }
-}
-```
+  ```
+
+#### **3. Get Reports Analytics**
+**Endpoint:** `GET /api/v1/dashboard/reports-analytics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      reportGeneration: {
+        totalReportsGenerated: number;
+        reportsThisMonth: number;
+        avgGenerationTime: number;
+        successRate: number;
+      };
+      upcomingDeadlines: Array<{
+        reportType: string;
+        dueDate: string;
+        priority: "HIGH" | "MEDIUM" | "LOW";
+        assignedTo: string;
+        status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+      }>;
+      reportTypes: Array<{
+        type: string;
+        count: number;
+        lastGenerated: string;
+        avgSize: string;
+      }>;
+      performance: {
+        fastestGeneration: number;
+        slowestGeneration: number;
+        failureRate: number;
+        popularReports: Array<{
+          type: string;
+          count: number;
+        }>;
+      };
+    };
+  }
+  ```
 
 ---
 
-## 4. Financial Overview (`/super-manager/finances`)
+## 6. Discipline Overview (`/super-manager/discipline-overview`)
 
-### **Financial Dashboard**
+### **Discipline Overview Page**
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Financial Overview - Academic Year 2024-2025           │
+│ Discipline Overview                   [📊 View Reports] │
 ├─────────────────────────────────────────────────────────┤
+│ [Filter: Academic Year] [Filter: Status] [Search: Student/Issue] │
 │                                                         │
-│ ┌─── Financial Summary ───┐                            │
-│ │ 💰 Total Expected: 95,500,000 FCFA                   │
-│ │ 💵 Total Collected: 75,200,000 FCFA                  │
-│ │ 📊 Collection Rate: 78.7%                            │
-│ │ 📈 This Month: +12,500,000 FCFA                      │
-│ │ ⏰ Outstanding: 20,300,000 FCFA                       │
+│ ┌─── Key Discipline Metrics ───┐                        │
+│ │ Total Active Issues: [Total Active Issues]            │
+│ │ Resolved This Week: [Resolved This Week]             │
+│ │ Pending Resolution: [Pending Resolution]             │
+│ │ Students with Multiple Issues: [Students With Multiple Issues] │
+│ │ Average Resolution Time: [Average Resolution Time] hours │
+│ │ Critical Cases: [Critical Cases]                     │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Payment Methods Breakdown ───┐                    │
-│ │ 🏦 EXPRESS_UNION: 45,200,000 FCFA (60%)              │
-│ │ 💳 CCA: 20,500,000 FCFA (27%)                        │
-│ │ 🔢 3DC: 9,500,000 FCFA (13%)                         │
+│ ┌─── Behavioral Trends ───┐                            │
+│ │ This Month: [This Month Incidents] incidents         │
+│ │ Last Month: [Last Month Incidents] incidents         │
+│ │ Trend: [Behavioral Trend]                             │
+│ │ [View Detailed Behavioral Analytics]                  │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Class-wise Collection Status ───┐                 │
-│ │ FORM 1: 85% collected ████████████▓░░                │
-│ │ FORM 2: 82% collected ████████████▓░░                │
-│ │ FORM 3: 75% collected █████████▓░░░░                 │
-│ │ FORM 4: 70% collected ████████▓░░░░░                 │
-│ │ FORM 5: 68% collected ████████▓░░░░░                 │
+│ ┌─── Issues by Type ───┐                                │
+│ │ [Issue Type 1]: [Count 1] (Trend: [Trend 1]) (Res Rate: [Res Rate 1]%) │
+│ │ [Issue Type 2]: [Count 2] (Trend: [Trend 2]) (Res Rate: [Res Rate 2]%) │
+│ │ [View All Issues by Type]                             │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Urgent Interventions ───┐                         │
+│ │ 👤 [Student 1 Name] ([Issue Count 1] issues) - Risk: [Risk Level 1] (Last Incident: [Last Incident 1]) │
+│ │    Recommended: [Recommended Action 1]               │
+│ │ 👤 [Student 2 Name] ([Issue Count 2] issues) - Risk: [Risk Level 2] (Last Incident: [Last Incident 2]) │
+│ │    Recommended: [Recommended Action 2]               │
+│ │ [View Early Warning System] [Create Intervention]     │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
 
-#### **API Integration:**
-```http
-GET /api/v1/bursar/financial-overview
-Authorization: Bearer {token}
+### **API Integration:**
 
-Query Parameters:
-?academicYearId=1&includeBreakdown=true
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "financialSummary": {
-      "totalExpected": 95500000,
-      "totalCollected": 75200000,
-      "collectionRate": 78.7,
-      "thisMonthCollection": 12500000,
-      "outstanding": 20300000,
-      "currency": "FCFA"
-    },
-    "paymentMethodBreakdown": [
-      {
-        "method": "EXPRESS_UNION",
-        "amount": 45200000,
-        "percentage": 60,
-        "transactionCount": 892
-      },
-      {
-        "method": "CCA", 
-        "amount": 20500000,
-        "percentage": 27,
-        "transactionCount": 405
-      },
-      {
-        "method": "3DC",
-        "amount": 9500000,
-        "percentage": 13,
-        "transactionCount": 187
-      }
-    ],
-    "classWiseCollection": [
-      {
-        "className": "FORM 1",
-        "expected": 18000000,
-        "collected": 15300000,
-        "collectionRate": 85,
-        "outstanding": 2700000
-      },
-      {
-        "className": "FORM 2",
-        "expected": 19200000,
-        "collected": 15744000,
-        "collectionRate": 82,
-        "outstanding": 3456000
-      }
-    ],
-    "monthlyTrend": [
-      {
-        "month": "2024-01",
-        "collected": 8500000,
-        "target": 10000000
-      }
-    ]
+#### **1. Get Discipline Master Enhanced Dashboard**
+**Endpoint:** `GET /api/v1/discipline-master/dashboard`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
   }
-}
-
-GET /api/v1/bursar/reports/financial-performance
-Authorization: Bearer {token}
-
-Query Parameters:
-?academicYearId=1&period=monthly&format=JSON
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "reportMetadata": {
-      "reportId": "FIN_2024_01",
-      "period": "monthly",
-      "academicYear": "2024-2025",
-      "generatedAt": "2024-01-22T10:00:00Z"
-    },
-    "performanceMetrics": {
-      "totalRevenue": 75200000,
-      "collectionEfficiency": 78.7,
-      "paymentMethodDiversity": 3,
-      "averageTransactionSize": 84375,
-      "onTimePaymentRate": 65.3
-    },
-    "alerts": [
-      {
-        "type": "LOW_COLLECTION",
-        "message": "FORM 5 collection rate below 70%",
-        "severity": "MEDIUM"
-      }
-    ]
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      totalActiveIssues: number;
+      resolvedThisWeek: number;
+      pendingResolution: number;
+      studentsWithMultipleIssues: number;
+      averageResolutionTime: number;
+      attendanceRate: number;
+      latenessIncidents: number;
+      absenteeismCases: number;
+      interventionSuccess: number;
+      criticalCases: number;
+      behavioralTrends: {
+        thisMonth: number;
+        lastMonth: number;
+        trend: "IMPROVING" | "DECLINING" | "STABLE";
+      };
+      urgentInterventions: Array<{
+        studentId: number;
+        studentName: string;
+        issueCount: number;
+        riskLevel: "HIGH" | "MEDIUM" | "LOW";
+        lastIncident: string;
+        recommendedAction: string;
+      }>;
+      issuesByType: Array<{
+        type: string;
+        count: number;
+        trend: "INCREASING" | "DECREASING" | "STABLE";
+        resolution_rate: number;
+      }>;
+    };
   }
-}
-```
+  ```
 
----
-
-## 5. Academic Management (`/super-manager/academics`)
-
-### **Academic Overview**
-```
-┌─────────────────────────────────────────────────────────┐
-│ Academic Management                                     │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│ ┌─── Current Exam Sequences ───┐                       │
-│ │ 📝 Sequence 1 (Sept - Nov 2024)                      │
-│ │    Status: ACTIVE | Progress: 75%                    │
-│ │    [View Details] [Generate Reports]                 │
-│ │                                                       │
-│ │ 📝 Sequence 2 (Dec 2024 - Feb 2025)                  │
-│ │    Status: PLANNED | Progress: 0%                    │
-│ │    [Configure] [Set Dates]                           │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Marks Entry Status ───┐                           │
-│ │ ✅ Mathematics: 100% complete                         │
-│ │ ✅ English: 100% complete                            │
-│ │ ⏳ Physics: 85% complete                             │
-│ │ ⏳ Chemistry: 70% complete                           │
-│ │ ❌ History: 45% complete                             │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### **API Integration:**
-```http
-GET /api/v1/exam-sequences
-Authorization: Bearer {token}
-
-Query Parameters:
-?academicYearId=1&status=ACTIVE
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "examSequences": [
-      {
-        "id": 1,
-        "name": "Sequence 1",
-        "academicYearId": 1,
-        "startDate": "2024-09-01",
-        "endDate": "2024-11-30",
-        "status": "ACTIVE",
-        "progress": 75,
-        "totalSubjects": 12,
-        "completedSubjects": 9,
-        "marksEntryDeadline": "2024-12-05"
-      },
-      {
-        "id": 2,
-        "name": "Sequence 2", 
-        "academicYearId": 1,
-        "startDate": "2024-12-01",
-        "endDate": "2025-02-28",
-        "status": "PLANNED",
-        "progress": 0,
-        "totalSubjects": 12,
-        "completedSubjects": 0
-      }
-    ],
-    "summary": {
-      "activeSequences": 1,
-      "plannedSequences": 1,
-      "completedSequences": 0,
-      "overallProgress": 37.5
-    }
+#### **2. Get Behavioral Analytics**
+**Endpoint:** `GET /api/v1/discipline-master/behavioral-analytics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
   }
-}
-
-GET /api/v1/marks/entry-status
-Authorization: Bearer {token}
-
-Query Parameters:
-?academicYearId=1&sequenceId=1
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "sequenceInfo": {
-      "sequenceId": 1,
-      "name": "Sequence 1",
-      "academicYear": "2024-2025"
-    },
-    "marksEntryStatus": [
-      {
-        "subjectId": 1,
-        "subjectName": "Mathematics",
-        "totalClasses": 6,
-        "completedClasses": 6,
-        "completionRate": 100,
-        "status": "COMPLETED",
-        "deadline": "2024-12-05",
-        "marksEntered": 245,
-        "totalStudents": 245
-      },
-      {
-        "subjectId": 2,
-        "subjectName": "English",
-        "totalClasses": 6,
-        "completedClasses": 6,
-        "completionRate": 100,
-        "status": "COMPLETED",
-        "marksEntered": 245,
-        "totalStudents": 245
-      },
-      {
-        "subjectId": 3,
-        "subjectName": "Physics",
-        "totalClasses": 6,
-        "completedClasses": 5,
-        "completionRate": 85,
-        "status": "IN_PROGRESS",
-        "marksEntered": 208,
-        "totalStudents": 245
-      },
-      {
-        "subjectId": 4,
-        "subjectName": "History", 
-        "totalClasses": 6,
-        "completedClasses": 3,
-        "completionRate": 45,
-        "status": "DELAYED",
-        "marksEntered": 110,
-        "totalStudents": 245
-      }
-    ],
-    "overallStats": {
-      "totalSubjects": 12,
-      "completedSubjects": 6,
-      "inProgressSubjects": 4,
-      "delayedSubjects": 2,
-      "overallCompletionRate": 72.5
-    }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      totalStudents: number;
+      studentsWithIssues: number;
+      behaviorScore: number;
+      riskDistribution: {
+        high: number;
+        medium: number;
+        low: number;
+        none: number;
+      };
+      monthlyTrends: Array<{
+        month: string;
+        incidents: number;
+        resolved: number;
+        newCases: number;
+      }>;
+      issueTypeAnalysis: Array<{
+        issueType: string;
+        frequency: number;
+        averageResolutionTime: number;
+        recurrenceRate: number;
+        effectiveInterventions: Array<string>;
+      }>;
+      classroomHotspots: Array<{
+        subClassName: string;
+        className: string;
+        incidentCount: number;
+        riskScore: number;
+        primaryIssues: Array<string>;
+      }>;
+    };
   }
-}
+  ```
 
-POST /api/v1/exam-sequences
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "name": "Sequence 3",
-  "academicYearId": 1,
-  "startDate": "2025-03-01",
-  "endDate": "2025-05-31",
-  "marksEntryDeadline": "2025-06-05",
-  "subjects": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-  "classLevels": [1, 2, 3, 4, 5, 6]
-}
-
-Success Response (201):
-{
-  "success": true,
-  "data": {
-    "sequenceId": 3,
-    "name": "Sequence 3",
-    "status": "CREATED",
-    "subjectsConfigured": 12,
-    "classesIncluded": 6
+#### **3. Get Student Behavior Profile**
+**Endpoint:** `GET /api/v1/discipline-master/student-profile/:studentId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): Student ID
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
   }
-}
-```
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      studentId: number;
+      studentName: string;
+      matricule: string;
+      className: string;
+      subClassName: string;
+      riskLevel: "HIGH" | "MEDIUM" | "LOW" | "NONE";
+      behaviorScore: number;
+      totalIncidents: number;
+      recentIncidents: number;
+      interventionsReceived: number;
+      lastIncidentDate?: string;
+      behaviorPattern: {
+        mostCommonIssues: Array<string>;
+        triggerFactors: Array<string>;
+        improvementAreas: Array<string>;
+        strengths: Array<string>;
+      };
+      interventionHistory: Array<{
+        id: number;
+        type: string;
+        date: string;
+        description: string;
+        outcome: "SUCCESSFUL" | "PARTIALLY_SUCCESSFUL" | "UNSUCCESSFUL" | "ONGOING";
+        followUpDate?: string;
+      }>;
+      recommendedActions: Array<{
+        priority: "HIGH" | "MEDIUM" | "LOW";
+        action: string;
+        timeline: string;
+        responsible: string;
+      }>;
+    };
+  }
+  ```
 
----
+#### **4. Get Early Warning System**
+**Endpoint:** `GET /api/v1/discipline-master/early-warning`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      criticalStudents: Array<{
+        studentId: number;
+        studentName: string;
+        warningLevel: "CRITICAL" | "HIGH" | "MODERATE";
+        riskFactors: Array<string>;
+        triggerEvents: Array<string>;
+        recommendedActions: Array<string>;
+        urgency: "IMMEDIATE" | "WITHIN_WEEK" | "MONITOR";
+      }>;
+      riskIndicators: Array<{
+        indicator: string;
+        studentsAffected: number;
+        severity: "HIGH" | "MEDIUM" | "LOW";
+        trendDirection: "INCREASING" | "STABLE" | "DECREASING";
+      }>;
+      preventiveRecommendations: Array<{
+        category: string;
+        recommendation: string;
+        targetStudents: number;
+        priority: "HIGH" | "MEDIUM" | "LOW";
+        implementationTimeline: string;
+      }>;
+    };
+  }
+  ```
 
-## 6. Discipline Overview (`/super-manager/discipline`)
+#### **5. Get Discipline Statistics**
+**Endpoint:** `GET /api/v1/discipline-master/statistics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    startDate?: string; // "YYYY-MM-DD"
+    endDate?: string;   // "YYYY-MM-DD"
+    classId?: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      overview: {
+        totalStudents: number;
+        studentsWithIssues: number;
+        behaviorScore: number;
+        riskDistribution: object;
+      };
+      trends: Array<object>;
+      issueAnalysis: Array<object>;
+      classroomHotspots: Array<object>;
+      filters: {
+        academicYearId?: number;
+        startDate?: string;
+        endDate?: string;
+        classId?: number;
+      };
+    };
+  }
+  ```
 
-### **System-wide Discipline Dashboard**
-```
-┌─────────────────────────────────────────────────────────┐
-│ Discipline Management Overview                          │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│ ┌─── Discipline Statistics ───┐                        │
-│ │ 🚨 Active Issues: 23                                 │
-│ │ ✅ Resolved This Week: 45                            │
-│ │ ⚠️ Students with Multiple Issues: 8                   │
-│ │ ⏱️ Average Resolution Time: 3.2 days                 │
-│ │ 📊 Overall Behavior Trend: IMPROVING                 │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Issue Types Breakdown ───┐                        │
-│ │ ⏰ Morning Lateness: 45%                             │
-│ │ 📚 Class Absence: 25%                               │
-│ │ 😤 Misconduct: 20%                                  │
-│ │ 📱 Phone Usage: 10%                                 │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Repeat Offenders Alert ───┐                       │
-│ │ 👤 Student A123 - 5 incidents this month             │
-│ │ 👤 Student B456 - 4 incidents this month             │
-│ │ 👤 Student C789 - 3 incidents this month             │
-│ │ [View All] [Generate Report]                         │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
+#### **6. Get Intervention Tracking**
+**Endpoint:** `GET /api/v1/discipline-master/interventions`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    status?: "PLANNED" | "ONGOING" | "COMPLETED" | "CANCELLED";
+    studentId?: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      studentId: number;
+      studentName: string;
+      interventionType: string;
+      description: string;
+      startDate: string;
+      expectedEndDate?: string;
+      actualEndDate?: string;
+      status: "PLANNED" | "ONGOING" | "COMPLETED" | "CANCELLED";
+      outcome?: "SUCCESSFUL" | "PARTIALLY_SUCCESSFUL" | "UNSUCCESSFUL";
+      effectiveness: number;
+      followUpRequired: boolean;
+      nextReviewDate?: string;
+      assignedTo: string;
+      notes: Array<{
+        date: string;
+        note: string;
+        recordedBy: string;
+      }>;
+    }>;
+    meta: {
+      total: number;
+      filters: object;
+    };
+  }
+  ```
 
-### **API Used:**
-```http
-GET /api/v1/discipline?academicYearId={id}
-GET /api/v1/discipline/lateness/statistics
-```
+#### **7. Create Intervention Plan**
+**Endpoint:** `POST /api/v1/discipline-master/interventions`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    studentId: number;
+    interventionType: string;
+    description: string;
+    expectedEndDate?: string; // "YYYY-MM-DD"
+    assignedTo: string;
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: "Intervention plan created successfully";
+    data: {
+      id: number;
+      studentId: number;
+      interventionType: string;
+      description: string;
+      startDate: string;
+      expectedEndDate?: string;
+      status: "PLANNED";
+      assignedTo: string;
+      createdAt: string;
+      createdBy: string;
+    };
+  }
+  ```
+
+#### **8. Update Intervention Status**
+**Endpoint:** `PUT /api/v1/discipline-master/interventions/:interventionId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `interventionId` (number): Intervention ID
+- **Request Body:**
+  ```typescript
+  {
+    status: "PLANNED" | "ONGOING" | "COMPLETED" | "CANCELLED";
+    outcome?: "SUCCESSFUL" | "PARTIALLY_SUCCESSFUL" | "UNSUCCESSFUL";
+    notes?: string;
+    effectiveness?: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Intervention updated successfully";
+    data: {
+      id: number;
+      status: string;
+      outcome?: string;
+      effectiveness?: number;
+      updatedAt: string;
+      updatedBy: string;
+    };
+  }
+  ```
+
+#### **9. Get Risk Assessment**
+**Endpoint:** `GET /api/v1/discipline-master/risk-assessment`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    riskLevel?: "CRITICAL" | "HIGH" | "MODERATE";
+    classId?: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      totalStudentsAssessed: number;
+      riskLevelBreakdown: {
+        critical: number;
+        high: number;
+        moderate: number;
+      };
+      studentsAtRisk: Array<object>;
+      riskIndicators: Array<object>;
+      recommendations: Array<object>;
+      filters: object;
+    };
+  }
+  ```
+
+#### **10. Generate Discipline Report**
+**Endpoint:** `GET /api/v1/discipline-master/reports`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    reportType?: string; // Default: "comprehensive"
+    startDate?: string;  // "YYYY-MM-DD"
+    endDate?: string;    // "YYYY-MM-DD"
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      reportInfo: {
+        type: string;
+        generatedAt: string;
+        generatedBy: string;
+        academicYearId?: number;
+        dateRange: {
+          startDate?: string;
+          endDate?: string;
+        };
+      };
+      executiveSummary: {
+        totalActiveIssues: number;
+        studentsWithIssues: number;
+        behaviorScore: number;
+        criticalCases: number;
+        resolutionRate: number;
+      };
+      detailedAnalysis: {
+        dashboard: object;
+        behavioralAnalytics: object;
+        earlyWarning: object;
+      };
+      recommendations: Array<string>;
+      actionItems: Array<{
+        priority: "HIGH" | "MEDIUM" | "LOW";
+        action: string;
+        responsible: string;
+        deadline: string;
+      }>;
+    };
+  }
+  ```
 
 ---
 
 ## 7. Report Card Management (`/super-manager/report-cards`)
 
-### **System-Wide Report Card Administration**
+### **Report Card Management Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Report Card Management               [📊 View Analytics] │
+├─────────────────────────────────────────────────────────┤
+│ [Filter: Academic Year] [Filter: Exam Sequence] [Filter: Status] │
+│                                                         │
+│ ┌─── Report Status Overview ───┐                        │
+│ │ Total Reports: [Total Reports] | Completed: [Completed Reports] │
+│ │ Generating: [Generating Reports] | Failed: [Failed Reports] │
+│ │ Last Generated: [Last Generated Date]                    │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Student Reports (Individual) ───┐                  │
+│ │ 👤 [Student Name 1] ([Class Name 1]) - [Sequence 1]   │
+│ │    Status: [Status 1] | Generated: [Generated At 1] │
+│ │    [View] [Download] [Regenerate] [Check Status]     │
+│ │ ─────────────────────────────────────              │
+│ │ 👤 [Student Name 2] ([Class Name 2]) - [Sequence 2]   │
+│ │    Status: [Status 2] | Generated: [Generated At 2] │
+│ │    [View] [Download] [Regenerate] [Check Status]     │
+│ │ [Load More Individual Reports]                        │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Subclass Reports (Combined) ───┐                  │
+│ │ 🏫 [Class Name 3] - [Subclass Name 3] - [Sequence 3] │
+│ │    Status: [Status 3] | Generated: [Generated At 3] │
+│ │    [View] [Download] [Regenerate] [Check Status]     │
+│ │ ─────────────────────────────────────              │
+│ │ 🏫 [Class Name 4] - [Subclass Name 4] - [Sequence 4] │
+│ │    Status: [Status 4] | Generated: [Generated At 4] │
+│ │    [View] [Download] [Regenerate] [Check Status]     │
+│ │ [Load More Subclass Reports]                        │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
 
-#### **API Integration**
+### **API Integration:**
 
-#### **Get System Report Card Overview**
-**Endpoint:** `GET /api/v1/super-manager/report-cards/system-overview`
+#### **1. Get Student Report Card (Download)**
+**Endpoint:** `GET /api/v1/report-cards/student/:studentId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): Student ID
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId: number;    // Required
+    examSequenceId: number;    // Required
+  }
+  ```
+- **Response (200 - Report Ready):** Returns PDF file for download (`Content-Type: application/pdf`)
+- **Response (202 - Processing):**
+  ```typescript
+  {
+    success: true;
+    message: "Report generation is currently processing. Please try again later.";
+    status: "PROCESSING" | "PENDING";
+  }
+  ```
+- **Response (404 - Not Found):**
+  ```typescript
+  {
+    success: false;
+    error: "Report record not found for this student. Generation might be pending, failed, or parameters incorrect.";
+  }
+  ```
+- **Response (500 - Generation Failed):**
+  ```typescript
+  {
+    success: false;
+    error: "Report generation failed for this student.";
+    message: string;
+    status: "FAILED";
+  }
+  ```
+
+#### **2. Generate Student Report Card**
+**Endpoint:** `POST /api/v1/report-cards/student/:studentId/generate`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): Student ID
+- **Request Body:**
+  ```typescript
+  {
+    academicYearId: number;   // Required
+    examSequenceId: number;   // Required
+  }
+  ```
+- **Response (200):** Triggers immediate report generation and download (returns PDF file).
+- **Error Responses:**
+  ```typescript
+  {
+    success: false;
+    error: "Valid studentId, academicYearId, and examSequenceId must be provided.";
+  }
+  ```
+
+#### **3. Get Subclass Report Cards (Download)**
+**Endpoint:** `GET /api/v1/report-cards/subclass/:subClassId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `subClassId` (number): Subclass ID
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId: number;    // Required
+    examSequenceId: number;    // Required
+  }
+  ```
+- **Response (200 - Report Ready):** Returns combined PDF file for download.
+- **Response (202 - Processing):**
+  ```typescript
+  {
+    success: true;
+    message: "Combined subclass report generation is currently processing. Please try again later.";
+    status: "PROCESSING" | "PENDING";
+  }
+  ```
+- **Response (404 - Not Found):**
+  ```typescript
+  {
+    success: false;
+    error: "Combined subclass report record not found. It might not have been generated yet or the parameters are incorrect.";
+  }
+  ```
+
+#### **4. Generate Subclass Report Cards**
+**Endpoint:** `POST /api/v1/report-cards/subclass/:subClassId/generate`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `subClassId` (number): Subclass ID
+- **Request Body:**
+  ```typescript
+  {
+    academicYearId: number;   // Required
+    examSequenceId: number;   // Required
+  }
+  ```
+- **Response (200):** Triggers immediate report generation and download for entire subclass.
+- **Error Responses:**
+  ```typescript
+  {
+    success: false;
+    error: "Valid subClassId, academicYearId, and examSequenceId must be provided.";
+  }
+  ```
+
+#### **5. Check Student Report Card Availability**
+**Endpoint:** `GET /api/v1/report-cards/student/:studentId/availability`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): Student ID
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId: number;    // Required
+    examSequenceId: number;    // Required
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      available: boolean;
+      status: "COMPLETED" | "PENDING" | "PROCESSING" | "FAILED" | "NOT_ENROLLED" | "SEQUENCE_NOT_FOUND" | "NO_MARKS" | "NOT_GENERATED";
+      message: string;
+      reportData?: {
+        studentName: string;
+        matricule: string;
+        className: string;
+        examSequence: number;
+        termName: string;
+        filePath?: string;
+        generatedAt?: string;
+        errorMessage?: string;
+        marksCount?: number;
+      };
+    };
+  }
+  ```
+
+#### **6. Check Subclass Report Card Availability**
+**Endpoint:** `GET /api/v1/report-cards/subclass/:subClassId/availability`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `subClassId` (number): Subclass ID
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId: number;    // Required
+    examSequenceId: number;    // Required
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      available: boolean;
+      status: "COMPLETED" | "PENDING" | "PROCESSING" | "FAILED" | "SUBCLASS_NOT_FOUND" | "SEQUENCE_NOT_FOUND" | "NO_STUDENTS" | "NO_MARKS" | "NOT_GENERATED";
+      message: string;
+      reportData?: {
+        subClassName: string;
+        enrolledStudents: number;
+        examSequence: number;
+        termName: string;
+        filePath?: string;
+        generatedAt?: string;
+        errorMessage?: string;
+        marksCount?: number;
+      };
+    };
+  }
+  ```
+
+---
+
+## 8. Reports & Analytics (`/super-manager/reports-analytics`)
+
+### **Reports & Analytics Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Reports & Analytics                   [⚙️ Configure Reports] │
+├─────────────────────────────────────────────────────────┤
+│ [Filter: Report Type] [Filter: Academic Year] [Filter: Date Range] │
+│                                                         │
+│ ┌─── Report Generation Statistics ───┐                  │
+│ │ Total Reports Generated: [Total Reports Generated]    │
+│ │ Reports This Month: [Reports This Month]             │
+│ │ Average Generation Time: [Avg Generation Time]s      │
+│ │ Success Rate: [Success Rate]%                        │
+│ │ Fastest Generation: [Fastest Generation]s            │
+│ │ Slowest Generation: [Slowest Generation]s            │
+│ │ Failure Rate: [Failure Rate]%                        │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Upcoming Report Deadlines ───┐                    │
+│ │ [Report Type 1] (Due: [Due Date 1]) - Priority: [Priority 1] (Assigned to: [Assigned To 1]) │
+│ │ [Report Type 2] (Due: [Due Date 2]) - Priority: [Priority 2] (Assigned to: [Assigned To 2]) │
+│ │ [View All Deadlines]                                  │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Popular Reports ───┐                               │
+│ │ [Report Type A]: [Count A] times generated            │
+│ │ [Report Type B]: [Count B] times generated            │
+│ │ [View All Report Types]                               │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### **API Integration:**
+
+#### **1. Get Reports Analytics (Dashboard Overview)**
+**Endpoint:** `GET /api/v1/dashboard/reports-analytics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      reportGeneration: {
+        totalReportsGenerated: number;
+        reportsThisMonth: number;
+        avgGenerationTime: number;
+        successRate: number;
+      };
+      upcomingDeadlines: Array<{
+        reportType: string;
+        dueDate: string;
+        priority: "HIGH" | "MEDIUM" | "LOW";
+        assignedTo: string;
+        status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+      }>;
+      reportTypes: Array<{
+        type: string;
+        count: number;
+        lastGenerated: string;
+        avgSize: string;
+      }>;
+      performance: {
+        fastestGeneration: number;
+        slowestGeneration: number;
+        failureRate: number;
+        popularReports: Array<{
+          type: string;
+          count: number;
+        }>;
+      };
+    };
+  }
+  ```
+
+#### **2. Get Academic Performance Report**
+**Endpoint:** `GET /api/v1/principal/reports/academic-performance`
 - **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
   ```typescript
   {
-    academicYearId?: number; // Optional, defaults to current year - super manager can see all
-    sequenceId?: number;     // Optional, filter by specific sequence
-    includeHistorical?: boolean; // Include data from previous academic years
+    academicYearId?: number;
+    classId?: number;
+    subjectId?: number;
   }
   ```
-- **Response:**
+- **Response (200):** (Same as Principal's Academic Performance Report)
   ```typescript
   {
     success: true;
     data: {
-      systemSummary: {
-        totalAcademicYears: number;
-        activeAcademicYears: number;
-        totalStudents: number;
-        totalReportsGenerated: number;
-        overallSuccessRate: number; // Percentage across all years
-        systemEfficiency: number;   // Generation speed metrics
-        totalStorageUsed: string;   // e.g., "2.3 GB"
-      };
-      currentAcademicYear: {
-        academicYearId: number;
-        academicYearName: string;
-        totalStudents: number;
-        completedReports: number;
-        generatingReports: number;
-        failedReports: number;
-        pendingReports: number;
-        successRate: number;
-        parentAccessRate: number;
-        averageGenerationTime: string;
-      };
-      sequences: Array<{
-        sequenceId: number;
-        sequenceName: string;
-        status: "OPEN" | "REPORTS_GENERATING" | "REPORTS_AVAILABLE" | "REPORTS_FAILED";
-        totalStudents: number;
-        completedReports: number;
-        failedReports: number;
-        generationDate?: string;
-        approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
-      }>;
-      systemHealth: {
-        generationQueueStatus: "IDLE" | "PROCESSING" | "OVERLOADED";
-        activeJobs: number;
-        failureRate: number; // Last 30 days
-        averageResponseTime: string;
-        storageHealth: "GOOD" | "WARNING" | "CRITICAL";
-      };
-      crossYearAnalytics: {
-        historicalTrends: Array<{
-          academicYear: string;
-          totalReports: number;
-          successRate: number;
-          averageGenerationTime: string;
-        }>;
-        improvementMetrics: {
-          successRateImprovement: number; // Percentage improvement
-          speedImprovement: number;       // Time reduction percentage
-          parentEngagementTrend: "INCREASING" | "DECREASING" | "STABLE";
-        };
-      };
+      academicPerformance: { /* ... */ };
+      generatedAt: string;
+      filters: { /* ... */ };
     };
   }
   ```
 
-#### **Get Template Management**
-**Endpoint:** `GET /api/v1/super-manager/report-cards/templates`
+#### **3. Get Attendance Analysis Report**
+**Endpoint:** `GET /api/v1/principal/reports/attendance-analysis`
 - **Headers:** `Authorization: Bearer <token>`
-- **Response:**
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    startDate?: string; // "YYYY-MM-DD"
+    endDate?: string;   // "YYYY-MM-DD"
+    classId?: number;
+  }
+  ```
+- **Response (200):** (Same as Principal's Attendance Analysis Report)
+  ```typescript
+  {
+    success: true;
+    data: { /* ... */ };
+  }
+  ```
+
+#### **4. Get Teacher Performance Analysis Report**
+**Endpoint:** `GET /api/v1/principal/reports/teacher-performance`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    departmentId?: number;
+    performanceThreshold?: number;
+  }
+  ```
+- **Response (200):** (Same as Principal's Teacher Performance Report)
+  ```typescript
+  {
+    success: true;
+    data: { /* ... */ };
+  }
+  ```
+
+#### **5. Get Financial Performance Analysis Report**
+**Endpoint:** `GET /api/v1/principal/reports/financial-performance`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):** (Same as Principal's Financial Performance Report)
+  ```typescript
+  {
+    success: true;
+    data: { /* ... */ };
+  }
+  ```
+
+#### **6. Get School Overview Summary Report**
+**Endpoint:** `GET /api/v1/principal/overview/summary`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):** (Same as Principal's School Overview Summary Report)
+  ```typescript
+  {
+    success: true;
+    data: { /* ... */ };
+  }
+  ```
+
+---
+
+## 9. System Settings (`/super-manager/system-settings`)
+
+### **System Settings Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ System Settings                       [💾 Save Changes] │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│ ┌─── General School Information ───┐                   │
+│ │ School Name: [School Name]                            │
+│ │ School Address: [School Address]                      │
+│ │ School Phone: [School Phone]                          │
+│ │ School Email: [School Email]                          │
+│ │ School Logo: [Image Upload / Current Logo]            │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Academic Configuration ───┐                       │
+│ │ Academic Year Start Month: [Academic Year Start Month] │
+│ │ Default Class Size: [Default Class Size]              │
+│ │ Default Pass Mark: [Default Pass Mark]                │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Feature Toggles ───┐                              │
+│ │ Enable Notifications: [Checkbox: Enable Notifications] │
+│ │ Enable Parent Portal: [Checkbox: Enable Parent Portal] │
+│ │ Enable Quiz System: [Checkbox: Enable Quiz System]    │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Localization & Finance ───┐                       │
+│ │ Currency Symbol: [Currency Symbol]                    │
+│ │ Timezone: [Timezone]                                  │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### **API Integration:**
+
+#### **1. Get System Settings**
+**Endpoint:** `GET /api/v1/system/settings`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
   ```typescript
   {
     success: true;
     data: {
-      activeTemplates: Array<{
-        id: number;
-        name: string;
-        version: string;
-        isDefault: boolean;
-        academicYears: string[];
-        lastModified: string;
-        modifiedBy: string;
-        status: "ACTIVE" | "DRAFT" | "DEPRECATED";
-      }>;
-      templateHistory: Array<{
-        templateId: number;
-        version: string;
-        changeDescription: string;
-        modifiedAt: string;
-        modifiedBy: string;
-      }>;
+      schoolName: string;
+      schoolAddress: string;
+      schoolPhone: string;
+      schoolEmail: string;
+      schoolLogo?: string;
+      academicYearStartMonth: number; // 1-12
+      defaultClassSize: number;
+      enableNotifications: boolean;
+      enableParentPortal: boolean;
+      enableQuizSystem: boolean;
+      defaultPassMark: number;
+      currencySymbol: string; // "FCFA"
+      timezone: string;
+      backupEnabled: boolean;
+      backupFrequency: "DAILY" | "WEEKLY" | "MONTHLY";
+      maintenanceMode: boolean;
     };
   }
   ```
 
-#### **Approve Report Release**
-**Endpoint:** `POST /api/v1/super-manager/report-cards/approve-release`
+#### **2. Update System Settings**
+**Endpoint:** `PUT /api/v1/system/settings`
 - **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
   ```typescript
   {
-    sequenceId: number;
-    academicYearId: number;
-    approvalStatus: "APPROVED" | "REJECTED";
-    approvalNotes?: string;
-    releaseToParents: boolean;
-    notificationSettings: {
-      notifyParents: boolean;
-      notifyTeachers: boolean;
-      notifyPrincipal: boolean;
-    };
+    schoolName?: string;
+    schoolAddress?: string;
+    schoolPhone?: string;
+    schoolEmail?: string;
+    schoolLogo?: string;
+    academicYearStartMonth?: number;
+    defaultClassSize?: number;
+    enableNotifications?: boolean;
+    enableParentPortal?: boolean;
+    enableQuizSystem?: boolean;
+    defaultPassMark?: number;
+    currencySymbol?: string;
+    timezone?: string;
+    backupEnabled?: boolean;
+    backupFrequency?: "DAILY" | "WEEKLY" | "MONTHLY";
+    maintenanceMode?: boolean;
   }
   ```
-
-#### **System Maintenance Operations**
-**Endpoint:** `POST /api/v1/super-manager/report-cards/maintenance`
-- **Headers:** `Authorization: Bearer <token>`
-- **Request Body:**
+- **Response (200):**
   ```typescript
   {
-    operation: "CLEANUP_FAILED" | "REBUILD_QUEUE" | "OPTIMIZE_STORAGE" | "REFRESH_CACHE";
-    parameters?: {
-      academicYearId?: number;
-      sequenceId?: number;
-      retentionDays?: number; // For cleanup operations
+    success: true;
+    message: "System settings updated successfully";
+    data: {
+      schoolName: string;
+      schoolAddress: string;
+      schoolPhone: string;
+      schoolEmail: string;
+      schoolLogo?: string;
+      academicYearStartMonth: number;
+      defaultClassSize: number;
+      enableNotifications: boolean;
+      enableParentPortal: boolean;
+      enableQuizSystem: boolean;
+      defaultPassMark: number;
+      currencySymbol: string;
+      timezone: string;
+      backupEnabled: boolean;
+      backupFrequency: "DAILY" | "WEEKLY" | "MONTHLY";
+      maintenanceMode: boolean;
     };
   }
   ```
 
-### **System Administration Dashboard**
-```
-┌─── Report Card System Administration ───┐
-│ [System Overview] [Templates] [Approval Queue] [Maintenance] [Analytics] │
-│                                                                           │
-│ ┌─── System Health & Performance ───┐                                    │
-│ │ 🏫 Academic Years: 3 | Active: 1                                       │
-│ │ 👨‍🎓 Total Students: 1,245 | All Years: 3,670                           │
-│ │ 📄 Reports Generated: 1,156/1,245 (93%) Current Year                   │
-│ │ 📊 Overall Success Rate: 96.2% (All Time)                              │
-│ │ ⚡ System Efficiency: 98.5% | Avg Generation: 2.1 min                  │
-│ │ 💾 Storage Used: 2.3 GB / 50 GB Available                              │
-│ │                                                                         │
-│ │ Generation Queue: 🟢 IDLE (0 jobs) | Health: 🟢 EXCELLENT              │
-│ │ [System Diagnostics] [Performance Report] [Storage Management]          │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── Current Academic Year (2024-2025) ───┐                              │
-│ │ Status: 📊 Sequence 3 Reports Available                                │
-│ │ ✅ Completed: 1,156 (93%) | ⏳ Generating: 67 (5%)                     │
-│ │ ❌ Failed: 22 (2%) | ⏸️ Pending: 0 (0%)                                │
-│ │ 👨‍👩‍👧‍👦 Parent Access: 902/1,156 (78%) reports downloaded                │
-│ │                                                                         │
-│ │ Approval Status: ⏳ Pending Review                                       │
-│ │ [📋 Review for Approval] [📧 Notify Stakeholders] [📊 Detailed View]   │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── Sequence Approval Queue ───┐                                        │
-│ │ Sequence 3 (January 2025): ⏳ Awaiting Final Approval                  │
-│ │ │ • Generation: ✅ 93% Complete                                         │
-│ │ │ • Quality Check: ✅ Passed                                            │
-│ │ │ • Principal Review: ✅ Approved                                       │
-│ │ │ • Parent Notification: ⏸️ Pending Super Manager Approval             │
-│ │ │ [✅ Approve & Release] [❌ Reject] [📝 Add Notes] [🔍 Quality Review] │
-│ │                                                                         │
-│ │ Sequence 2 (November 2024): ✅ Approved & Released                     │
-│ │ │ • Released: Nov 25, 2024 | Parent Access: 89%                       │
-│ │ │ [📊 View Analytics] [📋 Download Summary]                             │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── Template Management ───┐                                            │
-│ │ Active Templates: 3 | Draft Templates: 1                               │
-│ │                                                                         │
-│ │ 📄 Standard Report Template v2.1 (Default)                             │
-│ │ │ Used by: All classes | Last Modified: Jan 15, 2025                   │
-│ │ │ Status: ✅ Active | Academic Years: 2024-2025, 2023-2024             │
-│ │ │ [📝 Edit] [📋 Clone] [📊 Usage Stats] [🔒 Version History]            │
-│ │                                                                         │
-│ │ 📄 Enhanced Analytics Template v1.0                                     │
-│ │ │ Used by: Form 4-5 only | Status: ✅ Active                            │
-│ │ │ Features: Advanced charts, comparative analysis                       │
-│ │ │ [📝 Edit] [📋 Apply to All] [🎯 Target Classes]                       │
-│ │                                                                         │
-│ │ 📄 New Template v3.0 (Draft)                                           │
-│ │ │ Status: 🔶 Draft | Created: Jan 20, 2025                             │
-│ │ │ Changes: New layout, improved mobile support                          │
-│ │ │ [📝 Continue Editing] [🧪 Test Generate] [✅ Publish]                 │
-│ │                                                                         │
-│ │ [➕ Create New Template] [📥 Import Template] [📤 Export All]           │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── System Maintenance & Operations ───┐                                │
-│ │ Last Maintenance: Jan 20, 2025 | Next Scheduled: Feb 1, 2025          │
-│ │                                                                         │
-│ │ Quick Maintenance Actions:                                              │
-│ │ [🧹 Cleanup Failed Reports] [🔄 Rebuild Generation Queue]              │
-│ │ [🗜️ Optimize Storage] [🔄 Refresh System Cache]                        │
-│ │ [📊 Run System Diagnostics] [📈 Generate Health Report]                │
-│ │                                                                         │
-│ │ Storage Management:                                                     │
-│ │ • Current Year Reports: 1.2 GB                                         │
-│ │ • Archived Reports: 1.1 GB                                             │
-│ │ • Templates & Assets: 50 MB                                            │
-│ │ • System Backups: 200 MB                                               │
-│ │ [📁 Archive Old Reports] [🗑️ Cleanup Temporary Files]                  │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── Cross-Year Analytics ───┐                                           │
-│ │ Historical Performance Trends (Last 3 Academic Years)                  │
-│ │                                                                         │
-│ │ 📈 Success Rate Trend: 94.1% → 95.7% → 96.2% (Improving)              │
-│ │ ⚡ Speed Improvement: 3.2min → 2.7min → 2.1min (35% faster)            │
-│ │ 👨‍👩‍👧‍👦 Parent Engagement: 71% → 75% → 78% (Increasing)                  │
-│ │ 💾 Storage Efficiency: 85% → 91% → 94% (Better compression)            │
-│ │                                                                         │
-│ │ Predictive Analytics:                                                   │
-│ │ • Next Sequence ETA: Feb 15-20, 2025                                   │
-│ │ • Expected Success Rate: 96.5%                                         │
-│ │ • Storage Projection: 3.1 GB by year end                               │
-│ │                                                                         │
-│ │ [📊 Detailed Analytics] [📈 Trend Analysis] [🔮 Predictive Models]     │
-│ └───────────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### **Template Management Interface**
-When clicking "Template Management":
-```
-┌─── Report Card Template Management ───┐
-│ [Active] [Draft] [Deprecated] [Create New] [Import/Export]               │
-│                                                                           │
-│ ┌─── Template Editor ───┐                                                │
-│ │ Template Name: [Standard Report Template v2.1]                         │
-│ │ Version: [2.1] Status: [Active ▼] [Draft/Active/Deprecated]           │
-│ │                                                                         │
-│ │ ┌─── Layout Configuration ───┐                                         │
-│ │ │ Page Size: [A4 ▼] Orientation: [Portrait ●] [Landscape ○]           │
-│ │ │ Header Style: [School Logo & Info ▼]                                 │
-│ │ │ Footer Style: [Principal Signature ▼]                                │
-│ │ │ Color Scheme: [Blue Professional ▼]                                  │
-│ │ └─────────────────────────────────────────────────────────────────────┘│
-│ │                                                                         │
-│ │ ┌─── Content Sections ───┐                                             │
-│ │ │ [☑️] Student Information Header                                        │
-│ │ │ [☑️] Academic Performance Table                                        │
-│ │ │ [☑️] Subject-wise Analysis                                             │
-│ │ │ [☑️] Attendance Summary                                                │
-│ │ │ [☑️] Behavioral Comments                                               │
-│ │ │ [☑️] Class Position & Rankings                                         │
-│ │ │ [☑️] Teacher Remarks Section                                           │
-│ │ │ [☑️] Principal's Comments                                              │
-│ │ │ [☐] Parent Feedback Section (Optional)                                │
-│ │ │ [☑️] Next Term Guidelines                                              │
-│ │ └─────────────────────────────────────────────────────────────────────┘│
-│ │                                                                         │
-│ │ ┌─── Advanced Features ───┐                                            │
-│ │ │ [☑️] QR Code for Digital Verification                                  │
-│ │ │ [☑️] Watermark Security                                                │
-│ │ │ [☑️] Mobile-Responsive View                                            │
-│ │ │ [☑️] Multi-language Support                                            │
-│ │ │ [☐] Interactive Charts (Beta)                                         │
-│ │ │ [☐] Parent Portal Integration                                          │
-│ │ └─────────────────────────────────────────────────────────────────────┘│
-│ │                                                                         │
-│ │ Academic Year Scope: [☑️] 2024-2025 [☑️] 2025-2026 [☐] All Years      │
-│ │ Class Scope: [☑️] All Classes [☐] Specific Classes                     │
-│ │                                                                         │
-│ │ [🧪 Test Generate] [👁️ Preview] [💾 Save Draft] [✅ Publish Template]  │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── Template Usage Statistics ───┐                                      │
-│ │ Reports Generated: 15,670 (All Time)                                   │
-│ │ Success Rate: 97.8%                                                     │
-│ │ Average Generation Time: 2.1 minutes                                   │
-│ │ Parent Satisfaction: 4.6/5.0 (Based on feedback)                      │
-│ │ [📊 Detailed Stats] [📋 Usage Report] [🔍 Error Analysis]              │
-│ └───────────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### **Approval Workflow Interface**
-When clicking "Sequence Approval":
-```
-┌─── Report Card Approval Workflow ───┐
-│ Sequence 3 (January 2025) - Approval Review                              │
-│                                                                           │
-│ ┌─── Generation Summary ───┐                                             │
-│ │ Total Students: 1,245                                                   │
-│ │ ✅ Successfully Generated: 1,156 reports (92.8%)                       │
-│ │ ❌ Failed Generation: 22 reports (1.8%)                                │
-│ │ ⏳ Currently Generating: 67 reports (5.4%)                             │
-│ │                                                                         │
-│ │ Quality Metrics:                                                        │
-│ │ • Data Completeness: 98.9%                                             │
-│ │ • Template Compliance: 100%                                            │
-│ │ • PDF Integrity: 99.7%                                                 │
-│ │ • Performance Standards: ✅ Met                                         │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── Approval Checklist ───┐                                             │
-│ │ ✅ Academic Data Verification (Completed: Jan 22, 2025)                │
-│ │ ✅ Quality Assurance Review (Completed: Jan 23, 2025)                  │
-│ │ ✅ Principal Approval (Approved: Jan 24, 2025)                         │
-│ │ ✅ Template Compliance Check (Passed: Jan 24, 2025)                    │
-│ │ ⏳ Super Manager Final Approval (Pending)                               │
-│ │ ⏸️ Parent Notification (Awaiting Approval)                             │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── Review Comments ───┐                                                │
-│ │ Principal (Jan 24, 2025): "Sequence 3 reports look excellent.          │
-│ │ Academic performance data is accurate and complete. Recommend           │
-│ │ immediate release to parents."                                          │
-│ │                                                                         │
-│ │ Quality Assurance (Jan 23, 2025): "All quality checks passed.          │
-│ │ Template rendering is consistent across all reports. No data            │
-│ │ anomalies detected."                                                    │
-│ │                                                                         │
-│ │ Super Manager Notes: [Text Area for approval notes]                    │
-│ └───────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│ ┌─── Approval Actions ───┐                                               │
-│ │ Release Settings:                                                       │
-│ │ [☑️] Notify Parents via Email                                           │
-│ │ [☑️] Notify Parents via SMS                                             │
-│ │ [☑️] Notify Class Masters                                               │
-│ │ [☑️] Notify Principal                                                   │
-│ │ [☐] Schedule Release (Date/Time Picker)                                │
-│ │                                                                         │
-│ │ Approval Decision:                                                      │
-│ │ [✅ Approve & Release Immediately] [⏰ Approve & Schedule Release]       │
-│ │ [❌ Reject (Specify Reasons)] [⏸️ Request Additional Review]           │
-│ │                                                                         │
-│ │ [📧 Send Notifications] [📋 Generate Approval Report] [🔙 Back]         │
-│ └───────────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
 ---
 
-## 8. Reports & Analytics (`/super-manager/reports`)
-
-### **Comprehensive Reports Dashboard**
-```
-┌─────────────────────────────────────────────────────────┐
-│ System Reports & Analytics                              │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│ ┌─── Academic Reports ───┐   ┌─── Financial Reports ───┐│
-│ │ 📊 Student Performance   │   │ 💰 Fee Collection       │
-│ │ 📈 Class Analytics       │   │ 📋 Payment History      │
-│ │ 📝 Exam Statistics       │   │ 📊 Revenue Analysis     │
-│ │ 🎯 Subject Analysis      │   │ 💳 Payment Methods      │
-│ └─────────────────────────┘   └─────────────────────────┘│
-│                                                         │
-│ ┌─── Operational Reports ───┐  ┌─── System Reports ───┐ │
-│ │ 👥 Staff Performance     │   │ 🔐 User Activity       │
-│ │ 📅 Attendance Summary    │   │ 🔧 System Logs         │
-│ │ 🚨 Discipline Summary    │   │ 📊 Usage Statistics    │
-│ │ 🏫 Enrollment Trends     │   │ ⚡ Performance Metrics │
-│ └─────────────────────────┘   └─────────────────────────┘│
-│                                                         │
-│ ┌─── Custom Report Builder ───┐                        │
-│ │ Select Data: [Dropdown] Time Range: [Picker]         │
-│ │ Filters: [Multi-select] Format: [PDF/Excel]          │
-│ │ [Generate Report] [Schedule Report]                   │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## 8. System Settings (`/super-manager/settings`)
-
-### **System Configuration**
-```
-┌─────────────────────────────────────────────────────────┐
-│ System Settings & Configuration                         │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│ ┌─── General Settings ───┐                             │
-│ │ 🏫 School Name: [Input Field]                        │
-│ │ 📧 Admin Email: [Input Field]                        │
-│ │ 📱 School Phone: [Input Field]                       │
-│ │ 🌍 School Address: [Textarea]                        │
-│ │ 🖼️ School Logo: [Upload]                             │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Academic Settings ───┐                            │
-│ │ 📅 Academic Calendar Setup                           │
-│ │ 📊 Grading System Configuration                      │
-│ │ 💰 Fee Structure Templates                           │
-│ │ 📝 Exam Sequence Settings                            │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Security Settings ───┐                            │
-│ │ 🔐 Password Policy                                   │
-│ │ 🕒 Session Timeout: [30 minutes ▼]                  │
-│ │ 🔒 Two-Factor Authentication                         │
-│ │ 📋 Audit Log Retention                               │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## 9. System Maintenance (`/super-manager/maintenance`)
+## 10. System Maintenance (`/super-manager/maintenance`)
 
 ### **System Maintenance Dashboard**
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ System Maintenance & Health                             │
+│ System Maintenance                    [⚙️ Force Backup] │
 ├─────────────────────────────────────────────────────────┤
+│ [Filter: Log Level] [Filter: Category] [Filter: Date Range] │
 │                                                         │
-│ ┌─── System Health ───┐                                │
-│ │ 🟢 Database: Healthy                                 │
-│ │ 🟢 Server: Running (99.8% uptime)                    │
-│ │ 🟢 Storage: 45GB used / 500GB available              │
-│ │ 🟡 Memory: 78% usage                                 │
-│ │ 🟢 Backup: Last successful 2 hours ago               │
+│ ┌─── System Health Overview ───┐                        │
+│ │ Status: [System Health Status]                        │
+│ │ Uptime: [Uptime]                                      │
+│ │ Database: [Database Status]                           │
+│ │ Memory Usage: [Memory Usage]% ([Used Memory]MB / [Total Memory]MB) │
+│ │ Disk Usage: [Disk Usage]% ([Used Disk]MB / [Total Disk]MB) │
+│ │ Active Users: [Active Users] | Recent Errors: [Recent Errors] │
+│ │ Last Backup: [Last Backup] (Frequency: [Backup Frequency]) │
+│ │ Maintenance Mode: [Maintenance Mode Status] [Toggle]  │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Maintenance Actions ───┐                          │
-│ │ [🔄 Force Database Backup]                           │
-│ │ [🧹 Clean Temporary Files]                           │
-│ │ [📊 Generate System Report]                          │
-│ │ [⚡ Optimize Database]                               │
-│ │ [🔧 Run Diagnostics]                                │
+│ ┌─── Recent System Logs ───┐                           │
+│ │ [Timestamp 1] [Level 1] [Category 1]: [Message 1]   │
+│ │ [Timestamp 2] [Level 2] [Category 2]: [Message 2]   │
+│ │ [View All Logs]                                       │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Scheduled Tasks ───┐                              │
-│ │ ✅ Daily backup: Last run 02:00 AM                   │
-│ │ ✅ User session cleanup: Running                     │
-│ │ ⏳ Weekly report generation: Due in 2 days           │
-│ │ ⏳ Database optimization: Scheduled for Sunday       │
+│ ┌─── Quick Actions & Stats ───┐                         │
+│ │ [Perform Cleanup] (Cleaned [Cleaned Records] records, Freed [Freed Space]MB) │
+│ │ Total Records Cleaned: [Total Records Cleaned]        │
+│ │ Total Space Freed: [Total Space Freed MB]MB          │
+│ │ [View System Statistics]                              │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### **API Integration:**
+
+#### **1. Get System Health**
+**Endpoint:** `GET /api/v1/system/health`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      status: "HEALTHY" | "WARNING" | "CRITICAL";
+      uptime: number; // seconds
+      databaseStatus: "CONNECTED" | "DISCONNECTED" | "ERROR";
+      memoryUsage: {
+        used: number; // MB
+        total: number; // MB
+        percentage: number;
+      };
+      diskUsage: {
+        used: number; // MB
+        total: number; // MB
+        percentage: number;
+      };
+      activeUsers: number;
+      recentErrors: number;
+      lastBackup: string | null;
+      systemVersion: string;
+    };
+  }
+  ```
+
+#### **2. Perform System Backup**
+**Endpoint:** `POST /api/v1/system/backup`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: "System backup completed successfully";
+    data: {
+      id: string;
+      timestamp: string;
+      type: "MANUAL" | "SCHEDULED";
+      status: "SUCCESS" | "FAILED" | "IN_PROGRESS";
+      filePath?: string;
+      fileSize?: number; // bytes
+      duration?: number; // milliseconds
+      errorMessage?: string;
+    };
+  }
+  ```
+
+#### **3. Perform System Cleanup**
+**Endpoint:** `POST /api/v1/system/cleanup`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: string; // e.g., "System cleanup completed. X records cleaned, Y.Z MB freed."
+    data: {
+      operations: Array<{
+        operation: string;
+        recordsCleaned: number;
+        spaceFreed: number; // bytes
+        duration: number; // milliseconds
+      }>;
+      summary: {
+        totalRecordsCleaned: number;
+        totalSpaceFreed: number; // bytes
+        totalSpaceFreedMB: number;
+      };
+    };
+  }
+  ```
+
+#### **4. Get System Logs**
+**Endpoint:** `GET /api/v1/system/logs`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    level?: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+    category?: "AUTH" | "DATABASE" | "SYSTEM" | "USER_ACTION" | "ERROR";
+    startDate?: string; // "YYYY-MM-DD"
+    endDate?: string; // "YYYY-MM-DD"
+    userId?: number;
+    search?: string;
+    limit?: number; // max 1000, default 100
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: string;
+      timestamp: string;
+      level: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+      category: "AUTH" | "DATABASE" | "SYSTEM" | "USER_ACTION" | "ERROR";
+      message: string;
+      userId?: number;
+      ipAddress?: string;
+      details?: any;
+    }>;
+    meta: {
+      total: number;
+      limit: number;
+      filters: object;
+    };
+  }
+  ```
+
+#### **5. Get System Statistics**
+**Endpoint:** `GET /api/v1/system/statistics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      userStatistics: {
+        totalUsers: number;
+        totalStudents: number;
+        totalTeachers: number;
+        totalParents: number;
+        recentLogins: number;
+      };
+      academicStatistics: {
+        totalClasses: number;
+        totalSubjects: number;
+        totalEnrollments: number;
+        currentAcademicYear: string;
+      };
+      financialStatistics: {
+        totalFees: number;
+        totalPayments: number;
+      };
+      systemHealth: { /* ... same as Get System Health */ };
+    };
+  }
+  ```
+
+#### **6. Get System Info**
+**Endpoint:** `GET /api/v1/system/info`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      schoolName: string;
+      systemVersion: string;
+      uptime: number;
+      status: "HEALTHY" | "WARNING" | "CRITICAL";
+      maintenanceMode: boolean;
+    };
+  }
+  ```
+
+#### **7. Toggle Maintenance Mode**
+**Endpoint:** `POST /api/v1/system/maintenance-mode`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    enabled: boolean;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    message: "Maintenance mode enabled/disabled";
+    data: {
+      maintenanceMode: boolean;
+    };
+  }
+  ```
 
 ---
 

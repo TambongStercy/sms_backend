@@ -56,6 +56,10 @@ src/config/
 
 prisma/
 └── schema.prisma  # Single source of truth for database schema
+
+workflows/          # Detailed business logic and role-specific workflows
+                    # These documents explain user journeys, system interactions,
+                    # and often include API endpoint references for context.
 ```
 
 ### Critical Data Conversion Pattern
@@ -100,10 +104,11 @@ UserRole: { user_id, role, academic_year_id (nullable) }
 - **Template system**: EJS templates with CSS styling for professional reports
 
 ### API Documentation Strategy
-- **Complete Swagger integration** with schemas in `src/config/swagger/schemas/`
-- **Interactive testing**: Swagger UI at `/api-docs` with authentication
-- **Schema consistency**: All API models defined in reusable schemas
-- **Export capability**: JSON spec available at `/api-docs.json`
+-   **Primary Frontend Documentation**: `COMPLETE_API_DOCUMENTATION.md` is the *single, canonical source of truth* for frontend developers regarding API endpoints. It contains all necessary details, including request/response structures (in `camelCase`), authorization, and examples. Frontend developers should primarily consult this markdown file for integration.
+-   **Swagger Integration Role**: Swagger UI (available at `/api-docs`) serves as an **interactive testing and exploration tool**. It's useful for verifying endpoint behavior and understanding the API on the fly, but `COMPLETE_API_DOCUMENTATION.md` remains the definitive reference for comprehensive details and consistency.
+-   **Documentation Completeness**: **Crucial!** Ensure *all* API endpoints (GET, POST, PUT, DELETE, etc.) are thoroughly documented in `COMPLETE_API_DOCUMENTATION.md` immediately upon creation or modification in routes and controllers. This includes accurate request bodies, query parameters, path parameters, and response structures, adhering to `camelCase` for external API properties.
+-   **Schema consistency**: All API models defined in reusable schemas in `src/config/swagger/schemas/` are used to generate the Swagger spec and should be consistent with the types presented in `COMPLETE_API_DOCUMENTATION.md`.
+-   **Export capability**: JSON spec available at `/api-docs.json`.
 
 ### File Management
 - **Upload directory**: Configurable upload paths with static serving
@@ -138,3 +143,17 @@ UserRole: { user_id, role, academic_year_id (nullable) }
 - **Asset compilation**: Build process handles TypeScript compilation and asset copying
 - **Health checks**: Multiple health endpoints for monitoring (`/api/health`, `/api/v1/health`)
 - **Static file serving**: Uploads served from `/uploads` endpoint
+
+### Common Development Pitfalls and Best Practices
+
+To ensure smooth development and avoid common issues, keep the following in mind:
+
+-   **Undocumented Endpoints**: A frequent problem is endpoints existing in the code (e.g., in `src/api/v1/routes/`) but not being reflected in `COMPLETE_API_DOCUMENTATION.md`. **Always document new or modified endpoints fully** – including their purpose, authorization, request/response formats, and any specific query/path parameters.
+-   **Case Conversion Mismatch**: Remember the `camelCase` (API external) vs `snake_case` (internal/Prisma) convention. Rely entirely on the `caseConversion.middleware.ts` for automatic handling. **Do not manually convert case** in controllers or services unless explicitly dealing with a non-standard scenario.
+-   **Academic Year Context**: Many operations are tied to an `academic_year_id`.
+    -   Default to the current academic year using `getCurrentAcademicYear()` or `getAcademicYearId()` from `src/utils/academicYear.ts` if not explicitly provided.
+    -   Ensure filtering by `academic_year_id` is correctly applied in Prisma queries for year-scoped data.
+    -   Be mindful of `UserRole` records that can be global (`academic_year_id is null`) or year-specific.
+-   **Foreign Key Constraints**: Before deleting any entity (e.g., `Class`, `SubClass`, `Subject`, `AcademicYear`), **always perform a check for dependent records** (e.g., `enrollments`, `sub_classes`, `marks`). If dependent records exist, prevent deletion and return a `409 Conflict` error with a clear message.
+-   **Error Handling Consistency**: Adhere to the standard `{ success: false, error: "message" }` format for all error responses and use appropriate HTTP status codes (400, 401, 403, 404, 409, 500).
+-   **Prisma Schema as Source of Truth**: Any changes to database models must first be made in `prisma/schema.prisma`, followed by a migration (`npx prisma migrate dev`).

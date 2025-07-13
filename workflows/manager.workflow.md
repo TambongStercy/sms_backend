@@ -1,61 +1,133 @@
 # MANAGER Role - Complete Workflow & UX Design
 
-*Note: Based on the current API documentation, the MANAGER role appears to have access to general administrative endpoints but lacks specific manager-focused functionality. This workflow leverages available general endpoints that a school manager would logically need.*
-
 ## Post-Login Manager Dashboard (`/manager/dashboard`)
 
-#### **API Integration:**
-```http
-GET /api/v1/manager/dashboard
-Authorization: Bearer {token}
+### **Enhanced API Integration**
 
-Query Parameters:
-?academicYearId=1  // Optional, defaults to current year
+**Key Schema Details (from Prisma):**
+- **UserRole Model:** Manages user role assignments with `academic_year_id` for year-specific roles
+- **RoleAssignment Model:** Tracks VP, SDM, Bursar, and HOD assignments to specific academic years
+- **AuditLog Model:** Comprehensive tracking of all system modifications for compliance
+- **FormTemplate/FormSubmission Models:** Dynamic form creation and submission tracking
+- **GeneratedReport Model:** PDF report generation status and management
+- **PaymentTransaction Model:** Financial transaction oversight with payment methods
 
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "overview": {
-      "totalStaff": 52,
-      "totalClasses": 24,
-      "totalStudents": 1245,
-      "systemHealth": 98,
-      "pendingTasks": 8,
-      "issuesRequiring": 3,
-      "operationalEfficiency": 94,
-      "monthlyGoalsProgress": { "completed": 7, "total": 10 }
-    },
-    "departmentStatus": [
-      {
-        "name": "Academic",
-        "status": "OPERATIONAL",
-        "statusIcon": "✅"
-      },
-      {
-        "name": "Discipline", 
-        "status": "ISSUES",
-        "statusIcon": "⚠️",
-        "issueCount": 3
-      }
-    ],
-    "recentActivities": [
-      {
-        "action": "User account created for new teacher",
-        "timestamp": "2024-01-22T10:30:00Z",
-        "type": "USER_MANAGEMENT"
-      }
-    ],
-    "criticalAlerts": [
-      {
-        "priority": "HIGH",
-        "message": "5 students awaiting VP assignment",
-        "type": "ACADEMIC"
-      }
-    ]
+#### **1. Get Manager Dashboard**
+**Primary:** `GET /api/v1/manager/dashboard`
+**Enhanced:** `GET /api/v1/manager/operational-overview`
+**System Health:** `GET /api/v1/manager/system-health`
+**User Analytics:** `GET /api/v1/manager/user-analytics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;  // Optional, defaults to current year
+    includeSystemMetrics?: boolean;
+    includeUserActivity?: boolean;
+    includeFinancialOverview?: boolean;
   }
-}
-```
+  ```
+- **Enhanced Response Data:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      overview: {
+        totalStaff: number;
+        totalClasses: number;
+        totalStudents: number;
+        totalParents: number;
+        systemHealth: number;           // Percentage
+        pendingTasks: number;
+        issuesRequiringAttention: number;
+        operationalEfficiency: number;  // Percentage
+        monthlyGoalsProgress: {
+          completed: number;
+          total: number;
+          percentage: number;
+        };
+        academicYearStatus: {
+          current: string;
+          reportDeadline?: string;
+          daysToDeadline?: number;
+        };
+      };
+      systemMetrics: {
+        databaseHealth: "OPTIMAL" | "GOOD" | "NEEDS_ATTENTION" | "CRITICAL";
+        apiResponseTime: number;        // Milliseconds
+        activeUserSessions: number;
+        storageUsage: {
+          used: number;                // GB
+          total: number;               // GB
+          percentage: number;
+        };
+        lastBackup: string;
+        uptime: number;                 // Percentage
+      };
+      departmentStatus: Array<{
+        name: string;
+        category: "ACADEMIC" | "ADMINISTRATIVE" | "SUPPORT" | "FINANCIAL";
+        status: "OPERATIONAL" | "ISSUES" | "MAINTENANCE" | "OFFLINE";
+        statusIcon: string;
+        issueCount?: number;
+        efficiency: number;             // Percentage
+        staffCount: number;
+        lastUpdate: string;
+      }>;
+      userActivity: {
+        dailyActiveUsers: number;
+        weeklyActiveUsers: number;
+        newAccountsThisMonth: number;
+        passwordResetsThisWeek: number;
+        loginIssues: number;
+        rolesDistribution: Array<{
+          role: string;
+          count: number;
+          activeCount: number;
+        }>;
+      };
+      recentActivities: Array<{
+        id: number;
+        action: string;
+        timestamp: string;
+        type: "USER_MANAGEMENT" | "SYSTEM_UPDATE" | "DATA_CHANGE" | "SECURITY" | "ACADEMIC";
+        userId?: number;
+        userName?: string;
+        impact: "HIGH" | "MEDIUM" | "LOW";
+        requiresAction?: boolean;
+      }>;
+      criticalAlerts: Array<{
+        id: number;
+        priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+        message: string;
+        type: "ACADEMIC" | "SYSTEM" | "SECURITY" | "COMPLIANCE" | "FINANCIAL";
+        timestamp: string;
+        actionRequired: boolean;
+        responsibleRole?: string;
+        estimatedResolutionTime?: string;
+      }>;
+      financialOverview: {
+        totalRevenue: number;
+        monthlyTarget: number;
+        collectionRate: number;
+        outstandingAmount: number;
+        recentTransactions: number;
+        paymentMethodDistribution: Array<{
+          method: "EXPRESS_UNION" | "CCA" | "F3DC";
+          count: number;
+          amount: number;
+        }>;
+      };
+      complianceStatus: {
+        auditTrailHealth: "COMPLIANT" | "NEEDS_REVIEW" | "NON_COMPLIANT";
+        dataRetentionCompliance: number;  // Percentage
+        accessControlCompliance: number;  // Percentage
+        lastComplianceCheck: string;
+        pendingReviews: number;
+      };
+    };
+  }
+  ```
 
 ### **Main Dashboard Layout**
 ```
@@ -99,79 +171,273 @@ Success Response (200):
 └─────────────────────────────────────────────────────────┘
 ```
 
-## User Management (`/manager/users`)
+## Enhanced User Management (`/manager/users`)
 
-#### **API Integration:**
-```http
-GET /api/v1/users
-Authorization: Bearer {token}
+### **API Integration**
 
-Query Parameters:
-?role=TEACHER&status=ACTIVE&page=1&limit=10&search=john
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "users": [
-      {
-        "id": 1,
-        "name": "John Doe",
-        "email": "john@school.com",
-        "roles": ["TEACHER", "HOD"],
-        "status": "ACTIVE",
-        "lastLogin": "2024-01-22T08:00:00Z",
-        "department": "Mathematics",
-        "createdAt": "2024-01-15T00:00:00Z"
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 10,
-      "total": 298,
-      "totalPages": 30
-    },
-    "summary": {
-      "totalUsers": 298,
-      "activeUsers": 285,
-      "inactiveUsers": 13,
-      "staffCount": 52,
-      "parentCount": 201,
-      "studentCount": 45,
-      "newThisMonth": 12,
-      "passwordResets": 8,
-      "loginIssues": 3
-    }
+#### **1. Get All Users with Enhanced Filtering**
+**Endpoint:** `GET /api/v1/users`
+**Enhanced:** `GET /api/v1/manager/users/comprehensive`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    role?: string;                    // Filter by specific role
+    status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+    academicYearId?: number;
+    department?: string;
+    lastLoginBefore?: string;         // ISO date
+    lastLoginAfter?: string;          // ISO date
+    createdAfter?: string;            // ISO date
+    hasLoginIssues?: boolean;
+    hasMultipleRoles?: boolean;
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: "name" | "email" | "lastLogin" | "createdAt";
+    sortOrder?: "asc" | "desc";
+    includeAuditTrail?: boolean;
   }
-}
-
-POST /api/v1/users
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "name": "New Teacher",
-  "email": "teacher@school.com",
-  "phone": "+237123456789",
-  "gender": "MALE",
-  "dateOfBirth": "1990-05-15",
-  "address": "123 Main St",
-  "idCardNumber": "123456789",
-  "profilePhoto": "base64_encoded_image_data",
-  "roles": [
-    {
-      "role": "TEACHER",
-      "academicYearId": 1
-    }
-  ],
-  "autoGeneratePassword": true,
-  "sendCredentials": {
-    "email": true,
-    "sms": true
+  ```
+- **Enhanced Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      users: Array<{
+        id: number;
+        name: string;
+        email: string;
+        phone?: string;
+        gender: "Male" | "Female";
+        dateOfBirth: string;
+        address: string;
+        idCardNum?: string;
+        matricule?: string;
+        status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+        photo?: string;
+        totalHoursPerWeek?: number;     // For teachers
+        roles: Array<{
+          role: string;
+          academicYearId?: number;
+          academicYearName?: string;
+          assignedAt: string;
+        }>;
+        roleAssignments?: Array<{       // For VP, SDM, HOD, Bursar
+          roleType: string;
+          subClassName?: string;
+          subjectName?: string;
+          academicYearName: string;
+        }>;
+        lastLogin?: string;
+        loginCount: number;
+        passwordResetCount: number;
+        createdAt: string;
+        updatedAt: string;
+        recentActivity: Array<{
+          action: string;
+          timestamp: string;
+          impact: "HIGH" | "MEDIUM" | "LOW";
+        }>;
+        complianceStatus: {
+          accountCompliance: number;    // Percentage
+          securityCompliance: number;  // Percentage
+          lastReview?: string;
+        };
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      summary: {
+        totalUsers: number;
+        activeUsers: number;
+        inactiveUsers: number;
+        suspendedUsers: number;
+        roleBreakdown: Array<{
+          role: string;
+          count: number;
+          activeCount: number;
+        }>;
+        newThisMonth: number;
+        passwordResetsThisWeek: number;
+        loginIssuesThisWeek: number;
+        multiRoleUsers: number;
+        complianceScore: number;        // Overall percentage
+      };
+      analytics: {
+        userGrowthTrend: Array<{
+          month: string;
+          newUsers: number;
+          deletedUsers: number;
+          netGrowth: number;
+        }>;
+        loginActivityTrend: Array<{
+          date: string;
+          uniqueLogins: number;
+          totalSessions: number;
+        }>;
+        roleDistributionTrend: Array<{
+          role: string;
+          currentCount: number;
+          lastMonthCount: number;
+          change: number;
+        }>;
+      };
+    };
   }
-}
-```
+  ```
+
+#### **2. Create User with Enhanced Features**
+**Endpoint:** `POST /api/v1/users`
+**Enhanced:** `POST /api/v1/manager/users/create-enhanced`
+- **Request Body:**
+  ```typescript
+  {
+    name: string;
+    email: string;
+    phone: string;
+    whatsappNumber?: string;          // For parent communication
+    gender: "Male" | "Female";
+    dateOfBirth: string;              // "YYYY-MM-DD"
+    address: string;
+    idCardNum?: string;
+    matricule?: string;               // Auto-generated if not provided
+    photo?: string;                   // Base64 or file path
+    totalHoursPerWeek?: number;       // For teachers
+    
+    // Account Configuration
+    status?: "ACTIVE" | "INACTIVE";
+    autoGeneratePassword?: boolean;
+    temporaryPassword?: string;
+    requirePasswordChange?: boolean;
+    
+    // Role Assignment
+    roles: Array<{
+      role: string;
+      academicYearId?: number;        // Nullable for SUPER_MANAGER
+    }>;
+    
+    // Specialized Role Assignments (Optional)
+    roleAssignments?: Array<{
+      roleType: "VICE_PRINCIPAL" | "DISCIPLINE_MASTER" | "BURSAR" | "HOD";
+      academicYearId: number;
+      subClassId?: number;            // For VP and SDM
+      subjectId?: number;             // For HOD
+    }>;
+    
+    // Parent-Student Relationships (For parents)
+    childrenConnections?: Array<{
+      studentId: number;
+      relationship: "FATHER" | "MOTHER" | "GUARDIAN";
+    }>;
+    
+    // Communication Preferences
+    notificationPreferences: {
+      email: boolean;
+      sms: boolean;
+      whatsapp: boolean;
+    };
+    
+    // Additional Options
+    sendWelcomeMessage?: boolean;
+    scheduleOnboardingCall?: boolean;
+    assignMentor?: boolean;
+    mentorId?: number;
+    
+    // Audit & Compliance
+    dataProcessingConsent: boolean;
+    termsOfServiceAccepted: boolean;
+    privacyPolicyAccepted: boolean;
+    complianceNotes?: string;
+  }
+  ```
+
+#### **3. Bulk User Operations**
+**Endpoint:** `POST /api/v1/manager/users/bulk-operations`
+- **Request Body:**
+  ```typescript
+  {
+    operation: "CREATE" | "UPDATE" | "DEACTIVATE" | "DELETE" | "RESET_PASSWORD";
+    userIds?: number[];               // For UPDATE, DEACTIVATE, DELETE operations
+    userData?: Array<{               // For CREATE operations
+      name: string;
+      email: string;
+      phone: string;
+      role: string;
+      academicYearId?: number;
+      // ... other user fields
+    }>;
+    updateFields?: {                 // For UPDATE operations
+      status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+      roles?: Array<{
+        role: string;
+        academicYearId?: number;
+        action: "ADD" | "REMOVE";
+      }>;
+    };
+    notifyUsers?: boolean;
+    reason?: string;                 // For deactivation/deletion
+  }
+  ```
+
+#### **4. User Audit Trail**
+**Endpoint:** `GET /api/v1/manager/users/:userId/audit-trail`
+- **Query Parameters:**
+  ```typescript
+  {
+    startDate?: string;
+    endDate?: string;
+    action?: string;
+    page?: number;
+    limit?: number;
+  }
+  ```
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      userId: number;
+      userName: string;
+      auditTrail: Array<{
+        id: number;
+        action: string;               // CREATE, UPDATE, DELETE, LOGIN, etc.
+        tableName: string;
+        recordId: string;
+        oldValues?: object;
+        newValues?: object;
+        timestamp: string;
+        performedBy: {
+          userId: number;
+          userName: string;
+          role: string;
+        };
+        ipAddress?: string;
+        userAgent?: string;
+        impact: "HIGH" | "MEDIUM" | "LOW";
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      summary: {
+        totalActions: number;
+        actionTypes: Array<{
+          action: string;
+          count: number;
+        }>;
+        firstActivity: string;
+        lastActivity: string;
+        highImpactChanges: number;
+      };
+    };
+  }
+  ```
 
 ### **User Administration Dashboard**
 ```
@@ -271,83 +537,261 @@ Request Body:
 └─────────────────────────────────┘
 ```
 
-## System Administration (`/manager/system`)
+## Enhanced System Administration (`/manager/system`)
 
-#### **API Integration:**
-```http
-GET /api/v1/manager/system/health
-Authorization: Bearer {token}
+### **API Integration**
 
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "systemHealth": {
-      "overallHealth": 98,
-      "databaseStatus": "OPERATIONAL",
-      "apiResponseTime": 245,
-      "serverLoad": 23,
-      "storageUsed": 67,
-      "activeSessions": 45,
-      "lastBackup": "2024-01-22T03:00:00Z"
-    },
-    "recentActivities": [
-      {
-        "type": "BACKUP",
-        "message": "Database backup completed successfully",
-        "timestamp": "2024-01-22T03:00:00Z"
-      },
-      {
-        "type": "USER_MANAGEMENT", 
-        "message": "12 new user accounts created this week",
-        "timestamp": "2024-01-21T00:00:00Z"
-      }
-    ],
-    "dataStats": {
-      "totalStudents": 1245,
-      "totalUsers": 298,
-      "academicData": 15670,
-      "financialRecords": 3456,
-      "dataIntegrity": 99.8,
-      "lastValidation": "2024-01-21T00:00:00Z"
-    },
-    "maintenanceInfo": {
-      "nextScheduled": "2024-01-28T00:00:00Z",
-      "estimatedDowntime": "2 hours",
-      "type": "Database optimization & security updates"
-    }
+#### **1. Comprehensive System Health**
+**Endpoint:** `GET /api/v1/manager/system/health`
+**Enhanced:** `GET /api/v1/manager/system/comprehensive-health`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    includePerformanceMetrics?: boolean;
+    includeSecurityStatus?: boolean;
+    includeDataIntegrity?: boolean;
+    timeRange?: "1h" | "24h" | "7d" | "30d";
   }
-}
-
-GET /api/v1/manager/staff-management
-Authorization: Bearer {token}
-
-Query Parameters:
-?academicYearId=1&departmentId=1&startDate=2024-02-01&endDate=2024-02-29
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "attendanceOverview": {
-      "totalStaff": 52,
-      "presentToday": 48,
-      "onLeave": 3,
-      "sickLeave": 1,
-      "attendanceRate": 92.3
-    },
-    "departmentBreakdown": [
-      {
-        "departmentId": 1,
-        "name": "Mathematics",
-        "totalStaff": 8,
-        "present": 7,
-        "attendanceRate": 87.5
-      }
-    ]
+  ```
+- **Enhanced Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      systemHealth: {
+        overallHealth: number;          // Percentage
+        status: "OPTIMAL" | "GOOD" | "WARNING" | "CRITICAL";
+        databaseStatus: "OPERATIONAL" | "DEGRADED" | "MAINTENANCE" | "OFFLINE";
+        apiResponseTime: number;        // Milliseconds
+        serverLoad: number;             // Percentage
+        memoryUsage: number;            // Percentage
+        diskUsage: {
+          used: number;                 // GB
+          total: number;                // GB
+          percentage: number;
+        };
+        activeSessions: number;
+        peakConcurrentUsers: number;
+        systemUptime: number;           // Percentage
+        lastBackup: string;
+        backupStatus: "SUCCESS" | "FAILED" | "IN_PROGRESS" | "OVERDUE";
+      };
+      performanceMetrics: {
+        averageResponseTime: number;    // Milliseconds
+        slowestEndpoints: Array<{
+          endpoint: string;
+          averageTime: number;
+          callCount: number;
+        }>;
+        errorRate: number;              // Percentage
+        throughput: number;             // Requests per minute
+        cacheHitRate: number;           // Percentage
+      };
+      securityStatus: {
+        securityScore: number;          // Percentage
+        lastSecurityScan: string;
+        vulnerabilitiesFound: number;
+        criticalVulnerabilities: number;
+        failedLoginAttempts: number;
+        suspiciousActivity: number;
+        accessControlCompliance: number; // Percentage
+      };
+      dataIntegrity: {
+        overallIntegrity: number;       // Percentage
+        lastDataValidation: string;
+        corruptedRecords: number;
+        inconsistentRecords: number;
+        missingRelations: number;
+        dataBackupAge: number;          // Hours since last backup
+      };
+      recentActivities: Array<{
+        id: number;
+        type: "BACKUP" | "USER_MANAGEMENT" | "SYSTEM_UPDATE" | "SECURITY" | "MAINTENANCE";
+        message: string;
+        timestamp: string;
+        severity: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+        resolvedAt?: string;
+        actionTaken?: string;
+      }>;
+      systemAlerts: Array<{
+        id: number;
+        type: "PERFORMANCE" | "SECURITY" | "STORAGE" | "BACKUP" | "COMPLIANCE";
+        severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+        message: string;
+        timestamp: string;
+        acknowledged: boolean;
+        estimatedResolution?: string;
+      }>;
+      maintenanceInfo: {
+        nextScheduled?: string;
+        estimatedDowntime?: string;
+        maintenanceType?: string;
+        impactLevel: "LOW" | "MEDIUM" | "HIGH";
+        notificationSent: boolean;
+        preparationTasks: Array<{
+          task: string;
+          status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
+          assignedTo?: string;
+        }>;
+      };
+    };
   }
-}
-```
+  ```
+
+#### **2. System Configuration Management**
+**Endpoint:** `GET /api/v1/manager/system/configuration`
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      applicationSettings: {
+        academicYearSettings: {
+          currentAcademicYearId: number;
+          reportDeadline?: string;
+          allowLateEnrollment: boolean;
+          maxStudentsPerClass: number;
+        };
+        systemSettings: {
+          maintenanceMode: boolean;
+          allowNewRegistrations: boolean;
+          defaultLanguage: string;
+          timezone: string;
+          sessionTimeout: number;       // Minutes
+          maxLoginAttempts: number;
+        };
+        notificationSettings: {
+          emailEnabled: boolean;
+          smsEnabled: boolean;
+          whatsappEnabled: boolean;
+          systemAlertsEnabled: boolean;
+        };
+        securitySettings: {
+          passwordPolicy: {
+            minLength: number;
+            requireUppercase: boolean;
+            requireLowercase: boolean;
+            requireNumbers: boolean;
+            requireSpecialChars: boolean;
+            expirationDays: number;
+          };
+          sessionSecurity: {
+            singleSessionPerUser: boolean;
+            ipWhitelistEnabled: boolean;
+            geoLocationTracking: boolean;
+          };
+        };
+      };
+      databaseSettings: {
+        connectionPoolSize: number;
+        queryTimeout: number;
+        backupSchedule: string;
+        retentionPolicy: {
+          auditLogsRetentionDays: number;
+          userDataRetentionDays: number;
+          reportRetentionDays: number;
+        };
+      };
+      integrationSettings: {
+        paymentGateways: Array<{
+          name: string;
+          enabled: boolean;
+          testMode: boolean;
+        }>;
+        emailService: {
+          provider: string;
+          enabled: boolean;
+          dailyLimit: number;
+        };
+        smsService: {
+          provider: string;
+          enabled: boolean;
+          monthlyLimit: number;
+        };
+      };
+    };
+  }
+  ```
+
+#### **3. Data Management Operations**
+**Endpoint:** `GET /api/v1/manager/system/data-management`
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      dataStatistics: {
+        totalRecords: {
+          students: number;
+          users: number;
+          enrollments: number;
+          marks: number;
+          payments: number;
+          reports: number;
+          auditLogs: number;
+        };
+        dataGrowth: {
+          dailyGrowthRate: number;      // Records per day
+          weeklyGrowthRate: number;
+          monthlyGrowthRate: number;
+        };
+        storageBreakdown: {
+          userFiles: number;            // MB
+          reportFiles: number;          // MB
+          systemLogs: number;           // MB
+          backupFiles: number;          // MB
+          tempFiles: number;            // MB
+        };
+      };
+      dataQuality: {
+        completenessScore: number;      // Percentage
+        consistencyScore: number;       // Percentage
+        accuracyScore: number;          // Percentage
+        duplicateRecords: number;
+        orphanedRecords: number;
+        lastQualityCheck: string;
+      };
+      backupStatus: {
+        lastFullBackup: string;
+        lastIncrementalBackup: string;
+        backupSize: number;             // GB
+        backupLocation: string;
+        backupVerified: boolean;
+        scheduledBackups: Array<{
+          type: "FULL" | "INCREMENTAL";
+          schedule: string;
+          nextRun: string;
+        }>;
+      };
+      maintenanceTasks: Array<{
+        id: number;
+        task: string;
+        type: "DATA_CLEANUP" | "INDEX_REBUILD" | "OPTIMIZATION" | "BACKUP";
+        schedule: string;
+        lastRun?: string;
+        nextRun: string;
+        status: "SCHEDULED" | "RUNNING" | "COMPLETED" | "FAILED";
+        estimatedDuration: string;
+      }>;
+    };
+  }
+  ```
+
+#### **4. System Logs and Monitoring**
+**Endpoint:** `GET /api/v1/manager/system/logs`
+- **Query Parameters:**
+  ```typescript
+  {
+    logType?: "ERROR" | "WARNING" | "INFO" | "DEBUG";
+    source?: "DATABASE" | "API" | "AUTHENTICATION" | "PAYMENT" | "REPORT_GENERATION";
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }
+  ```
 
 ### **System Administration Dashboard**
 ```
@@ -398,87 +842,326 @@ Success Response (200):
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## Reports & Analytics (`/manager/reports`)
+## Enhanced Reports & Analytics (`/manager/reports`)
 
-#### **API Integration:**
-```http
-GET /api/v1/manager/reports/operational
-Authorization: Bearer {token}
+### **API Integration**
 
-Query Parameters:
-?period=monthly&academicYearId=1&startDate=2024-01-01&endDate=2024-01-31
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "reportMetadata": {
-      "reportId": "OP_2024_01",
-      "period": "monthly",
-      "generatedAt": "2024-01-22T10:00:00Z",
-      "generatedBy": "Manager",
-      "status": "COMPLETED"
-    },
-    "operationalMetrics": {
-      "userSatisfaction": 92,
-      "systemUptime": 99.7,
-      "avgResponseTime": 245,
-      "dataAccuracy": 99.8,
-      "staffEfficiency": 94,
-      "processCompletionRate": 97
-    },
-    "activitySummary": {
-      "newUsersCreated": 12,
-      "systemMaintenance": 3,
-      "issuesResolved": 15,
-      "reportsGenerated": 8
-    },
-    "downloadUrl": "/api/v1/reports/download/OP_2024_01.pdf",
-    "fileSize": "2.1MB",
-    "downloadCount": 3
+#### **1. Comprehensive Operational Reports**
+**Endpoint:** `GET /api/v1/manager/reports/operational`
+**Enhanced:** `GET /api/v1/manager/reports/comprehensive-operational`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    period: "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
+    academicYearId?: number;
+    startDate?: string;
+    endDate?: string;
+    includeFinancials?: boolean;
+    includeUserMetrics?: boolean;
+    includeSystemMetrics?: boolean;
+    includeComplianceData?: boolean;
+    format?: "json" | "pdf" | "excel";
   }
-}
-
-GET /api/v1/manager/reports/templates
-Authorization: Bearer {token}
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "templates": [
-      {
-        "id": "exec_summary",
-        "name": "Executive Summary Template",
-        "description": "High-level operational overview",
-        "category": "MANAGEMENT",
-        "lastModified": "2024-01-15T00:00:00Z"
-      },
-      {
-        "id": "operational_dashboard", 
-        "name": "Operational Dashboard Template",
-        "description": "Detailed operational metrics",
-        "category": "OPERATIONS",
-        "lastModified": "2024-01-10T00:00:00Z"
-      }
-    ]
+  ```
+- **Enhanced Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      reportMetadata: {
+        reportId: string;
+        reportType: "OPERATIONAL_COMPREHENSIVE";
+        period: string;
+        generatedAt: string;
+        generatedBy: string;
+        status: "COMPLETED" | "PROCESSING" | "FAILED";
+        academicYear: string;
+        dataScope: {
+          startDate: string;
+          endDate: string;
+          totalDays: number;
+        };
+      };
+      executiveSummary: {
+        systemHealth: number;           // Percentage
+        operationalEfficiency: number;  // Percentage
+        userSatisfaction: number;       // Percentage
+        financialHealth: number;        // Percentage
+        complianceScore: number;        // Percentage
+        keyAchievements: Array<string>;
+        majorConcerns: Array<string>;
+        recommendations: Array<string>;
+      };
+      userMetrics: {
+        totalUsers: number;
+        activeUsers: number;
+        newRegistrations: number;
+        userRetentionRate: number;
+        averageSessionDuration: string;
+        loginSuccessRate: number;
+        passwordResetRequests: number;
+        userSupportTickets: number;
+        roleDistribution: Array<{
+          role: string;
+          count: number;
+          growthRate: number;
+        }>;
+        userEngagement: {
+          dailyActiveUsers: number;
+          weeklyActiveUsers: number;
+          monthlyActiveUsers: number;
+          featureUsageStats: Array<{
+            feature: string;
+            usageCount: number;
+            userCount: number;
+          }>;
+        };
+      };
+      systemMetrics: {
+        uptime: number;                 // Percentage
+        averageResponseTime: number;    // Milliseconds
+        errorRate: number;              // Percentage
+        throughput: number;             // Requests per minute
+        databasePerformance: {
+          queryResponseTime: number;
+          connectionPoolUtilization: number;
+          slowQueryCount: number;
+        };
+        resourceUtilization: {
+          cpuUsage: number;             // Percentage
+          memoryUsage: number;          // Percentage
+          diskUsage: number;            // Percentage
+          networkTraffic: number;       // MB
+        };
+        securityMetrics: {
+          securityIncidents: number;
+          failedLoginAttempts: number;
+          suspiciousActivities: number;
+          dataBreachAttempts: number;
+        };
+      };
+      financialMetrics: {
+        totalRevenue: number;
+        collectionRate: number;
+        outstandingAmount: number;
+        paymentMethodDistribution: Array<{
+          method: string;
+          transactionCount: number;
+          totalAmount: number;
+          percentage: number;
+        }>;
+        monthlyTrends: Array<{
+          month: string;
+          revenue: number;
+          expenses: number;
+          netIncome: number;
+        }>;
+        budgetAnalysis: {
+          budgetAllocated: number;
+          budgetUtilized: number;
+          budgetVariance: number;
+          overBudgetItems: Array<{
+            category: string;
+            allocated: number;
+            utilized: number;
+            variance: number;
+          }>;
+        };
+      };
+      academicMetrics: {
+        totalStudents: number;
+        enrollmentTrends: Array<{
+          class: string;
+          enrolled: number;
+          capacity: number;
+          utilizationRate: number;
+        }>;
+        reportCardGeneration: {
+          totalReports: number;
+          successfulReports: number;
+          failedReports: number;
+          successRate: number;
+          averageGenerationTime: string;
+        };
+        teacherEfficiency: {
+          averageMarksEntryTime: string;
+          attendanceCompletionRate: number;
+          classroomUtilization: number;
+        };
+      };
+      complianceMetrics: {
+        dataProtectionCompliance: number;  // Percentage
+        auditTrailCompleteness: number;    // Percentage
+        accessControlCompliance: number;   // Percentage
+        backupCompliance: number;          // Percentage
+        securityPolicyCompliance: number;  // Percentage
+        regulatoryCompliance: {
+          educationStandards: number;
+          dataPrivacyLaws: number;
+          financialRegulations: number;
+        };
+        complianceIssues: Array<{
+          area: string;
+          severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+          description: string;
+          remediation: string;
+          dueDate?: string;
+        }>;
+      };
+      operationalKPIs: {
+        systemAvailability: number;
+        meanTimeToResolution: string;
+        userSatisfactionScore: number;
+        processAutomationRate: number;
+        dataAccuracy: number;
+        workflowEfficiency: number;
+        costPerUser: number;
+        returnOnInvestment: number;
+      };
+      trendAnalysis: {
+        growthTrends: Array<{
+          metric: string;
+          currentPeriod: number;
+          previousPeriod: number;
+          changePercentage: number;
+          trend: "INCREASING" | "DECREASING" | "STABLE";
+        }>;
+        seasonalPatterns: Array<{
+          pattern: string;
+          description: string;
+          impact: "HIGH" | "MEDIUM" | "LOW";
+        }>;
+        predictions: Array<{
+          metric: string;
+          predictedValue: number;
+          confidence: number;
+          timeframe: string;
+        }>;
+      };
+      actionItems: Array<{
+        priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+        category: "SYSTEM" | "USER" | "FINANCIAL" | "COMPLIANCE" | "ACADEMIC";
+        description: string;
+        assignedTo?: string;
+        dueDate?: string;
+        estimatedEffort: "LOW" | "MEDIUM" | "HIGH";
+        expectedImpact: "LOW" | "MEDIUM" | "HIGH";
+      }>;
+      downloadInfo: {
+        pdfUrl?: string;
+        excelUrl?: string;
+        csvUrl?: string;
+        fileSize: string;
+        generatedAt: string;
+        expiresAt: string;
+      };
+    };
   }
-}
+  ```
 
-POST /api/v1/manager/reports/generate
-Authorization: Bearer {token}
-Content-Type: application/json
+#### **2. Report Templates Management**
+**Endpoint:** `GET /api/v1/manager/reports/templates`
+**Enhanced:** `GET /api/v1/manager/reports/template-library`
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      templates: Array<{
+        id: string;
+        name: string;
+        description: string;
+        category: "EXECUTIVE" | "OPERATIONAL" | "FINANCIAL" | "ACADEMIC" | "COMPLIANCE";
+        reportType: "DASHBOARD" | "SUMMARY" | "DETAILED" | "ANALYTICS";
+        isCustom: boolean;
+        isActive: boolean;
+        lastModified: string;
+        modifiedBy: string;
+        usageCount: number;
+        estimatedGenerationTime: string;
+        supportedFormats: Array<"PDF" | "EXCEL" | "CSV" | "JSON">;
+        requiredPermissions: Array<string>;
+        templateSchema: {
+          sections: Array<{
+            name: string;
+            required: boolean;
+            dataSource: string;
+            visualization: "TABLE" | "CHART" | "GRAPH" | "TEXT";
+          }>;
+          parameters: Array<{
+            name: string;
+            type: "DATE" | "SELECT" | "BOOLEAN" | "NUMBER";
+            required: boolean;
+            defaultValue?: any;
+            options?: Array<any>;
+          }>;
+        };
+      }>;
+      customTemplates: Array<{
+        id: string;
+        name: string;
+        createdBy: string;
+        createdAt: string;
+        usageCount: number;
+        isShared: boolean;
+      }>;
+      templateCategories: Array<{
+        category: string;
+        count: number;
+        description: string;
+      }>;
+    };
+  }
+  ```
 
-Request Body:
-{
-  "templateId": "operational_dashboard",
-  "period": "weekly",
-  "academicYearId": 1,
-  "includeMetrics": ["user_activity", "system_performance", "staff_efficiency"],
-  "format": "PDF",
-  "recipients": ["admin@school.com", "principal@school.com"]
-}
-```
+#### **3. Advanced Report Generation**
+**Endpoint:** `POST /api/v1/manager/reports/generate-advanced`
+- **Request Body:**
+  ```typescript
+  {
+    templateId: string;
+    reportName?: string;
+    parameters: {
+      period: "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
+      academicYearId?: number;
+      startDate?: string;
+      endDate?: string;
+      classIds?: number[];
+      departmentIds?: number[];
+      userRoles?: string[];
+    };
+    customizations: {
+      includeSections: Array<string>;
+      excludeSections?: Array<string>;
+      chartTypes?: {
+        [sectionName: string]: "BAR" | "LINE" | "PIE" | "AREA" | "TABLE";
+      };
+      branding?: {
+        logo: boolean;
+        schoolName: boolean;
+        customFooter?: string;
+      };
+    };
+    outputFormat: "PDF" | "EXCEL" | "CSV" | "JSON";
+    delivery: {
+      method: "DOWNLOAD" | "EMAIL" | "SCHEDULE";
+      recipients?: Array<string>;
+      schedule?: {
+        frequency: "DAILY" | "WEEKLY" | "MONTHLY";
+        dayOfWeek?: number;
+        dayOfMonth?: number;
+        time: string;
+      };
+    };
+    security: {
+      accessLevel: "PUBLIC" | "RESTRICTED" | "CONFIDENTIAL";
+      password?: string;
+      watermark?: string;
+      expirationDate?: string;
+    };
+  }
+  ```
 
 ### **Management Reports Dashboard**
 ```
@@ -676,7 +1359,7 @@ Request Body:
   }
   ```
 
-#### **Get Parent Access Analytics**
+#### **4. Get Parent Access Analytics**
 **Endpoint:** `GET /api/v1/manager/report-cards/parent-access`
 - **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
@@ -687,9 +1370,10 @@ Request Body:
     classId?: number;
     startDate?: string;
     endDate?: string;
+    includeDetailedAnalytics?: boolean;
   }
   ```
-- **Response:**
+- **Enhanced Response:**
   ```typescript
   {
     success: true;
@@ -697,9 +1381,29 @@ Request Body:
       accessSummary: {
         totalReports: number;
         accessedReports: number;
-        accessRate: number; // Percentage
-        averageAccessTime: string; // Time from generation to first access
-        multipleAccessCount: number; // Reports accessed more than once
+        accessRate: number;             // Percentage
+        averageAccessTime: string;      // Time from generation to first access
+        multipleAccessCount: number;    // Reports accessed more than once
+        mobileAccessCount: number;      // Reports accessed via mobile
+        desktopAccessCount: number;     // Reports accessed via desktop
+        downloadCount: number;          // Reports downloaded
+        printCount: number;             // Reports printed
+      };
+      timeAnalysis: {
+        peakAccessHours: Array<{
+          hour: number;
+          accessCount: number;
+        }>;
+        dayOfWeekAccess: Array<{
+          day: string;
+          accessCount: number;
+        }>;
+        accessPatterns: {
+          immediateAccess: number;      // Within 1 hour
+          sameDay: number;              // Within 24 hours
+          withinWeek: number;           // Within 7 days
+          delayed: number;              // After 7 days
+        };
       };
       classBreakdown: Array<{
         classId: number;
@@ -707,23 +1411,134 @@ Request Body:
         totalReports: number;
         accessedReports: number;
         accessRate: number;
+        averageAccessTime: string;
+        parentEngagement: "HIGH" | "MEDIUM" | "LOW";
       }>;
       accessTrends: Array<{
         date: string;
         accessCount: number;
         downloadCount: number;
+        newParentRegistrations: number;
+        supportTickets: number;
       }>;
       unAccessedReports: Array<{
         studentId: number;
         studentName: string;
-        parentName: string;
-        parentContact: string;
-        generatedAt: string;
-        daysSinceGeneration: number;
+        matricule: string;
+        classId: number;
+        className: string;
+        parentInfo: Array<{
+          parentId: number;
+          parentName: string;
+          relationship: string;
+          primaryContact: string;
+          whatsappNumber?: string;
+          lastLogin?: string;
+        }>;
+        reportInfo: {
+          sequenceId: number;
+          sequenceName: string;
+          generatedAt: string;
+          daysSinceGeneration: number;
+          reportSize: string;
+        };
+        communicationHistory: Array<{
+          type: "EMAIL" | "SMS" | "WHATSAPP" | "PHONE";
+          sentAt: string;
+          status: "SENT" | "DELIVERED" | "READ" | "FAILED";
+        }>;
+        riskLevel: "HIGH" | "MEDIUM" | "LOW";
+        recommendedAction: string;
+      }>;
+      parentFeedback: {
+        totalFeedbackReceived: number;
+        averageRating: number;
+        commonIssues: Array<{
+          issue: string;
+          count: number;
+          category: "TECHNICAL" | "CONTENT" | "ACCESS" | "OTHER";
+        }>;
+        suggestedImprovements: Array<{
+          suggestion: string;
+          frequency: number;
+          priority: "HIGH" | "MEDIUM" | "LOW";
+        }>;
+      };
+      communicationEffectiveness: {
+        emailDeliveryRate: number;
+        smsDeliveryRate: number;
+        whatsappDeliveryRate: number;
+        responseRate: number;
+        preferredCommunicationMethods: Array<{
+          method: string;
+          percentage: number;
+        }>;
+      };
+      actionableInsights: {
+        priorityActions: Array<{
+          action: string;
+          affectedStudents: number;
+          estimatedImpact: "HIGH" | "MEDIUM" | "LOW";
+          effort: "LOW" | "MEDIUM" | "HIGH";
+          timeframe: string;
+        }>;
+        automationOpportunities: Array<{
+          process: string;
+          currentManualEffort: string;
+          potentialSavings: string;
+          feasibility: "HIGH" | "MEDIUM" | "LOW";
+        }>;
+      };
+    };
+  }
+  ```
+
+#### **5. Form Management System**
+**Endpoint:** `GET /api/v1/manager/forms/overview`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      formTemplates: Array<{
+        id: number;
+        title: string;
+        description?: string;
+        assignedRole: string;
+        isActive: boolean;
+        deadline?: string;
+        createdBy: string;
+        createdAt: string;
+        submissionCount: number;
+        fields: {
+          totalFields: number;
+          requiredFields: number;
+          fieldTypes: Array<string>;
+        };
+      }>;
+      formSubmissions: {
+        totalSubmissions: number;
+        pendingReview: number;
+        approved: number;
+        rejected: number;
+        submissionRate: number;         // Percentage
+      };
+      recentActivity: Array<{
+        formId: number;
+        formTitle: string;
+        submittedBy: string;
+        submittedAt: string;
+        status: "PENDING" | "REVIEWED" | "APPROVED" | "REJECTED";
+        priority: "HIGH" | "MEDIUM" | "LOW";
       }>;
     };
   }
   ```
+
+**Create Form Template:** `POST /api/v1/manager/forms/create-template`
+**Get Form Submissions:** `GET /api/v1/manager/forms/:formId/submissions`
+**Review Submission:** `PUT /api/v1/manager/forms/submissions/:submissionId/review`
 
 ### **Report Card Management Dashboard**
 ```
@@ -1071,154 +1886,387 @@ Success Response (200):
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Task Management (`/manager/tasks`)
+## Enhanced Task & Project Management (`/manager/tasks`)
 
-#### **API Integration:**
-```http
-GET /api/v1/manager/tasks
-Authorization: Bearer {token}
+### **API Integration**
 
-Query Parameters:
-?status=ACTIVE&priority=HIGH&assignedTo=me&page=1&limit=10
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "tasks": [
-      {
-        "id": 1,
-        "title": "Monthly compliance report",
-        "description": "Prepare and submit monthly operational compliance report",
-        "status": "OVERDUE",
-        "priority": "HIGH",
-        "assignedTo": [
-          {
-            "userId": 1,
-            "name": "Manager",
-            "role": "MANAGER"
-          }
-        ],
-        "dueDate": "2024-01-20T17:00:00Z",
-        "progress": 80,
-        "createdAt": "2024-01-15T00:00:00Z",
-        "category": "COMPLIANCE"
-      }
-    ],
-    "summary": {
-      "myTasks": {
-        "total": 8,
-        "overdue": 1,
-        "dueToday": 3,
-        "upcoming": 4
-      },
-      "teamTasks": {
-        "active": 15,
-        "completedThisMonth": 42
-      },
-      "projects": {
-        "ongoing": 3,
-        "completingThisWeek": 1
-      },
-      "overallProgress": 87
-    }
+#### **1. Comprehensive Task Management**
+**Endpoint:** `GET /api/v1/manager/tasks`
+**Enhanced:** `GET /api/v1/manager/tasks/comprehensive`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    status?: "ACTIVE" | "COMPLETED" | "OVERDUE" | "CANCELLED" | "ON_HOLD";
+    priority?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+    assignedTo?: "me" | "team" | "all" | number; // user ID
+    category?: "ACADEMIC" | "ADMINISTRATIVE" | "COMPLIANCE" | "SYSTEM" | "FINANCIAL";
+    dueDate?: "today" | "this_week" | "next_week" | "overdue";
+    search?: string;
+    tags?: string[];
+    page?: number;
+    limit?: number;
+    sortBy?: "dueDate" | "priority" | "createdAt" | "progress";
+    sortOrder?: "asc" | "desc";
+    includeSubtasks?: boolean;
+    includeTimeTracking?: boolean;
   }
-}
-
-POST /api/v1/manager/tasks
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "title": "Prepare Monthly Report",
-  "description": "Compile and analyze monthly operational metrics",
-  "assignedTo": [1, 2, 3],
-  "priority": "HIGH",
-  "dueDate": "2024-03-20T17:00:00Z",
-  "category": "ADMINISTRATIVE",
-  "estimatedHours": 8,
-  "dependencies": [],
-  "attachments": [
-    {
-      "filename": "template.xlsx",
-      "data": "base64_encoded_file_data"
-    }
-  ]
-}
-
-Success Response (201):
-{
-  "success": true,
-  "data": {
-    "taskId": 123,
-    "status": "CREATED",
-    "assignedTo": 3,
-    "notificationsSent": true
+  ```
+- **Enhanced Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      tasks: Array<{
+        id: number;
+        title: string;
+        description: string;
+        status: "ACTIVE" | "COMPLETED" | "OVERDUE" | "CANCELLED" | "ON_HOLD";
+        priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+        category: "ACADEMIC" | "ADMINISTRATIVE" | "COMPLIANCE" | "SYSTEM" | "FINANCIAL";
+        tags: Array<string>;
+        assignedTo: Array<{
+          userId: number;
+          name: string;
+          role: string;
+          assignedAt: string;
+          acceptedAt?: string;
+        }>;
+        createdBy: {
+          userId: number;
+          name: string;
+          role: string;
+        };
+        dueDate: string;
+        createdAt: string;
+        updatedAt: string;
+        progress: number;               // Percentage
+        estimatedHours: number;
+        actualHours?: number;
+        
+        // Task Details
+        subtasks: Array<{
+          id: number;
+          title: string;
+          completed: boolean;
+          assignedTo?: string;
+          dueDate?: string;
+        }>;
+        dependencies: Array<{
+          taskId: number;
+          taskTitle: string;
+          type: "BLOCKS" | "BLOCKED_BY" | "RELATED";
+        }>;
+        attachments: Array<{
+          id: number;
+          filename: string;
+          fileSize: string;
+          uploadedBy: string;
+          uploadedAt: string;
+        }>;
+        
+        // Progress Tracking
+        timeTracking: {
+          totalTimeSpent: string;
+          lastWorkedOn?: string;
+          workLogs: Array<{
+            userId: number;
+            userName: string;
+            timeSpent: string;
+            date: string;
+            notes?: string;
+          }>;
+        };
+        
+        // Comments & Updates
+        recentComments: Array<{
+          id: number;
+          userId: number;
+          userName: string;
+          comment: string;
+          timestamp: string;
+          type: "COMMENT" | "STATUS_UPDATE" | "PROGRESS_UPDATE";
+        }>;
+        
+        // Risk Assessment
+        riskFactors: {
+          riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+          delayRisk: number;            // Percentage
+          resourceRisk: number;         // Percentage
+          dependencyRisk: number;       // Percentage
+          riskMitigation?: string;
+        };
+        
+        // Performance Metrics
+        metrics: {
+          onTimeCompletion: boolean;
+          qualityScore?: number;
+          stakeholderSatisfaction?: number;
+          budgetVariance?: number;
+        };
+      }>;
+      
+      // Summary & Analytics
+      summary: {
+        myTasks: {
+          total: number;
+          active: number;
+          completed: number;
+          overdue: number;
+          dueToday: number;
+          dueThisWeek: number;
+          onHold: number;
+        };
+        teamTasks: {
+          total: number;
+          active: number;
+          completedThisMonth: number;
+          averageCompletionTime: string;
+          teamProductivity: number;     // Percentage
+        };
+        projects: {
+          ongoing: number;
+          completingThisWeek: number;
+          delayedProjects: number;
+          budgetOverruns: number;
+        };
+        workloadDistribution: Array<{
+          userId: number;
+          userName: string;
+          tasksAssigned: number;
+          hoursAllocated: number;
+          utilizationRate: number;      // Percentage
+          efficiency: number;           // Percentage
+        }>;
+        overallProgress: number;        // Percentage
+        healthScore: number;            // Percentage
+      };
+      
+      // Analytics
+      analytics: {
+        completionTrends: Array<{
+          week: string;
+          completed: number;
+          created: number;
+          efficiency: number;
+        }>;
+        categoryBreakdown: Array<{
+          category: string;
+          taskCount: number;
+          averageCompletionTime: string;
+          successRate: number;
+        }>;
+        priorityDistribution: Array<{
+          priority: string;
+          count: number;
+          averageAge: string;
+        }>;
+        bottlenecks: Array<{
+          area: string;
+          impact: "HIGH" | "MEDIUM" | "LOW";
+          description: string;
+          suggestedAction: string;
+        }>;
+      };
+      
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    };
   }
-}
+  ```
 
-PUT /api/v1/manager/tasks/:taskId
-Authorization: Bearer {token}
-Content-Type: application/json
-
-Request Body:
-{
-  "status": "IN_PROGRESS",
-  "progress": 25,
-  "notes": "Started working on data collection phase",
-  "estimatedCompletion": "2024-03-18T17:00:00Z"
-}
-
-GET /api/v1/manager/tasks/statistics
-Authorization: Bearer {token}
-
-Query Parameters:
-?period=monthly&startDate=2024-01-01&endDate=2024-01-31
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "period": {
-      "startDate": "2024-01-01", 
-      "endDate": "2024-01-31"
-    },
-    "statistics": {
-      "tasksCreated": 42,
-      "tasksCompleted": 38,
-      "completionRate": 90.5,
-      "averageCompletionTime": "5.2 days",
-      "onTimeCompletion": 85.7
-    },
-    "teamPerformance": [
-      {
-        "userId": 2,
-        "name": "Assistant Manager",
-        "tasksAssigned": 5,
-        "tasksCompleted": 5,
-        "status": "ON_SCHEDULE"
-      },
-      {
-        "userId": 3,
-        "name": "IT Coordinator", 
-        "tasksAssigned": 3,
-        "tasksCompleted": 2,
-        "status": "DELAYED"
-      }
-    ],
-    "upcomingDeadlines": [
-      {
-        "taskId": 124,
-        "title": "Board presentation preparation",
-        "dueDate": "2024-01-25T00:00:00Z",
-        "daysRemaining": 3,
-        "priority": "HIGH"
-      }
-    ]
+#### **2. Advanced Task Creation**
+**Endpoint:** `POST /api/v1/manager/tasks/create-advanced`
+- **Request Body:**
+  ```typescript
+  {
+    title: string;
+    description: string;
+    priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+    category: "ACADEMIC" | "ADMINISTRATIVE" | "COMPLIANCE" | "SYSTEM" | "FINANCIAL";
+    dueDate: string;
+    estimatedHours: number;
+    tags?: Array<string>;
+    
+    // Assignment
+    assignedTo: Array<{
+      userId: number;
+      role?: "LEAD" | "CONTRIBUTOR" | "REVIEWER";
+      hoursAllocated?: number;
+    }>;
+    
+    // Task Structure
+    subtasks?: Array<{
+      title: string;
+      description?: string;
+      assignedTo?: number;
+      dueDate?: string;
+      estimatedHours?: number;
+    }>;
+    
+    // Dependencies
+    dependencies?: Array<{
+      taskId: number;
+      type: "BLOCKS" | "BLOCKED_BY" | "RELATED";
+    }>;
+    
+    // Budget & Resources
+    budget?: {
+      allocated: number;
+      currency: "FCFA";
+      approvalRequired: boolean;
+    };
+    
+    resources?: Array<{
+      type: "HUMAN" | "EQUIPMENT" | "SOFTWARE" | "FACILITY";
+      name: string;
+      quantity?: number;
+      cost?: number;
+    }>;
+    
+    // Approval Workflow
+    requiresApproval?: boolean;
+    approvers?: Array<number>;        // User IDs
+    approvalDeadline?: string;
+    
+    // Notifications
+    notifications: {
+      assignmentNotification: boolean;
+      reminderNotifications: boolean;
+      progressNotifications: boolean;
+      completionNotification: boolean;
+      escalationNotification: boolean;
+    };
+    
+    // Risk Management
+    riskAssessment?: {
+      complexity: "LOW" | "MEDIUM" | "HIGH";
+      uncertainty: "LOW" | "MEDIUM" | "HIGH";
+      impact: "LOW" | "MEDIUM" | "HIGH";
+      mitigation?: string;
+    };
+    
+    // Attachments
+    attachments?: Array<{
+      filename: string;
+      fileData: string;               // Base64
+      description?: string;
+    }>;
+    
+    // Recurrence (for recurring tasks)
+    recurrence?: {
+      pattern: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+      interval: number;
+      endDate?: string;
+      endAfterOccurrences?: number;
+    };
   }
-}
-```
+  ```
+
+#### **3. Project Management Dashboard**
+**Endpoint:** `GET /api/v1/manager/projects/dashboard`
+- **Response:**
+  ```typescript
+  {
+    success: true;
+    data: {
+      projects: Array<{
+        id: number;
+        name: string;
+        description: string;
+        status: "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "CANCELLED";
+        priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+        manager: {
+          userId: number;
+          name: string;
+        };
+        startDate: string;
+        endDate: string;
+        progress: number;               // Percentage
+        budget: {
+          allocated: number;
+          spent: number;
+          remaining: number;
+          variance: number;
+        };
+        team: Array<{
+          userId: number;
+          name: string;
+          role: string;
+          allocation: number;           // Percentage
+        }>;
+        milestones: Array<{
+          id: number;
+          name: string;
+          dueDate: string;
+          completed: boolean;
+          progress: number;
+        }>;
+        risks: Array<{
+          id: number;
+          description: string;
+          probability: "LOW" | "MEDIUM" | "HIGH";
+          impact: "LOW" | "MEDIUM" | "HIGH";
+          mitigation: string;
+          status: "OPEN" | "MITIGATED" | "ACCEPTED";
+        }>;
+        kpis: {
+          schedulePerformance: number;  // Percentage
+          costPerformance: number;      // Percentage
+          qualityIndex: number;         // Percentage
+          teamSatisfaction: number;     // Percentage
+        };
+      }>;
+      
+      // Portfolio Overview
+      portfolioMetrics: {
+        totalProjects: number;
+        activeProjects: number;
+        completedThisYear: number;
+        totalBudget: number;
+        budgetUtilization: number;      // Percentage
+        portfolioHealth: "EXCELLENT" | "GOOD" | "AT_RISK" | "CRITICAL";
+        resourceUtilization: number;   // Percentage
+      };
+      
+      // Resource Management
+      resourceAnalysis: {
+        totalTeamMembers: number;
+        availableCapacity: number;      // Hours
+        allocatedCapacity: number;      // Hours
+        overallocatedMembers: number;
+        skillGaps: Array<{
+          skill: string;
+          demand: number;
+          available: number;
+          gap: number;
+        }>;
+      };
+      
+      // Timeline Analysis
+      timeline: {
+        upcomingMilestones: Array<{
+          projectId: number;
+          projectName: string;
+          milestoneName: string;
+          dueDate: string;
+          daysRemaining: number;
+          riskLevel: "LOW" | "MEDIUM" | "HIGH";
+        }>;
+        criticalPath: Array<{
+          projectId: number;
+          projectName: string;
+          delayDays: number;
+          impact: "LOW" | "MEDIUM" | "HIGH";
+        }>;
+      };
+    };
+  }
+  ```
 
 ### **Administrative Task Management**
 ```
@@ -1270,9 +2318,14 @@ Success Response (200):
 
 ## Navigation Structure
 
-### **Main Navigation**
+### **Enhanced Main Navigation**
 ```
-🏠 Dashboard | 👥 Users | 🖥️ System | 📊 Reports | 📧 Communications | 🏢 Resources | ✅ Tasks
+🏠 Dashboard | 👥 Users | 🖥️ System | 📊 Analytics | 📧 Communications | 🏢 Operations | ✅ Projects | ⚙️ Settings
+```
+
+### **Secondary Navigation**
+```
+📋 Forms | 🎓 Report Cards | 💰 Financial | 📱 Parent Portal | 🔒 Compliance | 📈 KPIs | 🔧 Tools
 ```
 
 ### **Quick Actions (Always Visible)**
@@ -1288,49 +2341,79 @@ Success Response (200):
 
 ### **Mobile Navigation**
 ```
-[🏠 Home] [👥 Users] [📊 Reports] [📧 Messages] [✅ Tasks]
+[🏠 Home] [👥 Users] [📊 Analytics] [📧 Messages] [✅ Tasks] [⚙️ System]
+```
+
+### **Enhanced Quick Actions (Always Visible)**
+```
+⚡ Manager Quick Actions:
+• [👤 Create User] [📊 System Health] [📧 Send Alert] [📋 Generate Report]
+• [✅ Assign Task] [🔄 Backup Status] [📱 Parent Analytics] [⚙️ Settings]
+• [🚨 Emergency Alert] [📈 Performance Review] [💰 Financial Overview]
 ```
 
 ## Key Features for Manager MVP:
 
-### **Administrative Operations:**
-1. **User Management** - Create, manage, and monitor user accounts
-2. **System Administration** - Monitor system health and manage operations
-3. **Resource Coordination** - Manage staff, facilities, and equipment
-4. **Task Management** - Organize and track administrative tasks
+### **Core Administrative Operations:**
+1. **Enhanced User Management** - Complete user lifecycle management with audit trails
+2. **Advanced System Administration** - Comprehensive system monitoring and maintenance
+3. **Resource & Budget Coordination** - Staff, facilities, equipment, and financial oversight
+4. **Project & Task Management** - Advanced task tracking with dependencies and resource allocation
+5. **Form & Document Management** - Dynamic form creation and submission workflow
 
-### **Communication & Coordination:**
-1. **Internal Communications** - Staff announcements and coordination
-2. **External Relations** - Vendor management and stakeholder communication
-3. **Reporting** - Generate operational and analytical reports
-4. **Meeting Management** - Schedule and coordinate administrative meetings
+### **Analytics & Reporting:**
+1. **Operational Analytics** - Real-time dashboards and performance metrics
+2. **Financial Oversight** - Budget tracking, payment monitoring, and financial reporting
+3. **Compliance Monitoring** - Audit trail analysis and regulatory compliance tracking
+4. **Performance Analytics** - Staff productivity, system efficiency, and process optimization
+5. **Report Card Management** - Generation oversight, parent access analytics, and quality monitoring
 
-### **Support Functions:**
-1. **Technical Support** - Assist with system issues and user problems
-2. **Process Improvement** - Identify and implement operational improvements
-3. **Compliance Management** - Ensure regulatory and policy compliance
-4. **Documentation** - Maintain operational records and procedures
+### **Communication & Stakeholder Management:**
+1. **Multi-channel Communications** - Email, SMS, WhatsApp integration with delivery tracking
+2. **Parent Engagement Analytics** - Access patterns, communication effectiveness, and feedback analysis
+3. **Staff Coordination** - Role assignments, workload distribution, and performance tracking
+4. **External Relations** - Vendor management, board communications, and regulatory reporting
+5. **Crisis Management** - Emergency communications and incident response coordination
 
-## API Limitations & Workarounds:
+### **Advanced Features:**
+1. **Predictive Analytics** - Trend analysis, forecasting, and risk assessment
+2. **Automation Workflows** - Automated task assignment, notifications, and escalations
+3. **Integration Management** - Third-party system integrations and data synchronization
+4. **Quality Assurance** - Data validation, process auditing, and compliance verification
+5. **Strategic Planning** - Goal tracking, KPI monitoring, and strategic initiative management
 
-### **Current Limitations:**
-1. **Limited Manager-Specific Endpoints** - Mostly general administrative access
-2. **No Advanced System Management** - Basic system monitoring only
-3. **Limited Resource Management** - No dedicated facilities/equipment APIs
-4. **Basic Task Management** - No dedicated project/task tracking system
+## Enhanced API Integration & Features:
 
-### **Recommended Workarounds:**
-1. **Leverage Existing APIs** - Use user management and general endpoints
-2. **External Tools Integration** - Third-party project management tools
-3. **Manual Tracking** - Spreadsheets and documents for complex operations
-4. **Custom Development** - Add manager-specific features as needed
+### **Comprehensive API Coverage:**
+1. **Advanced User Management** - Complete CRUD operations with audit trails and bulk operations
+2. **System Health Monitoring** - Real-time metrics, performance analysis, and predictive alerts
+3. **Report Card Analytics** - Generation tracking, parent access analysis, and quality metrics
+4. **Form Management System** - Dynamic form creation, submission tracking, and approval workflows
+5. **Financial Analytics** - Payment tracking, budget analysis, and revenue forecasting
+
+### **Operational Intelligence:**
+1. **Real-time Dashboards** - Live system metrics, user activity, and operational KPIs
+2. **Predictive Analytics** - Trend analysis, risk assessment, and performance forecasting
+3. **Compliance Tracking** - Automated audit trails, regulation compliance, and data protection
+4. **Resource Optimization** - Workload analysis, capacity planning, and efficiency metrics
+5. **Parent Engagement Insights** - Communication effectiveness, access patterns, and satisfaction metrics
+
+### **Advanced Automation:**
+1. **Workflow Automation** - Task assignment, escalation, and notification workflows
+2. **Report Generation** - Automated report scheduling, distribution, and access tracking
+3. **System Maintenance** - Automated backups, health checks, and maintenance scheduling
+4. **Communication Automation** - Multi-channel messaging, delivery tracking, and response monitoring
+5. **Quality Assurance** - Automated data validation, integrity checks, and compliance verification
 
 ## Critical UX Principles:
 
-1. **Operational Efficiency** - Streamlined administrative processes
-2. **Cross-Functional Support** - Assist and coordinate with all school roles
-3. **System Oversight** - Monitor and maintain system health
-4. **Communication Hub** - Central coordination for all stakeholders
-5. **Data Management** - Ensure data integrity and system compliance
-6. **Process Documentation** - Maintain comprehensive operational records
-7. **Continuous Improvement** - Regular assessment and optimization
+1. **Operational Excellence** - Streamlined processes with automation and intelligent workflow management
+2. **Data-Driven Decisions** - Real-time analytics, predictive insights, and comprehensive reporting
+3. **Stakeholder Coordination** - Centralized communication hub with multi-channel messaging and tracking
+4. **System Intelligence** - Proactive monitoring, predictive maintenance, and automated optimization
+5. **Compliance Assurance** - Automated audit trails, regulatory compliance, and data protection
+6. **Resource Optimization** - Intelligent workload distribution, capacity planning, and efficiency maximization
+7. **Continuous Innovation** - Performance monitoring, process improvement, and strategic planning support
+8. **Quality Management** - Comprehensive quality assurance, validation workflows, and standard enforcement
+9. **Risk Management** - Proactive risk assessment, mitigation planning, and crisis response coordination
+10. **Strategic Oversight** - Goal tracking, KPI monitoring, and long-term planning support

@@ -16,42 +16,31 @@
   {
     success: true;
     data: {
-      overview: {
-        totalStudents: number;
-        studentsAssigned: number;         // Students assigned to subclasses
-        pendingInterviews: number;        // Students awaiting interview
-        awaitingAssignment: number;       // Students ready for subclass assignment
-        assignmentRate: number;           // Percentage (0-100)
-        interviewCompletionRate: number;  // Percentage (0-100)
-        newRegistrations: number;         // Today's new registrations
-        issuesRequiringReview: number;    // Assignment issues
+      totalStudents: number;
+      studentsAssigned: number;
+      pendingInterviews: number;
+      completedInterviews: number;
+      awaitingAssignment: number;
+      recentDisciplineIssues: number;
+      classesWithPendingReports: number;
+      teacherAbsences: number;
+      enrollmentTrends: {
+        thisMonth: number;
+        lastMonth: number;
+        trend: "INCREASING" | "DECREASING" | "STABLE";
       };
-      enrollmentPipeline: {
-        registeredByBursar: number;       // Stage 1
-        interviewPending: number;         // Stage 2
-        interviewComplete: number;        // Stage 3
-        assignedToSubclass: number;       // Stage 4
-      };
-      classManagement: {
-        totalSubclasses: number;
-        averageCapacity: number;          // Percentage (0-100)
-        reassignments: number;            // Recent reassignments
-        fullClasses: number;              // Classes at capacity
-      };
-      priorityActions: Array<{
-        id: number;
-        priority: "URGENT" | "HIGH" | "MEDIUM";
-        description: string;
-        count?: number;
-        dueDate?: string;
-        category: "INTERVIEW" | "ASSIGNMENT" | "REVIEW" | "REPORT";
+      subclassCapacityUtilization: Array<{
+        subclassName: string;
+        className: string;
+        currentCapacity: number;
+        maxCapacity: number;
+        utilizationRate: number;
       }>;
-      todaysSchedule: Array<{
-        id: number;
-        time: string;                     // "10:30"
-        studentName: string;
-        activity: "INTERVIEW" | "MEETING" | "ASSIGNMENT";
-        status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
+      urgentTasks: Array<{
+        type: "INTERVIEW_OVERDUE" | "ASSIGNMENT_PENDING" | "CAPACITY_EXCEEDED";
+        description: string;
+        priority: "HIGH" | "MEDIUM" | "LOW";
+        count: number;
       }>;
     };
   }
@@ -66,32 +55,25 @@
 │ Vice Principal - Student Affairs & Enrollment           │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│ ┌─── Student Management Overview ───┐                   │
-│ │ 👨‍🎓 Total Students: 1,245    📝 Pending Interviews: 12  │
-│ │ 🏫 Students Assigned: 1,220   ⏳ Awaiting Assignment: 15│
-│ │ 📊 Assignment Rate: 98%       🎯 Interview Completion: 95%│
-│ │ 📋 New Registrations: 8       ⚠️ Issues Requiring Review: 3│
+│ ┌─── Student & Enrollment Overview ───┐                 │
+│ │ 👨‍🎓 Total Students: [Total Students]   📝 Pending Interviews: [Pending Interviews] │
+│ │ 🏫 Students Assigned: [Students Assigned]  ✅ Completed Interviews: [Completed Interviews] │
+│ │ ⏳ Awaiting Assignment: [Awaiting Assignment]   ⚠️ Recent Discipline Issues: [Recent Discipline Issues] │
+│ │ 📄 Classes with Pending Reports: [Classes With Pending Reports] │
+│ │ 🚸 Teacher Absences Today: [Teacher Absences]        │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Enrollment Pipeline ───┐   ┌─── Class Management ───┐│
-│ │ 1️⃣ Registered by Bursar: 8  │   │ 🏛️ Total Subclasses: 48    ││
-│ │ 2️⃣ Interview Pending: 12    │   │ 📊 Avg Capacity: 85%       ││
-│ │ 3️⃣ Interview Complete: 189  │   │ 🔄 Reassignments: 3        ││
-│ │ 4️⃣ Assigned to Subclass: 1,220│ │ 📈 Full Classes: 12        ││
-│ │ [Manage Pipeline]           │   │ [Manage Classes]           ││
-│ └─────────────────────────── │   └─────────────────────────┘ │
+│ ┌─── Enrollment Trends ───┐   ┌─── Subclass Capacity ───┐│
+│ │ This Month: [This Month Enrollment]                 │   │ [Subclass 1 Name] ([Class 1 Name]): [Utilization 1]% ││
+│ │ Last Month: [Last Month Enrollment]                 │   │ [Subclass 2 Name] ([Class 2 Name]): [Utilization 2]% ││
+│ │ Trend: [Enrollment Trend]                           │   │ [View All Capacities]               ││
+│ │ [View Detailed Enrollment Analytics]                │   │                                     ││
+│ └───────────────────────────┘   └─────────────────────────┘│
 │                                                         │
-│ ┌─── Priority Actions ───┐                              │
-│ │ 🚨 Urgent (3)                                         │
-│ │ • Complete interviews for 12 students                │
-│ │ • Assign 15 interviewed students to subclasses       │
-│ │ • Review 3 problematic assignments                   │
-│ │                                                       │
-│ │ ⚠️ This Week (8)                                      │
-│ │ • Monthly enrollment report due                       │
-│ │ • Class capacity review meeting                      │
-│ │ • Parent interviews scheduled                        │
-│ │ [View All Tasks] [Mark Complete]                     │
+│ ┌─── Urgent Tasks ───┐                                 │
+│ │ 🚨 [Urgent Task 1 Type]: [Urgent Task 1 Description] ([Urgent Task 1 Count]) │
+│ │ ⚠️ [Urgent Task 2 Type]: [Urgent Task 2 Description] ([Urgent Task 2 Count]) │
+│ │ [View All Urgent Tasks]                               │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -225,32 +207,32 @@
 │ [New Registrations] [Interviews] [Assignments] [Reports] │
 │                                                          │
 │ ┌─── Pipeline Status ───┐                               │
-│ │ Academic Year: 2024-2025                              │
-│ │ Total Enrolled: 1,245 students                        │
-│ │ Enrollment Target: 1,280 students                     │
-│ │ Remaining Capacity: 35 students                       │
-│ │ Pipeline Efficiency: 98% completion rate              │
+│ │ Academic Year: [Academic Year]                        │
+│ │ Total Enrolled: [Total Enrolled] students             │
+│ │ Enrollment Target: [Enrollment Target] students       │
+│ │ Remaining Capacity: [Remaining Capacity] students     │
+│ │ Pipeline Efficiency: [Pipeline Efficiency]% completion rate │
 │ └────────────────────────────────────────────────────┘ │
 │                                                          │
 │ ┌─── Stage 1: New Registrations (From Bursar) ───┐      │
-│ │ Students Awaiting Interview: 12                       │
-│ │ Registered Today: 3                                   │
-│ │ This Week: 8                                          │
+│ │ Students Awaiting Interview: [Students Awaiting Interview] │
+│ │ Registered Today: [Registered Today]                    │
+│ │ This Week: [Registered This Week]                       │
 │ │ [View New Students] [Schedule Interviews]             │
 │ └────────────────────────────────────────────────────┘ │
 │                                                          │
 │ ┌─── Stage 2: Interview Process ───┐                     │
-│ │ Interviews Pending: 12                                │
-│ │ Completed This Week: 15                               │
-│ │ Average Interview Score: 14.2/20                      │
-│ │ Pass Rate: 94%                                        │
+│ │ Interviews Pending: [Interviews Pending]              │
+│ │ Completed This Week: [Completed This Week]            │
+│ │ Average Interview Score: [Average Interview Score]/20 │
+│ │ Pass Rate: [Pass Rate]%                               │
 │ │ [Conduct Interviews] [Review Scores]                  │
 │ └────────────────────────────────────────────────────┘ │
 │                                                          │
 │ ┌─── Stage 3: Subclass Assignment ───┐                   │
-│ │ Ready for Assignment: 15 students                     │
-│ │ Assigned This Week: 18                                │
-│ │ Successful Placements: 100%                           │
+│ │ Ready for Assignment: [Ready for Assignment] students │
+│ │ Assigned This Week: [Assigned This Week]              │
+│ │ Successful Placements: [Successful Placements]%       │
 │ │ [Assign Students] [View Capacity]                     │
 │ └────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────┘
@@ -261,85 +243,93 @@
 ### **API Integration**
 
 #### **1. Get Students Awaiting Interview**
-**Endpoint:** `GET /api/v1/vice-principal/students/awaiting-interview`
+**Endpoint:** `GET /api/v1/vice-principal/interviews`
+- **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
   ```typescript
   {
     academicYearId?: number;
-    classId?: number;           // Filter by target class
-    registrationDate?: {
-      from: string;             // "YYYY-MM-DD"
-      to: string;               // "YYYY-MM-DD"
-    };
-    ageRange?: {
-      min: number;
-      max: number;
-    };
+    status?: "PENDING" | "COMPLETED" | "OVERDUE"; // Filter by PENDING or OVERDUE
     page?: number;
     limit?: number;
-    search?: string;            // Name or matricule search
+    search?: string;
   }
   ```
-- **Response Data:**
+- **Response (200):**
   ```typescript
   {
     success: true;
     data: Array<{
       id: number;
-      name: string;
-      matricule: string;
-      dateOfBirth: string;
-      age: number;
+      studentId: number;
+      studentName: string;
+      studentMatricule: string;
+      className: string;
+      interviewStatus: "PENDING" | "COMPLETED" | "OVERDUE";
+      scheduledDate?: string;
+      completedDate?: string;
+      score?: number;
+      comments?: string;
+      interviewerName?: string;
+      daysOverdue?: number;
       registrationDate: string;
-      targetClass: {
-        id: number;
-        name: string;           // "Form 1", "Form 2", etc.
-      };
-      formerSchool?: string;
-      parent: {
-        id: number;
-        name: string;
-        phone: string;
-        email?: string;
-        relationship: string;
-      };
-      status: "NOT_ENROLLED" | "AWAITING_INTERVIEW";
-      registeredBy: {
-        id: number;
-        name: string;           // Bursar who registered
-      };
     }>;
-    meta: {
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
+    count: number;
+  }
+  ```
+
+#### **2. Bulk Schedule Interviews**
+**Endpoint:** `POST /api/v1/vice-principal/bulk-schedule-interviews`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```typescript
+  {
+    studentIds: number[];
+    scheduledDate: string; // "YYYY-MM-DD"
+    academicYearId?: number;
+  }
+  ```
+- **Response (201):**
+  ```typescript
+  {
+    success: true;
+    message: string; // e.g., "Successfully scheduled X interviews"
+    data: {
+      scheduled: number;
+      errors: Array<{
+        studentId: number;
+        error: string;
+      }>;
     };
   }
   ```
 
-#### **2. Schedule Interview**
-**Endpoint:** `POST /api/v1/vice-principal/interviews/schedule`
+#### **3. Record Interview Mark**
+**Endpoint:** `POST /api/v1/enrollment/interview`
+- **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
   ```typescript
   {
     studentId: number;
-    interviewDate: string;      // "YYYY-MM-DD"
-    interviewTime: string;      // "HH:MM" (24-hour format)
-    notes?: string;
+    score: number;             // Interview score
+    comments?: string;
+    academicYearId?: number;
   }
   ```
-
-#### **3. Batch Schedule Interviews**
-**Endpoint:** `POST /api/v1/vice-principal/interviews/batch-schedule`
-- **Request Body:**
+- **Response (201):**
   ```typescript
   {
-    studentIds: Array<number>;
-    interviewDate: string;
-    startTime: string;          // "09:00"
-    intervalMinutes: number;    // Default: 30 minutes
-    notes?: string;
+    success: true;
+    message: "Interview mark recorded successfully. Student ready for subclass assignment.";
+    data: {
+      id: number;
+      studentId: number;
+      interviewerId: number;
+      score: number;
+      comments?: string;
+      academicYearId: number;
+      interviewDate: string;
+    };
   }
   ```
 
@@ -723,22 +713,51 @@
 └──────────────────────────────────────────┘
 ```
 
-## Subclass Assignment (`/vice-principal/assignments`)
+## Subclass Assignment (`/vice-principal/enrollment/assignment`)
 
-### **API Integration**
+### **Subclass Assignment Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Subclass Assignment                   [🔄 Refresh List] │
+├─────────────────────────────────────────────────────────┤
+│ [Filter: Class] [Search: Student Name/Matricule]        │
+│                                                         │
+│ ┌─── Students Ready for Assignment ───┐                │
+│ │ 👤 [Student Name 1] ([Matricule 1]) - Class: [Class 1 Name] │
+│ │    Interview Score: [Score 1]/20 | Interview Date: [Date 1] │
+│ │    [Assign to Subclass]                               │
+│ │ ─────────────────────────────────────              │
+│ │ 👤 [Student Name 2] ([Matricule 2]) - Class: [Class 2 Name] │
+│ │    Interview Score: [Score 2]/20 | Interview Date: [Date 2] │
+│ │    [Assign to Subclass]                               │
+│ │ [Load More Students]                                  │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Subclass Capacity Overview ───┐                   │
+│ │ 🏫 [Class Name A]                                   │
+│ │    [Subclass A1] (Current: [Current A1]/[Max A1]) [Available: [Available A1]] │
+│ │    [Subclass A2] (Current: [Current A2]/[Max A2]) [Available: [Available A2]] │
+│ │ [View Full Class Capacity]                            │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
 
-#### **1. Get Students Ready for Assignment**
-**Endpoint:** `GET /api/v1/vice-principal/students/ready-for-assignment`
+### **API Integration:**
+
+#### **1. Get Unassigned Students (Ready for Subclass Assignment)**
+**Endpoint:** `GET /api/v1/enrollment/unassigned`
+- **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
   ```typescript
   {
-    classId?: number;
-    academicYearId?: number;
+    academicYearId?: number; // Optional, defaults to current year
+    classId?: number;        // Filter by target class
+    search?: string;         // Search by name or matricule
     page?: number;
     limit?: number;
   }
   ```
-- **Response Data:**
+- **Response (200):**
   ```typescript
   {
     success: true;
@@ -746,174 +765,101 @@
       id: number;
       name: string;
       matricule: string;
-      targetClass: {
-        id: number;
-        name: string;
-      };
-      interviewResult: {
-        totalScore: number;
-        maxScore: number;
-        percentage: number;
-        recommendedSubclass?: {
-          id: number;
-          name: string;
-          currentCapacity: number;
-          maxCapacity: number;
-          availableSpots: number;
-        };
-        comments: string;
-      };
-      interviewDate: string;
-      interviewedBy: {
-        id: number;
-        name: string;
-      };
+      dateOfBirth: string;
+      className: string;
+      interviewStatus: "PENDING" | "COMPLETED";
+      interviewScore?: number;
+      registrationDate: string;
     }>;
+    count: number;
   }
   ```
 
-#### **2. Get Subclass Capacity**
-**Endpoint:** `GET /api/v1/vice-principal/subclasses/capacity`
+#### **2. Get Available Subclasses for Assignment**
+**Endpoint:** `GET /api/v1/enrollment/available-subclasses/:classId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `classId` (number): ID of the class to get available subclasses for.
 - **Query Parameters:**
   ```typescript
   {
-    classId?: number;
-    academicYearId?: number;
+    academicYearId?: number; // Optional, defaults to current year
   }
   ```
-- **Response Data:**
+- **Response (200):**
   ```typescript
   {
     success: true;
+    message: "Available subclasses retrieved successfully";
     data: Array<{
       id: number;
-      name: string;              // "Form 1A"
-      className: string;         // "Form 1"
-      capacity: {
-        current: number;         // Current student count
-        maximum: number;         // Maximum capacity
-        available: number;       // Available spots
-        percentage: number;      // Capacity percentage
-      };
-      classMaster?: {
-        id: number;
-        name: string;
-      };
-      academicFocus?: string;    // "Science", "Arts", "General"
+      name: string;
+      capacity: number;
+      currentEnrollment: number;
+      availableSpots: number;
+      classId: number;
+      className: string;
     }>;
   }
   ```
 
 #### **3. Assign Student to Subclass**
-**Endpoint:** `POST /api/v1/vice-principal/assignments`
+**Endpoint:** `POST /api/v1/enrollment/assign-subclass`
+- **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
   ```typescript
   {
     studentId: number;
-    subclassId: number;
-    academicYearId?: number;
-    assignmentReason?: string;
-    notes?: string;
+    subClassId: number;
+    academicYearId?: number; // Optional, defaults to current year
   }
   ```
-- **Response:**
+- **Response (200):**
   ```typescript
   {
     success: true;
+    message: "Student successfully assigned to subclass. Enrollment complete.";
     data: {
-      enrollmentId: number;
-      student: {
+      enrollment: {
         id: number;
-        name: string;
-        matricule: string;
-      };
-      subclass: {
-        id: number;
-        name: string;
-        className: string;
-      };
-      academicYear: {
-        id: number;
-        name: string;
-      };
-      assignedAt: string;
-      assignedBy: {
-        id: number;
-        name: string;
+        studentId: number;
+        classId: number;
+        subClassId: number;
+        academicYearId: number;
+        status: "ASSIGNED_TO_CLASS";
       };
     };
   }
   ```
 
-#### **4. Bulk Assignment**
-**Endpoint:** `POST /api/v1/vice-principal/assignments/bulk`
-- **Request Body:**
+#### **4. Get Subclass Optimization (Capacity Analysis)**
+**Endpoint:** `GET /api/v1/vice-principal/subclass-optimization`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
   ```typescript
   {
-    assignments: Array<{
-      studentId: number;
-      subclassId: number;
-      notes?: string;
+    success: true;
+    data: Array<{
+      classId: number;
+      className: string;
+      subclasses: Array<{
+        id: number;
+        name: string;
+        currentEnrollment: number;
+        maxCapacity: number;
+        utilizationRate: number;
+        availableSpots: number;
+        status: "OPTIMAL" | "UNDERUTILIZED" | "OVERLOADED" | "FULL";
+        recommendations: Array<string>;
+      }>;
+      overallUtilization: number;
+      recommendations: Array<{
+        type: "BALANCE_ENROLLMENT" | "CREATE_SUBCLASS" | "MERGE_SUBCLASS";
+        description: string;
+        priority: "HIGH" | "MEDIUM" | "LOW";
+      }>;
     }>;
-    academicYearId?: number;
   }
   ```
-
-### **Assignment Dashboard**
-```
-┌─── Subclass Assignment Management ───┐
-│ [Ready for Assignment] [Capacity View] [Assignment History] │
-│                                                            │
-│ ┌─── Students Ready for Assignment ───┐                    │
-│ │ Total Ready: 15 students | Last Updated: 2 hours ago    │
-│ │ Classes Available: Form 1-5 | Avg Capacity: 85%         │
-│ │ [Bulk Assign] [Auto-Assign] [Manual Review]             │
-│ └──────────────────────────────────────────────────────┘ │
-│                                                            │
-│ Student       Score  Recommended   Current    Action       │
-│ John Doe      16/20  Form 1A       Available  [Assign]    │
-│ Mary Smith    18/20  Form 3A       Available  [Assign]    │
-│ Peter Johnson 14/20  Form 2B       Available  [Assign]    │
-│ Sarah Williams 15/20 Form 1A       Full       [Reassign]  │
-│ Michael Brown 12/20  Form 4C       Available  [Assign]    │
-│                                                            │
-│ [Select All] [Bulk Actions ▼] [Export List]               │
-│                                                            │
-│ ┌─── Subclass Capacity Overview ───┐                       │
-│ │ Subclass     Capacity    Available  Master      Status  │
-│ │ Form 1A      28/30      2 spots    Mr. Johnson  🟢      │
-│ │ Form 1B      30/30      0 spots    Mrs. Smith   🔴      │
-│ │ Form 1C      25/30      5 spots    Mr. Brown    🟢      │
-│ │ Form 2A      29/30      1 spot     Mrs. Davis   🟡      │
-│ │ [View All Classes] [Capacity Report]                   │
-│ └──────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────┘
-```
-
-### **Assignment Modal**
-```
-┌─── Assign Student - John Doe ───┐
-│ Student: John Doe (STU2024001)   │
-│ Interview Score: 16/20 (80%)     │
-│ Recommended: Form 1A             │
-│                                  │
-│ ┌─── Available Subclasses ───┐   │
-│ │ ● Form 1A (2 spots) - Science  │
-│ │ ○ Form 1B (0 spots) - Full     │
-│ │ ○ Form 1C (5 spots) - General  │
-│ │ ○ Form 1D (3 spots) - Arts     │
-│ │                                │
-│ │ Selected: Form 1A              │
-│ │ Class Master: Mr. Johnson      │
-│ │ Focus: Science Stream          │
-│ └──────────────────────────────┘ │
-│                                  │
-│ Assignment Notes:                │
-│ [Text Area]                      │
-│                                  │
-│ [Confirm Assignment] [Cancel]    │
-└────────────────────────────────┘
-```
 
 ## Class Management (`/vice-principal/classes`)
 
@@ -1311,3 +1257,217 @@
 8. Implement conflict detection for interview scheduling
 9. Add auto-save for interview drafts
 10. Use efficient pagination for large student lists
+
+## Student Progress Tracking (`/vice-principal/student/:studentId/progress`)
+
+### **Student Progress Profile Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Student Progress: [Student Name] ([Matricule])        │
+├─────────────────────────────────────────────────────────┤
+│ [Filter: Academic Year]                                 │
+│                                                         │
+│ ┌─── Enrollment Journey ───┐                            │
+│ │ 1️⃣ Registered: [Registration Date] (by [Registered By]) │
+│ │ 2️⃣ Interviewed: [Interview Date] (Score: [Interview Score]) │
+│ │ 3️⃣ Assigned: [Assignment Date] (to [Subclass Name]) │
+│ │ 4️⃣ Enrolled: [Enrollment Date] (Status: [Current Status]) │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Alerts & Next Actions ───┐                         │
+│ │ Current Status: [Current Status]                      │
+│ │ Days in Current Stage: [Days In Current Stage] days   │
+│ │ Next Action: [Next Action]                            │
+│ │ Alerts: [Alert 1], [Alert 2]                          │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### **API Integration:**
+
+#### **1. Get Student Progress Tracking**
+**Endpoint:** `GET /api/v1/vice-principal/student-progress/:studentId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `studentId` (number): Student ID
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      studentId: number;
+      studentName: string;
+      matricule: string;
+      enrollmentJourney: Array<{
+        stage: "REGISTERED" | "INTERVIEWED" | "ASSIGNED" | "ENROLLED";
+        date: string;
+        details: string;
+        completedBy?: string;
+      }>;
+      currentStatus: string;
+      nextAction: string;
+      daysInCurrentStage: number;
+      alerts: Array<string>;
+    };
+  }
+  ```
+
+## Enrollment Analytics & Quick Stats (`/vice-principal/analytics`)
+
+### **Enrollment Analytics Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Enrollment Analytics                  [📊 View Trends] │
+├─────────────────────────────────────────────────────────┤
+│ [Filter: Academic Year] [Filter: Timeframe]             │
+│                                                         │
+│ ┌─── Enrollment Trends ───┐                            │
+│ │ [Chart showing daily/weekly/monthly registrations]    │
+│ │ Daily Registrations: [Daily Registrations]            │
+│ │ Completed Payments: [Completed Payments]              │
+│ │ Pending Count: [Pending Count]                        │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Gender & Age Distribution ───┐                    │
+│ │ Male: [Male Count] | Female: [Female Count]          │
+│ │ Age Range [Age Range 1]: [Count 1]                    │
+│ │ Age Range [Age Range 2]: [Count 2]                    │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Class Distribution & Capacity ───┐                 │
+│ │ [Class 1 Name]: [Registered Students 1] / [Capacity 1] (Waiting: [Waiting List 1]) │
+│ │ [Class 2 Name]: [Registered Students 2] / [Capacity 2] (Waiting: [Waiting List 2]) │
+│ │ [View Full Class Capacity Analysis]                   │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### **Students Requiring Attention Page**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Students Requiring Attention        [🔄 Refresh List] │
+├─────────────────────────────────────────────────────────┤
+│ [Filter: Risk Level] [Filter: Category]                 │
+│                                                         │
+│ ┌─── Overview ───┐                                      │
+│ │ Total Requiring Attention: [Total Requiring Attention] │
+│ │ Pending Interviews: [Pending Interviews Count]        │
+│ │ Overdue Interviews: [Overdue Interviews Count]        │
+│ │ Awaiting Assignment: [Awaiting Assignment Count]      │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Students List (Prioritized) ───┐                  │
+│ │ 🚨 [Student Name 1] ([Class 1 Name]): [Reason 1]     │
+│ │    Action: [Recommended Action 1] | Urgency: [Urgency 1] │
+│ │ ⚠️ [Student Name 2] ([Class 2 Name]): [Reason 2]     │
+│ │    Action: [Recommended Action 2] | Urgency: [Urgency 2] │
+│ │ [View All Students Requiring Attention]               │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### **API Integration:**
+
+#### **1. Get Enrollment Analytics**
+**Endpoint:** `GET /api/v1/vice-principal/enrollment-analytics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      enrollmentTrends: Array<{
+        date: string;
+        count: number;
+      }>;
+      genderDistribution: Array<{
+        gender: "MALE" | "FEMALE";
+        count: number;
+      }>;
+      ageDistribution: Array<{
+        ageRange: string;
+        count: number;
+      }>;
+      classDistribution: Array<{
+        classId: number;
+        enrollmentCount: number;
+        lastEnrollment: string;
+      }>;
+    };
+  }
+  ```
+
+#### **2. Get Students Requiring Attention**
+**Endpoint:** `GET /api/v1/vice-principal/students-requiring-attention`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      pendingInterviews: {
+        count: number;
+        students: Array<object>; // Limited to 10
+      };
+      overdueInterviews: {
+        count: number;
+        students: Array<object>;
+      };
+      awaitingAssignment: {
+        count: number;
+        students: Array<object>;
+      };
+      totalRequiringAttention: number;
+    };
+  }
+  ```
+
+#### **3. Get Class Capacity Analysis**
+**Endpoint:** `GET /api/v1/vice-principal/class-capacity-analysis`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      classId: number;
+      className: string;
+      subclasses: Array<{
+        id: number;
+        name: string;
+        currentEnrollment: number;
+        maxCapacity: number;
+        utilizationRate: number;
+        availableSpots: number;
+        status: "OPTIMAL" | "UNDERUTILIZED" | "OVERLOADED" | "FULL";
+        recommendations: Array<string>;
+      }>;
+      overallUtilization: number;
+      recommendations: Array<{
+        type: "BALANCE_ENROLLMENT" | "CREATE_SUBCLASS" | "MERGE_SUBCLASS";
+        description: string;
+        priority: "HIGH" | "MEDIUM" | "LOW";
+      }>;
+    }>;
+  }
+  ```
+
+#### **4. Get Quick Statistics**
+**Endpoint:** `GET /api/v1/vice-principal/quick-stats`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      totalStudents: number;
+      studentsAssigned: number;
+      pendingInterviews: number;
+      awaitingAssignment: number;
+      completionRate: number;
+      interviewCompletionRate: number;
+      urgentTasksCount: number;
+      enrollmentTrend: "INCREASING" | "DECREASING" | "STABLE";
+      averageInterviewScore: number;
+    };
+  }
+  ```

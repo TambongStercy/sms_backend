@@ -179,6 +179,38 @@ export async function deleteSubject(id: number): Promise<Subject> {
 }
 
 /**
+ * Unlinks a subject from a specific subclass.
+ * @param subjectId The ID of the subject.
+ * @param subClassId The ID of the subclass.
+ * @returns The deleted SubClassSubject record.
+ * @throws Error if the link does not exist.
+ */
+export async function unlinkSubjectFromSubClass(subjectId: number, subClassId: number): Promise<SubClassSubject> {
+    // Check if the link exists
+    const existingLink = await prisma.subClassSubject.findUnique({
+        where: {
+            sub_class_id_subject_id: {
+                subject_id: subjectId,
+                sub_class_id: subClassId,
+            },
+        },
+    });
+
+    if (!existingLink) {
+        throw new Error(`Subject with ID ${subjectId} is not linked to subclass with ID ${subClassId}`);
+    }
+
+    return prisma.subClassSubject.delete({
+        where: {
+            sub_class_id_subject_id: {
+                subject_id: subjectId,
+                sub_class_id: subClassId,
+            },
+        },
+    });
+}
+
+/**
  * Assigns a subject to all sub_classes of a class
  * @param class_id The ID of the class
  * @param subject_id The ID of the subject to assign

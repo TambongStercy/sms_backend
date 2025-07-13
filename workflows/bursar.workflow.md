@@ -3,7 +3,14 @@
 ## Post-Login Bursar Dashboard (`/bursar/dashboard`)
 
 ### **API Integration**
-**Primary Endpoint:** `GET /api/v1/bursar/dashboard`
+**Primary Endpoint:** `GET /api/v1/bursar/enhanced` (Enhanced dashboard)
+**Alternative:** `GET /api/v1/bursar/dashboard` (Basic dashboard)
+**Additional Analytics:** `GET /api/v1/dashboard/bursar/enhanced`
+**Financial Overview:** `GET /api/v1/dashboard/financial-overview`
+**Student Registration Analytics:** `GET /api/v1/dashboard/student-registration`
+**Collection Analytics:** `GET /api/v1/bursar/collection-analytics`
+**Payment Trends:** `GET /api/v1/bursar/payment-trends`
+**Defaulters Report:** `GET /api/v1/bursar/defaulters-report`
 - **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
   ```typescript
@@ -11,29 +18,80 @@
     academicYearId?: number; // Optional, defaults to current year
   }
   ```
-- **Response Data:**
+- **Enhanced Response Data:**
   ```typescript
   {
     success: true;
     data: {
-      totalFeesExpected: number;      // Total expected in FCFA
-      totalFeesCollected: number;     // Total collected in FCFA
-      pendingPayments: number;        // Count of students with pending payments
-      collectionRate: number;         // Percentage (0-100)
-      recentTransactions: number;     // Count of recent transactions
-      newStudentsThisMonth: number;   // New registrations count
-      studentsWithParents: number;    // Students linked to parent accounts
-      studentsWithoutParents: number; // Students without parent links
-      paymentMethods: Array<{
-        method: string;             // "EXPRESS_UNION" | "CCA" | "3DC"
-        count: number;              // Number of transactions
-        totalAmount: number;        // Total amount via this method
+      // Financial Overview
+      financialOverview: {
+        totalRevenue: number;          // Total revenue in FCFA
+        monthlyRevenue: number;        // This month's revenue
+        outstandingAmount: number;     // Total outstanding
+        collectionRate: number;        // Collection percentage
+        defaultersCount: number;       // Students in default
+      };
+      
+      // Enrollment Financials
+      enrollmentFinancials: {
+        totalEnrollments: number;
+        paidEnrollments: number;
+        pendingPayments: number;
+        averageFeePerStudent: number;
+      };
+      
+      // Payment Trends (12 months)
+      paymentTrends: Array<{
+        month: string;
+        collected: number;
+        target: number;
+        variance: number;
       }>;
-      recentRegistrations: Array<{
+      
+      // Recent Transactions
+      recentTransactions: Array<{
+        id: number;
         studentName: string;
-        parentName: string;
-        registrationDate: string;
+        amount: number;
+        type: string;
+        date: string;
+        status: string;
+        paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC";
+        receiptNumber: string;
+      }>;
+      
+      // Alerts & Notifications
+      alerts: {
+        overduePayments: number;
+        newDefaulters: number;
+        largePayments: number;
+        pendingInterviews: number;
+      };
+      
+      // Registration Analytics
+      registrationStats: {
+        totalRegistrations: number;
+        completedRegistrations: number;
+        pendingPayments: number;
+        rejectedApplications: number;
+      };
+      
+      // Daily/Weekly Registration Trends
+      dailyRegistrations: Array<{
+        date: string;
+        newRegistrations: number;
+        completedPayments: number;
+        pendingCount: number;
+      }>;
+      
+      // Class Distribution
+      classDistribution: Array<{
+        classId: number;
         className: string;
+        registeredStudents: number;
+        capacity: number;
+        waitingList: number;
+        averageFee: number;
       }>;
     };
   }
@@ -48,28 +106,48 @@
 │ Financial Officer & Student Registration                 │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│ ┌─── Financial Overview ───┐                           │
-│ │ 💰 Total Expected: 15,500,000 FCFA                   │
-│ │ 💵 Total Collected: 12,200,000 FCFA                  │
-│ │ 📊 Collection Rate: 79%                               │
-│ │ ⏰ Pending Payments: 127 students                     │
-│ │ 📈 This Month: +2,100,000 FCFA                       │
-│ │ 🎯 Target: 16,000,000 FCFA                           │
+│ ┌─── Enhanced Financial Overview ───┐                  │
+│ │ 💰 Total Revenue: 15,500,000 FCFA                    │
+│ │ 💵 Monthly Revenue: 2,100,000 FCFA                   │
+│ │ 📊 Collection Rate: 79% (Target: 85%)                │
+│ │ ⚠️  Outstanding: 3,300,000 FCFA                      │
+│ │ 👥 Defaulters: 45 students                           │
+│ │ 📈 Payment Trends: ↗️ +15% vs last month            │
+│ │ 🎯 Monthly Target: 2,500,000 FCFA                    │
+│ │                                                      │
+│ │ Payment Methods Breakdown:                           │
+│ │ • EXPRESS_UNION: 65% (10,075,000 FCFA)             │
+│ │ • CCA: 25% (3,875,000 FCFA)                        │
+│ │ • F3DC: 10% (1,550,000 FCFA)                       │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Recent Activity ───┐  ┌─── Pending Tasks ───┐      │
-│ │ • Payment: 75,000 FCFA │  │ • 15 new students to      │
-│ │   John Doe (Form 5A)   │  │   register fees           │
-│ │ • Payment: 125,000 FCFA│  │ • 8 fee adjustment        │
-│ │   Mary Smith (Form 3B) │  │   requests                │
-│ │ • New student enrolled │  │ • Monthly report due      │
-│ │   Peter Johnson       │  │   January 31              │
-│ │ [View All] [Export]    │  │ [Handle Tasks]            │
+│ ┌─── Recent Activity ───┐  ┌─── Alerts & Tasks ───┐     │
+│ │ • Payment: 75,000 FCFA │  │ 🔴 45 overdue payments     │
+│ │   John Doe (Form 5A)   │  │ 🟡 15 new registrations    │
+│ │   EU #R12345           │  │    need fee setup         │
+│ │ • Payment: 125,000 FCFA│  │ 🟢 8 large payments        │
+│ │   Mary Smith (Form 3B) │  │    (>100k FCFA) today     │
+│ │   CCA #R12346          │  │ ⏰ Monthly report due      │
+│ │ • New enrollment:      │  │    January 31              │
+│ │   Peter Johnson       │  │ 📊 Collection rate below   │
+│ │   Fees: 100,000 FCFA  │  │    target by 6%            │
+│ │ [View All] [Export]    │  │ [Handle All] [Dismiss]     │
 │ └─────────────────────── │  └─────────────────────────┘ │
 │                                                         │
 │ ┌─── Quick Actions ───┐                                 │
-│ │ [Register Student] [Record Payment] [Generate Report] │
-│ │ [Fee Management] [Payment History] [Parent Accounts]  │
+│ │ [📝 Register Student] [💰 Record Payment]             │
+│ │ [📊 Generate Report] [🎓 Fee Management]              │
+│ │ [👥 Parent Accounts] [📋 Defaulters List]             │
+│ │ [📈 Collection Analytics] [⚙️ Fee Structure Setup]    │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Registration & Enrollment Analytics ───┐           │
+│ │ Today's Registrations: 3 students                     │
+│ │ This Week: 15 registrations                           │
+│ │ Pending VP Interviews: 8 students                     │
+│ │ Completed Enrollments: 445 students                   │
+│ │ Class Capacity Utilization: 87% average               │
+│ │ [View Details] [Capacity Analysis]                    │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -192,6 +270,15 @@
   }
   ```
 
+### **Student Registration Process**
+
+**Key Schema Details (from Prisma):**
+- **Student Model:** `matricule` (unique), `name`, `date_of_birth`, `place_of_birth`, `gender`, `residence`, `former_school`, `is_new_student`, `status` (NOT_ENROLLED → ENROLLED → ASSIGNED_TO_CLASS)
+- **Enrollment Model:** Links student to academic year and class, optional `sub_class_id` after VP interview
+- **Class Model:** Contains fee structure: `base_fee`, `miscellaneous_fee`, `new_student_fee`, `old_student_fee`, term fees
+- **SchoolFees Model:** Tracks expected vs paid amounts, due dates, academic year context
+- **ParentStudent Model:** Links parents to students with relationship tracking
+
 ### **Enhanced Student Registration Form**
 ```
 ┌─── Register New Student ───┐
@@ -202,19 +289,23 @@
 │ │ Gender: [Male ●] [Female ○]                          │
 │ │ Residence: [Text Input]                              │
 │ │ Former School: [Text Input] (Optional)               │
-│ │ Class: [Form 1 ▼]                                    │
-│ │ New Student: [Yes ●] [No ○]                          │
+│ │ Class: [Form 1 ▼] (Capacity: 67/80)                 │
+│ │ New Student: [Yes ●] [No ○] (Affects fee structure) │
+│ │ Academic Year: [2024-2025 ▼] (Current)              │
 │ └────────────────────────────────────────────────────┘ │
 │                                                         │
 │ ┌─── Parent/Guardian Information ───┐                   │
 │ │ [Create New Parent ●] [Link Existing Parent ○]       │
 │ │                                                      │
 │ │ ── New Parent Details ──                             │
-│ │ Parent Name: [Text Input]                            │
-│ │ Phone Number: [Text Input]                           │
-│ │ WhatsApp: [Text Input] (Optional)                    │
-│ │ Email: [Text Input] (Optional)                       │
-│ │ Address: [Text Input]                                │
+│ │ Parent Name: [Text Input] *Required                  │
+│ │ Phone Number: [Text Input] *Required (677XXXXXX)    │
+│ │ WhatsApp: [Text Input] (Optional, for notifications) │
+│ │ Email: [Text Input] (Optional, for portal access)   │
+│ │ Address: [Text Input] *Required                      │
+│ │ Gender: [Male ●] [Female ○] (For matricule prefix)  │
+│ │ Date of Birth: [Date Picker] (For complete profile) │
+│ │ ID Card Number: [Text Input] (Optional)             │
 │ │ Relationship: [Father ▼] [Mother] [Guardian]         │
 │ │                                                      │
 │ │ ── OR Select Existing Parent ──                      │
@@ -258,28 +349,45 @@
 │ Student Details:                       │
 │ Name: John Doe                         │
 │ Matricule: STU2024001                  │
-│ Class: Form 1A                         │
-│ Status: Awaiting VP Interview          │
+│ Class: Form 1A (Initial Assignment)    │
+│ Status: NOT_ENROLLED → ENROLLED        │
+│ Next Step: VP Interview Required       │
 │                                        │
 │ 👤 Parent Account Created:             │
 │ Name: Mr. Johnson                      │
-│ Matricule: PAR2024001                  │
+│ Matricule: SO2024001 (SO = Parent)    │
 │ Password: TEMP123456                   │
+│ Portal Access: Enabled                 │
+│                                        │
+│ 💰 Fee Structure Applied:              │
+│ Base Fee: 75,000 FCFA                 │
+│ New Student Fee: 15,000 FCFA           │
+│ Books & Materials: 10,000 FCFA         │
+│ Total Expected: 100,000 FCFA           │
 │                                        │
 │ ⚠️ Please provide these credentials    │
 │ to the parent for login access         │
 │                                        │
-│ [Print Credentials] [Send SMS]         │
-│ [Create Fee Record] [Close]            │
+│ [Print Credentials] [Send SMS to Parent] │
+│ [✅ Auto-Create Fee Record] [Schedule VP Interview] │
+│ [Generate ID Card] [Close]              │
 └──────────────────────────────────────┘
 ```
 
 ## Fee Management (`/bursar/fees`)
 
+### **Fee Management Integration**
+
+**Key Schema Details:**
+- **SchoolFees Model:** `amount_expected`, `amount_paid`, `due_date`, `is_new_student` flag
+- **PaymentTransaction Model:** `amount`, `payment_date`, `receipt_number`, `payment_method`, `recorded_by_id`, `notes`
+- **Class Fee Structure:** Built into Class model with base fees, term fees, and student type differentiation
+
 ### **API Integration**
 
 #### **1. Get All Fees**
 **Endpoint:** `GET /api/v1/fees`
+**Enhanced Reports:** `GET /api/v1/fees/reports`
 - **Query Parameters:**
   ```typescript
   {
@@ -297,21 +405,29 @@
 - **Request Body:**
   ```typescript
   {
-    enrollmentId: number;      // Student's enrollment ID
-    amountExpected: number;    // Amount in FCFA
-    feeType?: string;          // "SCHOOL_FEES" | "BOOKS" | "UNIFORM" | "OTHER"
-    description?: string;
-    dueDate?: string;          // "YYYY-MM-DD"
-    academicYearId?: number;
+    enrollmentId: number;      // Links to student enrollment
+    amountExpected: number;    // Calculated from class fee structure
+    isNewStudent: boolean;     // Affects fee calculation
+    dueDate: string;           // "YYYY-MM-DD" (usually term start)
+    academicYearId: number;    // Required for fee period
+    
+    // Auto-calculated from Class model:
+    // baseFee + (isNewStudent ? newStudentFee : oldStudentFee) + miscellaneousFee
   }
   ```
 
 #### **3. Get Student Fees**
 **Endpoint:** `GET /api/v1/fees/student/:studentId`
 - **Query Parameters:** `{ academicYearId?: number }`
+- **Response includes:** Total expected, amount paid, balance, payment history, due dates
 
-#### **4. Get Subclass Fee Summary**
-**Endpoint:** `GET /api/v1/fees/subclass/:subClassId/summary`
+#### **4. Get Class/Subclass Fee Summary**
+**Endpoint:** `GET /api/v1/fees/sub_class/:id/summary` or `GET /api/v1/fees/subclass/:id/summary`
+- **Response:** Class-wide fee collection statistics, payment rates, outstanding balances
+
+#### **5. Fee Structure Management**
+**Class Fees:** `GET/PUT /api/v1/classes/:id` (includes fee structure)
+**Term Management:** `GET /api/v1/academic-years/:id/terms` (for term-based fee calculation)
 
 ### **Fee Management Dashboard**
 ```
@@ -363,10 +479,16 @@
 │ │ Academic Year: [2024-2025 ▼]                        │
 │ │                                                     │
 │ │ ✅ Auto-calculate based on class fee structure      │
-│ │ Base Fee: 100,000 FCFA                             │
-│ │ + New Student Fee: 25,000 FCFA                     │
-│ │ + Books & Materials: 25,000 FCFA                   │
-│ │ Total: 150,000 FCFA                                │
+│ │ Base Fee: 100,000 FCFA (from Class.base_fee)       │
+│ │ + New Student Fee: 25,000 FCFA (Class.new_student_fee) │
+│ │ + Books & Materials: 25,000 FCFA (Class.miscellaneous_fee) │
+│ │ Term Fees: First: 0, Second: 0, Third: 0          │
+│ │ Total Expected: 150,000 FCFA                       │
+│ │                                                     │
+│ │ Fee Breakdown by Term:                              │
+│ │ • First Term: 150,000 FCFA (Main fees)            │
+│ │ • Second Term: 0 FCFA (Class.second_term_fee)     │
+│ │ • Third Term: 0 FCFA (Class.third_term_fee)       │
 │ └───────────────────────────────────────────────────┘ │
 │                                                        │
 │ [Create Fee Record] [Save Draft] [Cancel]              │
@@ -379,12 +501,13 @@
 
 #### **1. Record Payment**
 **Endpoint:** `POST /api/v1/fees/:feeId/payments`
+**Enhanced Notifications:** `POST /api/v1/notifications/payment-confirmation`
 - **Request Body:**
   ```typescript
   {
     amount: number;            // Payment amount in FCFA
     paymentDate: string;       // "YYYY-MM-DD" (from receipt)
-    paymentMethod: "EXPRESS_UNION" | "CCA" | "3DC";
+    paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC"; // F3DC not 3DC (from schema)
     receiptNumber?: string;    // Receipt reference
     recordedById?: number;     // Auto-set from authentication
     notes?: string;           // Additional notes
@@ -411,16 +534,21 @@
 #### **2. Get Fee Payments**
 **Endpoint:** `GET /api/v1/fees/:feeId/payments`
 
-#### **3. Get All Payments**
-**Endpoint:** `GET /api/v1/fees/reports`
+#### **3. Get All Payments & Reports**
+**Primary:** `GET /api/v1/fees/reports`
+**Enhanced Analytics:** `GET /api/v1/bursar/collection-analytics`
+**Payment Trends:** `GET /api/v1/bursar/payment-trends`
+**Defaulters:** `GET /api/v1/bursar/defaulters-report`
 - **Query Parameters:**
   ```typescript
   {
     startDate?: string;
     endDate?: string;
-    paymentMethod?: string;
+    paymentMethod?: "EXPRESS_UNION" | "CCA" | "F3DC";
     academicYearId?: number;
-    export?: "excel" | "pdf";
+    classId?: number;
+    export?: "excel" | "pdf" | "csv";
+    reportType?: "summary" | "detailed" | "outstanding" | "collections";
   }
   ```
 
@@ -436,7 +564,7 @@
 │ │                                                     │
 │ │ Payment Amount: [____] FCFA                         │
 │ │ Payment Date: [Date Picker] (Receipt Date)          │
-│ │ Payment Method: [EXPRESS_UNION ▼] [CCA] [3DC]       │
+│ │ Payment Method: [EXPRESS_UNION ▼] [CCA] [F3DC]      │
 │ │ Receipt Number: [Text Input]                        │
 │ │ Notes: [Text Area] (Optional)                       │
 │ │                                                     │
@@ -447,7 +575,7 @@
 │ │ Time     Student        Amount      Method    Receipt │
 │ │ 14:30    John Doe       75,000 FCFA EU       #R001   │
 │ │ 13:15    Mary Smith     50,000 FCFA CCA      #R002   │
-│ │ 11:45    Peter Brown    125,000 FCFA 3DC     #R003   │
+│ │ 11:45    Peter Brown    125,000 FCFA F3DC    #R003   │
 │ │ 10:20    Sarah Davis    100,000 FCFA EU      #R004   │
 │ │                                                     │
 │ │ Today's Total: 350,000 FCFA | Transactions: 4      │
@@ -465,22 +593,28 @@
 │ Student: Mary Smith (STU2024002)    │
 │ Amount: 25,000 FCFA                 │
 │ Method: EXPRESS_UNION               │
+│ Recorded By: [Current User]         │
+│ Balance After Payment: 75,000 FCFA  │
 │ Receipt: #R002                      │
 │ Date: 2024-01-20                    │
 │                                     │
 │ Updated Balance: 0 FCFA (Fully Paid)│
 │                                     │
-│ [Print Receipt] [SMS Parent]        │
-│ [Record Another] [Close]            │
+│ [Print Receipt] [📱 SMS Parent]      │
+│ [📧 Email Receipt] [Record Another] [Close] │
 └───────────────────────────────────┘
 ```
 
 ## Reports & Analytics (`/bursar/reports`)
 
-### **API Integration**
+### **Enhanced Reporting Integration**
 
 #### **1. Financial Reports**
-**Endpoint:** `GET /api/v1/fees/reports`
+**Primary:** `GET /api/v1/fees/reports`
+**Enhanced Dashboard:** `GET /api/v1/dashboard/financial-overview`
+**Bursar Analytics:** `GET /api/v1/bursar/collection-analytics`
+**Payment Trends:** `GET /api/v1/bursar/payment-trends`
+**Defaulters Analysis:** `GET /api/v1/bursar/defaulters-report`
 - **Query Parameters:**
   ```typescript
   {
@@ -494,7 +628,12 @@
   ```
 
 #### **2. Payment Analytics**
-**Endpoint:** `GET /api/v1/bursar/dashboard` (includes payment method breakdown)
+**Enhanced Dashboard:** `GET /api/v1/dashboard/bursar/enhanced`
+**Financial Overview:** `GET /api/v1/dashboard/financial-overview`
+- **Includes:** Payment method breakdown, collection trends, defaulter analysis
+- **Time-based Analytics:** Daily, monthly, quarterly trends
+- **Class-wise Breakdowns:** Fee collection by class/subclass
+- **Comparative Analysis:** Current vs previous year performance
 
 ### **Reports Dashboard**
 ```
@@ -518,7 +657,7 @@
 │ ┌─── Quick Stats ───┐                                      │
 │ │ This Month Collections: 2,100,000 FCFA                 │
 │ │ Outstanding Total: 3,300,000 FCFA                      │
-│ │ Payment Methods: EU (65%), CCA (25%), 3DC (10%)        │
+│ │ Payment Methods: EU (65%), CCA (25%), F3DC (10%)       │
 │ │ Collection Rate: 79% (Target: 85%)                     │
 │ └───────────────────────────────────────────────────────┘ │
 │                                                            │
@@ -533,18 +672,29 @@
 
 ## Parent Account Management (`/bursar/parents`)
 
+### **Parent Management Integration**
+
+**Key Schema Details:**
+- **User Model (Parents):** Standard user with role PARENT, unique matricule with "SO" prefix
+- **ParentStudent Model:** Junction table linking parents to multiple students
+- **User Communication:** WhatsApp number for notifications, email for portal access
+
 ### **API Integration**
 
 #### **1. Get All Parents**
 **Endpoint:** `GET /api/v1/bursar/available-parents`
-- **Query Parameters:** As described in registration section
+**Enhanced:** `GET /api/v1/users/teachers` (filter by role PARENT)
+- **Query Parameters:** Search, pagination, children count filtering
 
 #### **2. Create Parent Account**
-**Included in student registration API**
+**Integrated in:** `POST /api/v1/bursar/create-parent-with-student`
+**Standalone:** `POST /api/v1/users/create-with-role` (with role: PARENT)
 
 #### **3. Link/Unlink Parent-Student**
 **Link:** `POST /api/v1/bursar/link-existing-parent`
+**Advanced Link:** `POST /api/v1/students/:id/link-parent`
 **Unlink:** `DELETE /api/v1/students/:studentId/parents/:parentId`
+**Get Links:** `GET /api/v1/students/:studentId/parents`
 
 ### **Parent Account Dashboard**
 ```
@@ -569,13 +719,21 @@
 
 ## Settings & Configuration (`/bursar/settings`)
 
-### **API Integration**
+### **Settings & Configuration Integration**
 
 #### **1. Fee Structure Management**
-**Endpoint:** `GET/PUT /api/v1/classes/:id` (includes fee information)
+**Classes:** `GET/PUT /api/v1/classes/:id` (includes all fee fields from schema)
+**Academic Terms:** `GET/POST /api/v1/academic-years/:id/terms`
+**Fee Reports:** `GET /api/v1/fees/reports` (for fee structure analysis)
 
-#### **2. Payment Methods Configuration**
-**Endpoint:** Internal system settings
+#### **2. Communication & Notifications**
+**SMS Templates:** `GET /api/v1/notifications/templates`
+**Send Payment Notifications:** `POST /api/v1/notifications/payment-confirmation`
+**Bulk Notifications:** `POST /api/v1/notifications/send-bulk`
+
+#### **3. System Settings**
+**Basic Settings:** `GET/PUT /api/v1/system/settings`
+**Payment Methods:** Configured in PaymentMethod enum (EXPRESS_UNION, CCA, F3DC)
 
 ### **Bursar Settings**
 ```
@@ -583,12 +741,17 @@
 │ [💰 Fee Structure] [💳 Payment Methods] [📱 SMS Config] │
 │                                                        │
 │ ┌─── Class Fee Structure ───┐                          │
-│ │ Class         Base Fee    New Student  Books  Total │
-│ │ Form 1        75,000     15,000       10,000  100,000│
-│ │ Form 2        80,000     15,000       12,000  107,000│
-│ │ Form 3        85,000     15,000       15,000  115,000│
-│ │ Form 4        90,000     15,000       18,000  123,000│
-│ │ Form 5        95,000     15,000       20,000  130,000│
+│ │ Class  Base Fee   New Student  Old Student  Misc    Books  Total │
+│ │ Form 1  75,000    15,000      10,000       5,000   10,000  105,000│
+│ │ Form 2  80,000    15,000      12,000       5,000   12,000  112,000│
+│ │ Form 3  85,000    15,000      15,000       5,000   15,000  120,000│
+│ │ Form 4  90,000    15,000      18,000       5,000   18,000  128,000│
+│ │ Form 5  95,000    15,000      20,000       5,000   20,000  135,000│
+│ │                                                                    │
+│ │ Term Fees (Optional):                                              │
+│ │ • First Term Fee: Included in base                                │
+│ │ • Second Term Fee: 0 (configurable)                              │
+│ │ • Third Term Fee: 0 (configurable)                               │
 │ │ [Edit Structure] [Import] [Export]                   │
 │ └──────────────────────────────────────────────────── │
 │                                                        │
@@ -615,10 +778,11 @@
 }
 
 // Common Bursar-specific errors:
-// 400: "Invalid fee amount" | "Student already has fees for this year"
-// 404: "Student not found" | "Parent not found" 
-// 409: "Parent already linked to this student"
-// 500: "Payment processing failed" | "Database error"
+// 400: "Invalid fee amount" | "Student already has fees for this year" | "Invalid payment method"
+// 404: "Student not found" | "Parent not found" | "Fee record not found" | "Enrollment not found"
+// 409: "Parent already linked to this student" | "Duplicate fee record" | "Payment amount exceeds balance"
+// 422: "Student not enrolled in academic year" | "Class capacity exceeded"
+// 500: "Payment processing failed" | "Database error" | "SMS notification failed"
 ```
 
 ### **Loading & Validation States**
@@ -635,6 +799,37 @@
 - Auto-generated receipt numbers
 - Print-friendly receipt formats
 
+### **Additional Features & Integrations**
+
+#### **Student Status Management**
+- Track student progression: NOT_ENROLLED → ENROLLED → ASSIGNED_TO_CLASS
+- Integration with VP interview process for subclass assignment
+- Automatic status updates based on payment and interview completion
+
+#### **Academic Year Context**
+- All financial operations scoped to specific academic years
+- Term-based fee management with configurable due dates
+- Cross-year comparison and analytics
+
+#### **Advanced Fee Management**
+- Coefficient-based subject fees (from SubClassSubject.coefficient)
+- Multiple fee types and categories
+- Automatic fee calculation from class structure
+- Term-wise payment tracking
+
+#### **Parent Portal Integration**
+- Auto-generated parent accounts with portal access
+- SMS and email notifications for payments
+- Quiz system access for parent-supervised assessments
+- Direct communication channels with school staff
+
+#### **Reporting & Analytics**
+- Real-time financial dashboards
+- Payment trend analysis
+- Defaulter identification and management
+- Class-wise and term-wise financial reports
+- Comparative analysis across academic years
+
 **Frontend Implementation Notes:**
 1. Implement currency formatting for FCFA amounts
 2. Add number input validation and formatting
@@ -644,4 +839,14 @@
 6. Handle offline payment recording with sync capabilities
 7. Implement proper receipt printing functionality
 8. Add SMS gateway integration status monitoring
+9. Implement fee structure inheritance from class settings
+10. Add academic year context to all financial operations
+11. Implement coefficient-based fee calculations for special programs
+12. Add multi-term fee payment scheduling
+13. Implement parent portal integration for fee viewing
+14. Add audit trail for all financial transactions
+15. Implement payment reminder automation
+16. Add support for payment plans and installments
+17. Integrate with mobile notification system for parents
+18. Add comprehensive financial analytics and forecasting
 

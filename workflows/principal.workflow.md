@@ -16,60 +16,96 @@
   {
     success: true;
     data: {
-      schoolStatistics: {
+      schoolAnalytics: {
         totalStudents: number;
-        totalClasses: number;
         totalTeachers: number;
+        totalClasses: number;
+        totalSubjects: number;
         activeExamSequences: number;
-        disciplineIssues: number;
-        averageAttendance: number;        // Percentage
-        schoolPerformance: string;        // "A+", "A", "B+", etc.
-        collectionRate: number;           // Fee collection percentage
+        averageAttendanceRate: number;
+        overallAcademicPerformance: number;
+        financialCollectionRate: number;
+        disciplineIssuesThisMonth: number;
+        newEnrollmentsThisMonth: number;
+        teacherUtilizationRate: number;
+        classCapacityUtilization: number;
       };
-      academicOverview: {
-        currentTerm: {
-          id: number;
-          name: string;
-          startDate: string;
-          endDate: string;
+      performanceMetrics: {
+        academicPerformance: {
+          overallPassRate: number;
+          averageGrade: number;
+          subjectPerformance: Array<{
+            subjectName: string;
+            averageScore: number;
+            passRate: number;
+            totalStudents: number;
+          }>;
+          classPerformance: Array<{
+            className: string;
+            subClassName: string;
+            averageScore: number;
+            passRate: number;
+            totalStudents: number;
+            teacherName: string;
+          }>;
         };
-        ongoingSequences: number;
-        reportsDue: string;               // Date or count
-        averageGrade: number;             // Out of 20
-        gradeImprovement: number;         // Compared to previous period
+        attendanceMetrics: {
+          overallAttendanceRate: number;
+          classAttendanceRates: Array<object>;
+          monthlyAttendanceTrends: Array<object>;
+        };
+        teacherPerformance: {
+          totalTeachers: number;
+          averageClassesPerTeacher: number;
+          teacherEfficiency: Array<{
+            teacherName: string;
+            subjectsTeaching: number;
+            averageStudentPerformance: number;
+            classesManaged: number;
+            attendanceRate: number;
+          }>;
+        };
       };
-      operationalStatus: {
-        pendingVPAssignments: number;
-        teacherAbsences: number;
-        feeDefaulters: number;
-        activeAnnouncements: number;
-        criticalIssues: number;
+      financialOverview: {
+        totalExpectedRevenue: number;
+        totalCollectedRevenue: number;
+        collectionRate: number;
+        pendingPayments: number;
+        paymentMethodBreakdown: Array<{
+          method: string;
+          amount: number;
+          percentage: number;
+          transactionCount: number;
+        }>;
+        outstandingDebts: Array<{
+          studentName: string;
+          className: string;
+          amountOwed: number;
+          daysOverdue: number;
+        }>;
       };
-      priorityAlerts: Array<{
-        id: number;
-        priority: "HIGH" | "MEDIUM" | "LOW";
-        category: "ACADEMIC" | "STAFF" | "DISCIPLINE" | "FINANCIAL" | "OPERATIONAL";
-        title: string;
-        description: string;
-        dueDate?: string;
-        assignedTo?: string;
-        status: "PENDING" | "IN_PROGRESS" | "RESOLVED";
-      }>;
-      recentActivities: Array<{
-        id: number;
-        timestamp: string;
-        actor: string;
-        action: string;
-        target: string;
-        status: "SUCCESS" | "PENDING" | "FAILED";
-      }>;
-      keyMetrics: {
-        enrollmentTarget: number;
-        currentEnrollment: number;
-        staffUtilization: number;         // Percentage
-        budgetUtilization: number;        // Percentage
-        parentSatisfaction: number;       // Survey score
+      disciplineOverview: {
+        totalIssues: number;
+        resolvedIssues: number;
+        pendingIssues: number;
+        averageResolutionTime: number;
+        issuesByType: Array<{
+          issueType: string;
+          count: number;
+          trend: "INCREASING" | "DECREASING" | "STABLE";
+        }>;
       };
+      staffOverview: {
+        totalStaff: number;
+        teacherCount: number;
+        administrativeStaff: number;
+        staffUtilization: Array<{
+          role: string;
+          count: number;
+          utilizationRate: number;
+        }>;
+      };
+      quickActions: Array<string>;
     };
   }
   ```
@@ -83,31 +119,51 @@
 │ School Principal - Strategic Overview                    │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│ ┌─── School Statistics ───┐                            │
-│ │ 👨‍🎓 Total Students: 1,245   🏫 Total Classes: 24       │
-│ │ 👨‍🏫 Total Teachers: 45      📝 Active Exam Sequences: 2│
-│ │ ⚠️ Discipline Issues: 8      📊 Average Attendance: 94% │
-│ │ 🎯 School Performance: B+    💰 Collection Rate: 87%   │
+│ ┌─── School Overview ───┐                               │
+│ │ 👨‍🎓 Students: [Total Students]   👨‍🏫 Teachers: [Total Teachers] │
+│ │ 🏫 Classes: [Total Classes]    📚 Subjects: [Total Subjects] │
+│ │ 📊 Avg. Attendance: [Avg. Attendance Rate]%            │
+│ │ 📈 Overall Perf.: [Overall Academic Performance]%     │
+│ │ 💰 Fee Collection: [Financial Collection Rate]%      │
+│ │ ⚠️ Discipline Issues (Month): [Discipline Issues This Month] │
+│ │ ✨ New Enrollments (Month): [New Enrollments This Month] │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Academic Overview ───┐   ┌─── Operational Status ───┐│
-│ │ Current Term: Term 2     │   │ Pending VP Assignments: 5 ││
-│ │ Ongoing Sequences: 2     │   │ Teacher Absences: 3       ││
-│ │ Reports Due: Jan 31      │   │ Fee Defaulters: 45        ││
-│ │ Average Grade: 14.2/20   │   │ Active Announcements: 3   ││
-│ │ [Academic Details]       │   │ [Review All]              ││
-│ └─────────────────────────┘   └─────────────────────────┘│
+│ ┌─── Academic Performance ───┐                           │
+│ │  Passing Rate: [Overall Pass Rate]%                  │
+│ │ Avg. Grade: [Average Grade]/20                       │
+│ │ Top Subjects:                                         │
+│ │   - [Subject 1 Name]: [Subject 1 Avg Score]%         │
+│ │   - [Subject 2 Name]: [Subject 2 Avg Score]%         │
+│ │ Top Classes:                                          │
+│ │   - [Class 1 Name]: [Class 1 Avg Score]%             │
+│ │   - [Class 2 Name]: [Class 2 Avg Score]%             │
+│ │ [View Detailed Academic Performance]                 │
+│ └─────────────────────────────────────────────────────┘ │
 │                                                         │
-│ ┌─── Recent Alerts & Actions Required ───┐              │
-│ │ 🚨 High Priority (2)                                  │
-│ │ • Teacher shortage in Mathematics Department          │
-│ │ • Parent complaint requires review (Form 5A)         │
-│ │                                                       │
-│ │ ⚠️ Medium Priority (5)                                │
-│ │ • 3 students awaiting disciplinary review            │
-│ │ • Budget request from Science Department             │
-│ │ • Staff meeting agenda approval needed               │
-│ │ [View All Alerts] [Prioritize Tasks]                │
+│ ┌─── Financial Insights ───┐                            │
+│ │ Expected: [Total Expected Revenue] FCFA              │
+│ │ Collected: [Total Collected Revenue] FCFA            │
+│ │ Pending: [Pending Payments] FCFA                     │
+│ │ Top Defaulters:                                       │
+│ │   - [Student 1 Name]: [Amount Owed 1] FCFA          │
+│ │   - [Student 2 Name]: [Amount Owed 2] FCFA          │
+│ │ [View Detailed Financials]                           │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Staff & Discipline Overview ───┐                   │
+│ │ Total Staff: [Total Staff]        Teachers: [Teacher Count] │
+│ │ Admin Staff: [Administrative Staff]                    │
+│ │ Discipline Issues (Total): [Total Issues]            │
+│ │ Resolved Issues: [Resolved Issues]                    │
+│ │ Pending Issues: [Pending Issues]                      │
+│ │ [View Detailed Staff & Discipline]                   │
+│ └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│ ┌─── Quick Actions ───┐                                  │
+│ │ [Manage Academic Year] [Review Pending Reports]        │
+│ │ [Address Discipline Cases] [Monitor Teacher Absences]  │
+│ │ [Generate Financial Report] [Update School Settings]   │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -130,55 +186,52 @@
   {
     success: true;
     data: {
-      academicStatus: {
-        academicYear: {
-          id: number;
-          name: string;
-          startDate: string;
-          endDate: string;
-        };
-        currentTerm: {
-          id: number;
-          name: string;
-          startDate: string;
-          endDate: string;
-        };
-        activeSequences: Array<{
-          id: number;
-          name: string;
-          startDate: string;
-          endDate: string;
-          status: "ACTIVE" | "COMPLETED" | "PLANNED";
-          progress: number;           // Percentage completion
-        }>;
-        schoolAverage: number;        // Out of 20
-        improvementFromLastYear: number;
-      };
-      sequenceManagement: Array<{
-        id: number;
-        name: string;
-        status: "ACTIVE" | "COMPLETED" | "PLANNED";
-        startDate: string;
-        endDate: string;
-        marksEntryProgress: number;   // Percentage
-        teachersPending: number;
-        expectedCompletion: string;
-      }>;
-      departmentPerformance: Array<{
-        departmentName: string;
-        averageScore: number;
-        status: "ABOVE_AVERAGE" | "AVERAGE" | "BELOW_AVERAGE";
-        improvement: number;          // Change from previous period
-        teacherCount: number;
-        studentCount: number;
-      }>;
+      totalStudents: number;
+      totalTeachers: number;
+      totalClasses: number;
+      totalSubjects: number;
+      activeExamSequences: number;
+      averageAttendanceRate: number;
+      overallAcademicPerformance: number;
+      financialCollectionRate: number;
+      disciplineIssuesThisMonth: number;
+      newEnrollmentsThisMonth: number;
+      teacherUtilizationRate: number;
+      classCapacityUtilization: number;
     };
   }
   ```
 
 #### **2. Get Exam Sequence Details**
-**Endpoint:** `GET /api/v1/principal/exam-sequences/:sequenceId`
-- **Response includes:** Detailed progress, pending teachers, completion status
+**Endpoint:** `GET /api/v1/academic-years/:academicYearId/exam-sequences` (Filter by `sequence_number` and `term_id` on client-side or add query parameters if needed by backend)
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `academicYearId` (number): Academic Year ID (can be retrieved from current academic year endpoint or from dashboard data)
+- **Query Parameters:**
+  ```typescript
+  {
+    termId?: number;
+    sequenceNumber?: number; // Filter by sequence number within the term
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      sequence_number: number;
+      academic_year_id: number;
+      term_id: number;
+      created_at: string;
+      updated_at: string;
+      status: "OPEN" | "CLOSED" | "FINALIZED" | "REPORTS_GENERATING" | "REPORTS_AVAILABLE" | "REPORTS_FAILED";
+      term: {
+        id: number;
+        name: string;
+      };
+    }>;
+  }
+  ```
 
 #### **3. Get Department Analytics**
 **Endpoint:** `GET /api/v1/principal/analytics/performance`
@@ -197,34 +250,34 @@
 │ [Exam Sequences] [Performance Analytics] [Curriculum] [Reports] │
 │                                                                │
 │ ┌─── Current Academic Status ───┐                              │
-│ │ Academic Year: 2024-2025                                    │
-│ │ Current Term: Term 2 (Jan 15 - Apr 30)                      │
-│ │ Active Exam Sequences: 2                                    │
-│ │ Sequences Completed: 1                                      │
-│ │ Overall School Average: 14.2/20                             │
-│ │ Improvement from Last Year: +0.8                            │
+│ │ Academic Year: [Academic Year Name]                       │
+│ │ Current Term: [Current Term Name] ([Current Term Start] - [Current Term End]) │
+│ │ Active Exam Sequences: [Active Sequences Count]             │
+│ │ Sequences Completed: [Completed Sequences Count]            │
+│ │ Overall School Average: [School Average]/20                 │
+│ │ Improvement from Last Year: [Improvement from Last Year]    │
 │ └───────────────────────────────────────────────────────────┘ │
 │                                                                │
 │ ┌─── Exam Sequence Management ───┐                             │
-│ │ Sequence 2 - Term 2 (Active)                               │
+│ │ Sequence [Sequence 2 Number] - [Term 2 Name] (Active)      │
 │ │ Status: Marks Entry in Progress                             │
-│ │ Progress: 78% complete                                      │
-│ │ Teachers Pending: 8                                         │
-│ │ Expected Completion: Jan 28                                 │
+│ │ Progress: [Marks Entry Progress]% complete                  │
+│ │ Teachers Pending: [Teachers Pending Count]                  │
+│ │ Expected Completion: [Expected Completion Date]             │
 │ │ [Monitor Progress] [Send Reminders] [Generate Reports]      │
 │ │ ─────────────────────────────────────                      │
-│ │ Sequence 3 - Term 2 (Planned)                              │
-│ │ Scheduled: Feb 15 - Feb 22                                 │
+│ │ Sequence [Sequence 3 Number] - [Term 2 Name] (Planned)     │
+│ │ Scheduled: [Sequence 3 Start] - [Sequence 3 End]          │
 │ │ Status: Not Started                                         │
 │ │ [Configure] [Set Dates] [Notify Staff]                     │
 │ └───────────────────────────────────────────────────────────┘ │
 │                                                                │
 │ ┌─── Department Performance ───┐                               │
-│ │ Mathematics: 15.2/20 (Above Average ✅)                     │
-│ │ English: 14.8/20 (Above Average ✅)                         │
-│ │ Sciences: 13.9/20 (Below Average ⚠️)                       │
-│ │ Social Studies: 14.5/20 (Average)                          │
-│ │ Languages: 15.1/20 (Above Average ✅)                       │
+│ │ Mathematics: [Math Avg Score]/20 ([Math Status])         │
+│ │ English: [English Avg Score]/20 ([English Status])       │
+│ │ Sciences: [Sciences Avg Score]/20 ([Sciences Status])     │
+│ │ Social Studies: [Social Studies Avg Score]/20 ([Social Studies Status]) │
+│ │ Languages: [Languages Avg Score]/20 ([Languages Status]) │
 │ │ [Detailed Analysis] [Intervention Plans]                   │
 │ └───────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
@@ -233,17 +286,61 @@
 ### **Exam Sequence Detail** (`/principal/academics/sequences/:sequenceId`)
 
 #### **API Integration**
-**Get Sequence Progress:** `GET /api/v1/principal/exam-sequences/:sequenceId/progress`
-- **Response includes:** Teacher completion status, class-wise progress, pending actions
 
-**Send Reminder:** `POST /api/v1/principal/exam-sequences/:sequenceId/remind`
+#### **Get Exam Sequence Details**
+**Endpoint:** `GET /api/v1/academic-years/:academicYearId/exam-sequences` (Filter by `sequence_number` and `term_id` on client-side or add query parameters if needed by backend)
+- **Headers:** `Authorization: Bearer <token>`
+- **Path Parameters:** `academicYearId` (number): Academic Year ID (can be retrieved from current academic year endpoint or from dashboard data)
+- **Query Parameters:**
+  ```typescript
+  {
+    termId?: number;
+    sequenceNumber?: number; // Filter by sequence number within the term
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: Array<{
+      id: number;
+      sequence_number: number;
+      academic_year_id: number;
+      term_id: number;
+      created_at: string;
+      updated_at: string;
+      status: "OPEN" | "CLOSED" | "FINALIZED" | "REPORTS_GENERATING" | "REPORTS_AVAILABLE" | "REPORTS_FAILED";
+      term: {
+        id: number;
+        name: string;
+      };
+    }>;
+  }
+  ```
+
+#### **Send Reminder (via Notifications System)**
+**Endpoint:** `POST /api/v1/notifications/send`
+- **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
   ```typescript
   {
-    recipientType: "ALL_TEACHERS" | "PENDING_ONLY" | "SPECIFIC";
-    teacherIds?: Array<number>;    // If SPECIFIC
-    messageTemplate?: string;
-    deadline?: string;             // "YYYY-MM-DD"
+    title: string;                 // e.g., "Reminder: Marks Submission Deadline for Sequence X"
+    message: string;               // Detailed message content
+    recipientIds: number[];        // IDs of teachers/staff to remind
+    category?: "ACADEMIC";         // Optional category for notification
+    actionUrl?: string;            // Deep link to relevant page
+    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      notificationId: string;
+      recipientCount: number;
+      sentAt: string;
+    };
   }
   ```
 
@@ -777,3 +874,178 @@
 8. Add keyboard shortcuts for common administrative actions
 9. Use proper error boundaries for complex data operations
 10. Implement offline capability for critical functions
+
+### **Report Management** (`/principal/reports`)
+
+#### **API Integration**
+
+#### **1. Get Academic Performance Report**
+**Endpoint:** `GET /api/v1/principal/reports/academic-performance`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    classId?: number;
+    subjectId?: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      academicPerformance: {
+        overallPassRate: number;
+        averageGrade: number;
+        subjectPerformance: Array<{
+          subjectName: string;
+          averageScore: number;
+          passRate: number;
+          totalStudents: number;
+        }>;
+        classPerformance: Array<{
+          className: string;
+          subClassName: string;
+          averageScore: number;
+          passRate: number;
+          totalStudents: number;
+          teacherName: string;
+        }>;
+      };
+      generatedAt: string;
+      filters: {
+        academicYearId: number | null;
+        classId: number | null;
+        subjectId: number | null;
+      };
+    };
+  }
+  ```
+
+#### **2. Get Attendance Analysis Report**
+**Endpoint:** `GET /api/v1/principal/reports/attendance-analysis`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    startDate?: string; // "YYYY-MM-DD"
+    endDate?: string;   // "YYYY-MM-DD"
+    classId?: number;
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      overallMetrics: {
+        overallAttendanceRate: number;
+        classAttendanceRates: Array<object>;
+        monthlyAttendanceTrends: Array<object>;
+      };
+      dateRange: {
+        startDate: string;
+        endDate: string;
+      };
+      classFilter: number | null;
+      summary: {
+        totalAnalyzed: number;
+        averageAttendanceRate: number;
+        trendsIdentified: number;
+        issuesDetected: number;
+      };
+      recommendations: Array<string>;
+    };
+  }
+  ```
+
+#### **3. Get Teacher Performance Analysis Report**
+**Endpoint:** `GET /api/v1/principal/reports/teacher-performance`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```typescript
+  {
+    academicYearId?: number;
+    departmentId?: number;
+    performanceThreshold?: number; // Default: 10
+  }
+  ```
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      summary: {
+        totalTeachers: number;
+        aboveThreshold: number;
+        needsImprovement: number;
+        averagePerformance: number;
+      };
+      teacherAnalysis: Array<{
+        teacherName: string;
+        subjectsTeaching: number;
+        averageStudentPerformance: number;
+        classesManaged: number;
+        attendanceRate: number;
+        performanceCategory: "ABOVE_THRESHOLD" | "NEEDS_IMPROVEMENT";
+        recommendations: Array<string>;
+      }>;
+      performanceThreshold: number;
+      generatedAt: string;
+    };
+  }
+  ```
+
+#### **4. Get Financial Performance Analysis Report**
+**Endpoint:** `GET /api/v1/principal/reports/financial-performance`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      totalExpectedRevenue: number;
+      totalCollectedRevenue: number;
+      collectionRate: number;
+      pendingPayments: number;
+      paymentMethodBreakdown: Array<object>;
+      outstandingDebts: Array<object>;
+      performanceIndicators: {
+        collectionEfficiency: "EXCELLENT" | "GOOD" | "NEEDS_IMPROVEMENT";
+        outstandingRisk: "HIGH" | "MEDIUM" | "LOW";
+        diversificationIndex: "GOOD" | "LIMITED";
+      };
+      alerts: Array<string>;
+      recommendations: Array<string>;
+    };
+  }
+  ```
+
+#### **5. Get School Overview Summary Report**
+**Endpoint:** `GET /api/v1/principal/overview/summary`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200):**
+  ```typescript
+  {
+    success: true;
+    data: {
+      keyMetrics: {
+        totalStudents: number;
+        totalTeachers: number;
+        collectionRate: number;
+        overallPassRate: number;
+        attendanceRate: number;
+        disciplineIssues: number;
+      };
+      alerts: Array<string>;
+      trends: {
+        enrollmentTrend: "INCREASING" | "STABLE" | "DECREASING";
+        performanceTrend: "IMPROVING" | "STABLE" | "DECLINING";
+        financialTrend: "POSITIVE" | "STABLE" | "CONCERNING";
+      };
+      priorities: Array<string>;
+    };
+  }
+  ```

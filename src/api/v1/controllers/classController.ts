@@ -258,6 +258,56 @@ export const updateClass = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
+export const deleteClass = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const classId = parseInt(req.params.id);
+
+        if (isNaN(classId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid class ID format'
+            });
+            return;
+        }
+
+        // Check if class exists before attempting deletion
+        const classExists = await classService.getClassById(classId);
+        if (!classExists) {
+            res.status(404).json({
+                success: false,
+                error: 'Class not found'
+            });
+            return;
+        }
+
+        await classService.deleteClass(classId);
+        res.json({ success: true, message: 'Class deleted successfully' });
+    } catch (error: any) {
+        console.error('Error deleting class:', error);
+        if (error.message === 'CLASS_HAS_SUBCLASSES') {
+            res.status(409).json({
+                success: false,
+                error: 'Cannot delete class, it has associated subclasses'
+            });
+        } else if (error.message === 'CLASS_HAS_ENROLLMENTS') {
+            res.status(409).json({
+                success: false,
+                error: 'Cannot delete class, it has associated enrollments'
+            });
+        } else if (error.code === 'P2025') { // Prisma error: Record to delete not found
+            res.status(404).json({
+                success: false,
+                error: 'Class not found'
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete class due to an internal error'
+            });
+        }
+    }
+};
+
 export const addSubClass = async (req: Request, res: Response): Promise<void> => {
     try {
         const classId = parseInt(req.params.id);

@@ -254,6 +254,31 @@ export async function updateClass(id: number, data: Partial<ClassData>): Promise
     });
 }
 
+export async function deleteClass(id: number): Promise<Class> {
+    // Check if there are any subclasses associated with this class
+    const subClassCount = await prisma.subClass.count({
+        where: { class_id: id },
+    });
+
+    if (subClassCount > 0) {
+        throw new Error('CLASS_HAS_SUBCLASSES');
+    }
+
+    // Check if there are any enrollments directly associated with this class (should be via subclass usually, but good to check)
+    const enrollmentCount = await prisma.enrollment.count({
+        where: { class_id: id },
+    });
+
+    if (enrollmentCount > 0) {
+        throw new Error('CLASS_HAS_ENROLLMENTS');
+    }
+
+    // If no associated records, proceed with deletion
+    return prisma.class.delete({
+        where: { id },
+    });
+}
+
 export async function addSubClass(class_id: number, data: { name: string }): Promise<SubClass> {
     return prisma.subClass.create({
         data: {

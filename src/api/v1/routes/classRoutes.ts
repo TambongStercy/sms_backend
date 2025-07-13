@@ -27,6 +27,10 @@ router.get('/:id', authenticate, classController.getClassById);
 // Only SUPER_MANAGER, PRINCIPAL can update classes
 router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), classController.updateClass);
 
+// DELETE /classes/:id - Delete a class
+// Only SUPER_MANAGER, PRINCIPAL can delete classes
+router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), classController.deleteClass);
+
 // POST /classes/:id/sub-classes - Add a new sub-class to a class
 // Only SUPER_MANAGER, PRINCIPAL can add sub-classes
 router.post('/:id/sub-classes', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), classController.addSubClass);

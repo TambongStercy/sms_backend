@@ -33,6 +33,10 @@ router.post('/:id/teachers', authenticate, authorize(['SUPER_MANAGER', 'MANAGER'
 // Only SUPER_MANAGER, PRINCIPAL can link subjects to sub-classes
 router.post('/:id/sub-classes', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), subjectController.linkSubjectToSubClass);
 
+// DELETE /subjects/:subjectId/sub-classes/:subClassId - Unlink subject from a sub-class
+// Only SUPER_MANAGER, PRINCIPAL can unlink subjects
+router.delete('/:subjectId/sub-classes/:subClassId', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), subjectController.unlinkSubjectFromSubClass);
+
 // POST /subjects/:subjectId/classes/:classId - Assign a subject to all sub_classes of a class
 // Only SUPER_MANAGER, PRINCIPAL can assign subjects to classes
 router.post('/:subjectId/classes/:classId', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), subjectController.assignSubjectToClass);

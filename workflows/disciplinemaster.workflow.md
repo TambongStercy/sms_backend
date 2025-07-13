@@ -2,10 +2,21 @@
 
 ## Post-Login Discipline Master Dashboard (`/discipline-master/dashboard`)
 
-### **API Integration**
+### **Enhanced API Integration**
+
+**Key Schema Details (from Prisma):**
+- **DisciplineIssue Model:** `enrollment_id`, `issue_type` (DisciplineType enum), `description`, `notes`, `assigned_by_id`, `reviewed_by_id`
+- **StudentAbsence Model:** `assigned_by_id`, `teacher_period_id`, `enrollment_id`, `absence_type` (AbsenceType enum)
+- **DisciplineType Enum:** MORNING_LATENESS, CLASS_ABSENCE, MISCONDUCT, OTHER
+- **AbsenceType Enum:** MORNING_LATENESS, CLASS_ABSENCE
+- **TeacherPeriod Model:** Links periods to subjects, teachers, and subclasses for attendance tracking
 
 #### **1. Get Discipline Master Dashboard**
-**Endpoint:** `GET /api/v1/discipline-master/dashboard`
+**Primary:** `GET /api/v1/discipline-master/dashboard`
+**Enhanced:** `GET /api/v1/dashboard/vp/enhanced` (includes disciplinary overview)
+**Behavioral Analytics:** `GET /api/v1/discipline-master/behavioral-analytics`
+**Early Warning:** `GET /api/v1/discipline-master/early-warning`
+**Statistics:** `GET /api/v1/discipline-master/statistics`
 - **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
   ```typescript

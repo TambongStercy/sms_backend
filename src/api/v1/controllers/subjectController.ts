@@ -59,10 +59,10 @@ export const getAllSubjects = async (req: Request, res: Response) => {
             delete processedFilters.include_sub_classes;
         }
 
-        
+
         const result = await subjectService.getAllSubjects(paginationOptions, processedFilters, include);
 
-        
+
         // Transform the data array within the result
         const transformedData = result.data.map(transformSubject);
 
@@ -246,6 +246,57 @@ export const deleteSubject = async (req: Request, res: Response): Promise<any> =
         res.status(500).json({
             success: false,
             error: error.message
+        });
+    }
+};
+
+/**
+ * Unlink a subject from a subclass
+ * @param req Request object containing subjectId and subClassId
+ * @param res Response object
+ */
+export const unlinkSubjectFromSubClass = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const subjectId = parseInt(req.params.subjectId);
+        const subClassId = parseInt(req.params.subClassId);
+
+        // Validate inputs
+        if (isNaN(subjectId) || isNaN(subClassId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid subject ID or subclass ID'
+            });
+            return;
+        }
+
+        // Call service to unlink subject from sub_class
+        await subjectService.unlinkSubjectFromSubClass(subjectId, subClassId);
+
+        res.json({
+            success: true,
+            message: `Subject ID ${subjectId} successfully unlinked from subclass ID ${subClassId}`
+        });
+    } catch (error: any) {
+        console.error('Error unlinking subject from subclass:', error);
+
+        if (error.message.includes('not linked')) {
+            res.status(404).json({
+                success: false,
+                error: error.message
+            });
+            return;
+        }
+        if (error.code === 'P2025') { // Prisma error code for record not found
+            res.status(404).json({
+                success: false,
+                error: 'Subject-subclass link not found'
+            });
+            return;
+        }
+
+        res.status(500).json({
+            success: false,
+            error: `Failed to unlink subject from subclass: ${error.message}`
         });
     }
 };
