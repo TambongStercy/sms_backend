@@ -2733,6 +2733,7 @@
 - Complete fee management oversight
 - Financial reporting and analysis
 - Payment method configuration
+- **Note:** The `GET /api/v1/fees` endpoint now supports comprehensive filtering by student name/ID, parent name, class, subclass, and due date (including ranges).
 
 ### **System Administration:**
 - System configuration and settings

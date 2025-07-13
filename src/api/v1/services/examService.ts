@@ -12,6 +12,7 @@ import getPuppeteerConfig from '../../../utils/puppeteer.config';
 import * as PuppeteerManager from '../../../utils/puppeteerManager';
 import { reportGenerationQueue } from '../../../config/queue';
 import * as reportSequelizeService from './reportSequelizeService';
+import moment from 'moment';
 
 export async function createExamPaper(data: {
     name: string;
@@ -773,9 +774,12 @@ async function generateSubclassReportCards(
         // Assemble the final ReportData object
         const academicYearName = context ? `${new Date(context.start_date).getFullYear()}-${new Date(context.end_date).getFullYear()}` : '';
         const studentReportData: ReportData = {
-            student: s.student,
+            student: {
+                ...s.student,
+                dateOfBirth: moment(s.student.date_of_birth).format('DD/MM/YY'), // Format date of birth here
+            },
             classInfo: {
-                className: `${context.class_name} ${context.sub_class_name}`,
+                className: `${context.sub_class_name}`, // Only show subclass name
                 enrolledStudents: enrolledStudentsCount,
                 classMaster: context.class_master_name || 'Not Assigned',
                 academicYear: academicYearName,
@@ -1067,7 +1071,7 @@ async function generateStudentReportData(
     const reportData: ReportData = {
         student: updatedStudentEntry.student,
         classInfo: {
-            className: `${context.class_name} ${context.sub_class_name}`,
+            className: `${context.sub_class_name}`, // Only show subclass name
             enrolledStudents: students.length, // Total students considered for class stats
             classMaster: context.class_master_name || 'Not Assigned',
             academicYear: academicYearName,
@@ -1781,7 +1785,7 @@ export async function checkStudentReportCardAvailability(
                 reportData: {
                     studentName: enrollment.student.name,
                     matricule: enrollment.student.matricule,
-                    className: `${enrollment.sub_class.class.name} ${enrollment.sub_class.name}`,
+                    className: `${enrollment.sub_class.name}`, // Only show subclass name
                     examSequence: examSequence.sequence_number,
                     termName: examSequence.term?.name,
                     filePath: reportRecord.file_path,
@@ -1814,7 +1818,7 @@ export async function checkStudentReportCardAvailability(
             reportData: {
                 studentName: enrollment.student.name,
                 matricule: enrollment.student.matricule,
-                className: `${enrollment.sub_class.class.name} ${enrollment.sub_class.name}`,
+                className: `${enrollment.sub_class.name}`, // Only show subclass name
                 examSequence: examSequence.sequence_number,
                 termName: examSequence.term?.name,
                 marksCount: marksCount
@@ -1899,7 +1903,7 @@ export async function checkSubclassReportCardAvailability(
                 status: reportRecord.status,
                 message: getStatusMessage(reportRecord.status),
                 reportData: {
-                    subClassName: `${subClass.class.name} ${subClass.name}`,
+                    subClassName: `${subClass.name}`, // Only show subclass name
                     enrolledStudents: enrolledStudentsCount,
                     examSequence: examSequence.sequence_number,
                     termName: examSequence.term?.name,
@@ -1934,7 +1938,7 @@ export async function checkSubclassReportCardAvailability(
             status: 'NOT_GENERATED',
             message: 'Subclass report card can be generated but has not been created yet',
             reportData: {
-                subClassName: `${subClass.class.name} ${subClass.name}`,
+                subClassName: `${subClass.name}`, // Only show subclass name
                 enrolledStudents: enrolledStudentsCount,
                 examSequence: examSequence.sequence_number,
                 termName: examSequence.term?.name,

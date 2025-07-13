@@ -2,20 +2,130 @@
 import prisma, { SchoolFees, PaymentTransaction, PaymentMethod } from '../../../config/db';
 import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
 import { shouldPayNewStudentFees, getStudentStatus, StudentStatus } from '../../../utils/studentStatus';
+import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 
-export async function getAllFees(academicYearId?: number): Promise<SchoolFees[]> {
+export async function getAllFees(
+    paginationOptions?: PaginationOptions,
+    filterOptions?: FilterOptions,
+    academicYearId?: number
+): Promise<PaginatedResult<SchoolFees>> {
     const yearId = await getAcademicYearId(academicYearId);
 
-    return prisma.schoolFees.findMany({
-        where: yearId ? { academic_year_id: yearId } : undefined,
-        include: {
-            enrollment: {
-                include: {
-                    student: true
+    const where: any = {};
+
+    if (yearId) {
+        where.academic_year_id = yearId;
+    }
+
+    if (filterOptions) {
+        // Consolidated search by name/ID
+        if (filterOptions.search) {
+            const searchString = filterOptions.search as string;
+            const searchId = parseInt(searchString, 10);
+
+            where.OR = [
+                // Search by student name
+                {
+                    enrollment: {
+                        student: {
+                            name: { contains: searchString, mode: 'insensitive' }
+                        }
+                    }
+                },
+                // Search by parent name
+                {
+                    enrollment: {
+                        student: {
+                            parent_students: {
+                                some: {
+                                    parent: {
+                                        name: { contains: searchString, mode: 'insensitive' }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
+            ];
+
+            // If searchString is a valid number, also search by student ID
+            if (!isNaN(searchId)) {
+                where.OR.push({
+                    enrollment: {
+                        student_id: searchId
+                    }
+                });
             }
         }
-    });
+
+        // Filter by class name
+        if (filterOptions.className) {
+            where.enrollment = {
+                ...(where.enrollment || {}),
+                sub_class: {
+                    ...(where.enrollment?.sub_class || {}),
+                    class: {
+                        name: { contains: filterOptions.className, mode: 'insensitive' }
+                    }
+                }
+            };
+        }
+
+        // Filter by subclass name
+        if (filterOptions.subclassName) {
+            where.enrollment = {
+                ...(where.enrollment || {}),
+                sub_class: {
+                    ...(where.enrollment?.sub_class || {}),
+                    name: { contains: filterOptions.subclassName, mode: 'insensitive' }
+                }
+            };
+        }
+
+        // Filter by due date
+        if (filterOptions.dueDate) {
+            const dueDate = new Date(filterOptions.dueDate as string);
+            if (!isNaN(dueDate.getTime())) {
+                where.due_date = { lte: dueDate }; // Fees due on or before this date
+            }
+        }
+
+        if (filterOptions.dueBeforeDate) {
+            const dueBeforeDate = new Date(filterOptions.dueBeforeDate as string);
+            if (!isNaN(dueBeforeDate.getTime())) {
+                where.due_date = { lte: dueBeforeDate };
+            }
+        }
+
+        if (filterOptions.dueAfterDate) {
+            const dueAfterDate = new Date(filterOptions.dueAfterDate as string);
+            if (!isNaN(dueAfterDate.getTime())) {
+                where.due_date = { gte: dueAfterDate };
+            }
+        }
+    }
+
+    const include: any = {
+        enrollment: {
+            include: {
+                student: {
+                    include: { parent_students: { include: { parent: true } } } // Include parents for filtering
+                },
+                sub_class: {
+                    include: { class: true }
+                }
+            }
+        },
+        academic_year: true,
+        payment_transactions: true
+    };
+
+    return paginate<SchoolFees>(
+        prisma.schoolFees,
+        paginationOptions,
+        where,
+        include
+    );
 }
 
 /**

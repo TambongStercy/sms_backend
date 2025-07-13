@@ -164,7 +164,7 @@ Each child gets a card showing:
           examSequence: {
             id: number;
             name: string;
-            academicYear: string;
+          academicYear: string;
           };
           status: "COMPLETED" | "GENERATING" | "FAILED" | "PENDING";
           generatedAt?: string;
@@ -1182,9 +1182,9 @@ For reports being generated:
     success: true;
     data: {
       announcements: Array<{
-        id: number;
-        title: string;
-        content: string;
+      id: number;
+      title: string;
+      content: string;
         audience: "ALL" | "STUDENTS" | "PARENTS" | "TEACHERS" | "STAFF";
         priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
         isActive: boolean;
@@ -1205,7 +1205,7 @@ For reports being generated:
           startDate: string;
           endDate: string;
         };
-      }>;
+    }>;
       pagination: {
         currentPage: number;
         totalPages: number;

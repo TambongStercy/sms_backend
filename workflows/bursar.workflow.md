@@ -444,8 +444,10 @@
 │ └───────────────────────────────────────────────────┘ │
 │                                                        │
 │ ┌─── Filter & Search ───┐                             │
-│ │ Class: [All ▼] | Status: [All ▼] | Search: [____]  │
-│ │ Amount Range: [Min] - [Max] FCFA                    │
+│ │ Search: [Name/ID/Parent Name ____]                │
+│ │ Class: [All ▼] | Subclass: [All ▼]                 │
+│ │ Due Date: [From Date Picker] - [To Date Picker]    │
+│ │ Payment Status: [All ▼] [Paid] [Partial] [Unpaid]  │
 │ │ [Apply Filters] [Clear] [Export Filtered]           │
 │ └───────────────────────────────────────────────────┘ │
 │                                                        │

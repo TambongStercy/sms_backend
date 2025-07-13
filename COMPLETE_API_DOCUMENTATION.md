@@ -3614,6 +3614,15 @@ Authorization: Bearer <token>
 ```typescript
 {
   academicYearId?: number;
+  page?: number;
+  limit?: number;
+  search?: string;           // Student name, parent name, or student ID
+  classId?: number;
+  subClassId?: number;
+  dueDate?: string;          // "YYYY-MM-DD" - Fees due on or before this date
+  dueBeforeDate?: string;    // "YYYY-MM-DD" - Fees due on or before this date
+  dueAfterDate?: string;     // "YYYY-MM-DD" - Fees due on or after this date
+  paymentStatus?: "PAID" | "PARTIAL" | "UNPAID"; // Filter by payment status (existing parameter)
 }
 ```
 

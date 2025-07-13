@@ -1,14 +1,28 @@
 // src/api/v1/controllers/feeController.ts
 import { Request, Response } from 'express';
 import * as feeService from '../services/feeService';
+import { PaginationOptions, FilterOptions } from '../../../utils/pagination';
 
 export const getAllFees = async (req: Request, res: Response) => {
     try {
-        // Use snake_case directly - middleware handles the conversion
         const academic_year_id = req.finalQuery.academic_year_id ?
             parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
-        const fees = await feeService.getAllFees(academic_year_id);
+        const paginationOptions: PaginationOptions = {
+            page: req.finalQuery.page ? parseInt(req.finalQuery.page as string) : undefined,
+            limit: req.finalQuery.limit ? parseInt(req.finalQuery.limit as string) : undefined,
+        };
+
+        const filterOptions: FilterOptions = {
+            search: req.finalQuery.search as string, // Consolidated search
+            className: req.finalQuery.className as string,
+            subclassName: req.finalQuery.subclassName as string,
+            dueDate: req.finalQuery.dueDate as string,
+            dueBeforeDate: req.finalQuery.dueBeforeDate as string,
+            dueAfterDate: req.finalQuery.dueAfterDate as string,
+        };
+
+        const fees = await feeService.getAllFees(paginationOptions, filterOptions, academic_year_id);
         res.json({
             success: true,
             data: fees
