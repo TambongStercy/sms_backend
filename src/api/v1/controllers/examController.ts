@@ -322,12 +322,11 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
         // Check the status
         switch (reportRecord.status) {
             case ReportStatus.COMPLETED:
-                if (!reportRecord.file_path || !reportRecord.page_number) {
+                if (!reportRecord.file_path) {
                     res.status(500).json({
                         success: false,
-                        error: 'Report generation completed, but file path or page number is missing.'
+                        error: 'Report generation completed, but file path is missing.'
                     });
-                    //TODO: Generate the report again
                     return;
                 }
                 const absolutePath = path.join(process.cwd(), reportRecord.file_path);
@@ -341,33 +340,48 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
                     return;
                 }
 
-                try {
-                    // Extract the specific page using pdf-lib
-                    const pdfBytes = fs.readFileSync(absolutePath);
-                    const pdfDoc = await PDFDocument.load(pdfBytes);
-                    const totalPages = pdfDoc.getPageCount();
-                    const pageNumZeroBased = reportRecord.page_number - 1; // pdf-lib uses 0-based index
+                // If page number is available, extract the specific page from a combined document
+                if (reportRecord.page_number) {
+                    try {
+                        // Extract the specific page using pdf-lib
+                        const pdfBytes = fs.readFileSync(absolutePath);
+                        const pdfDoc = await PDFDocument.load(pdfBytes);
+                        const totalPages = pdfDoc.getPageCount();
+                        const pageNumZeroBased = reportRecord.page_number - 1; // pdf-lib uses 0-based index
 
-                    if (pageNumZeroBased < 0 || pageNumZeroBased >= totalPages) {
-                        throw new Error(`Invalid page number (${reportRecord.page_number}) for PDF with ${totalPages} pages.`);
+                        if (pageNumZeroBased < 0 || pageNumZeroBased >= totalPages) {
+                            throw new Error(`Invalid page number (${reportRecord.page_number}) for PDF with ${totalPages} pages.`);
+                        }
+
+                        const newPdfDoc = await PDFDocument.create();
+                        const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNumZeroBased]);
+                        newPdfDoc.addPage(copiedPage);
+
+                        const newPdfBytes = await newPdfDoc.save();
+
+                        // Send the extracted page
+                        const student = await prisma.student.findUnique({ where: { id: studentId }, select: { matricule: true } });
+                        const filename = `report-student-${student?.matricule || studentId}-seq-${exam_sequence_id}.pdf`;
+                        res.setHeader('Content-Type', 'application/pdf');
+                        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                        res.send(Buffer.from(newPdfBytes)); // Send the extracted page bytes
+
+                    } catch (pdfError: any) {
+                        console.error(`Error extracting page ${reportRecord.page_number} from ${absolutePath}:`, pdfError);
+                        res.status(500).json({ success: false, error: "Failed to extract student report page from combined PDF.", details: pdfError.message });
                     }
-
-                    const newPdfDoc = await PDFDocument.create();
-                    const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNumZeroBased]);
-                    newPdfDoc.addPage(copiedPage);
-
-                    const newPdfBytes = await newPdfDoc.save();
-
-                    // Send the extracted page
-                    const student = await prisma.student.findUnique({ where: { id: studentId }, select: { matricule: true } });
-                    const filename = `report-student-${student?.matricule || studentId}-seq-${exam_sequence_id}.pdf`;
-                    res.setHeader('Content-Type', 'application/pdf');
-                    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-                    res.send(Buffer.from(newPdfBytes)); // Send the extracted page bytes
-
-                } catch (pdfError: any) {
-                    console.error(`Error extracting page ${reportRecord.page_number} from ${absolutePath}:`, pdfError);
-                    res.status(500).json({ success: false, error: "Failed to extract student report page from combined PDF.", details: pdfError.message });
+                } else {
+                    // No page number, assume the file_path points to the individual student's report and serve it directly
+                    try {
+                        const student = await prisma.student.findUnique({ where: { id: studentId }, select: { matricule: true } });
+                        const filename = `report-student-${student?.matricule || studentId}-seq-${exam_sequence_id}.pdf`;
+                        res.setHeader('Content-Type', 'application/pdf');
+                        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                        fs.createReadStream(absolutePath).pipe(res);
+                    } catch (streamError: any) {
+                        console.error(`Error streaming direct report file ${absolutePath}:`, streamError);
+                        res.status(500).json({ success: false, error: "Failed to serve student report file.", details: streamError.message });
+                    }
                 }
                 break;
 
