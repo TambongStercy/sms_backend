@@ -1700,19 +1700,79 @@ export async function updateExamSequenceStatus(
 }
 
 export async function deleteExamPaper(id: number): Promise<ExamPaper> {
-    // Check if exam paper exists
-    const examPaper = await prisma.examPaper.findUnique({
-        where: { id }
+    // Check for related exam paper questions first
+    const relatedQuestions = await prisma.examPaperQuestion.count({
+        where: { exam_paper_id: id }
     });
 
-    if (!examPaper) {
-        throw new Error(`Exam paper with ID ${id} not found`);
+    if (relatedQuestions > 0) {
+        throw new Error('Cannot delete this exam paper because it has associated questions.');
     }
 
-    // Delete the exam paper by ID
-    return prisma.examPaper.delete({
-        where: { id }
+    // You may want to check other dependencies here if any
+
+    try {
+        const deletedPaper = await prisma.examPaper.delete({
+            where: { id: id },
+        });
+        return deletedPaper;
+    } catch (error: any) {
+        // Handle cases where the record to delete does not exist
+        if (error.code === 'P2025') {
+            throw new Error(`Exam paper with ID ${id} not found.`);
+        }
+        throw error;
+    }
+}
+
+/**
+ * Regenerates a student's report card by queuing a background job.
+ * Finds or creates a report record, sets it to PENDING, and dispatches the job.
+ */
+export async function regenerateStudentReportCard(
+    studentId: number,
+    academicYearId: number,
+    examSequenceId: number
+): Promise<any> {
+    // 1. Find or create the GeneratedReport record
+    let reportRecord = await prisma.generatedReport.findFirst({
+        where: {
+            student_id: studentId,
+            academic_year_id: academicYearId,
+            exam_sequence_id: examSequenceId,
+            report_type: ReportType.SINGLE_STUDENT,
+        },
     });
+
+    if (reportRecord) {
+        // If it exists, update status to PENDING
+        reportRecord = await prisma.generatedReport.update({
+            where: { id: reportRecord.id },
+            data: { status: ReportStatus.PENDING, error_message: null },
+        });
+    } else {
+        // If not, create a new record
+        reportRecord = await prisma.generatedReport.create({
+            data: {
+                student_id: studentId,
+                academic_year_id: academicYearId,
+                exam_sequence_id: examSequenceId,
+                report_type: ReportType.SINGLE_STUDENT,
+                status: ReportStatus.PENDING,
+            },
+        });
+    }
+
+    // 2. Add the job to the queue
+    await reportGenerationQueue.add('generate-single-report', {
+        reportId: reportRecord.id, // Pass the ID of the record to the worker
+        studentId,
+        academicYearId,
+        examSequenceId,
+    });
+
+    // 3. Return the initial record to the client
+    return reportRecord;
 }
 
 /**
@@ -1966,5 +2026,55 @@ function getStatusMessage(status: string): string {
         default:
             return 'Unknown status';
     }
+}
+
+/**
+ * Regenerates a subclass's report card by queuing a background job.
+ * Finds or creates a report record, sets it to PENDING, and dispatches the job.
+ */
+export async function regenerateSubclassReportCards(
+    subClassId: number,
+    academicYearId: number,
+    examSequenceId: number
+): Promise<any> {
+    // 1. Find or create the GeneratedReport record
+    let reportRecord = await prisma.generatedReport.findFirst({
+        where: {
+            sub_class_id: subClassId,
+            academic_year_id: academicYearId,
+            exam_sequence_id: examSequenceId,
+            report_type: ReportType.SUBCLASS,
+        },
+    });
+
+    if (reportRecord) {
+        // If it exists, update status to PENDING
+        reportRecord = await prisma.generatedReport.update({
+            where: { id: reportRecord.id },
+            data: { status: ReportStatus.PENDING, error_message: null },
+        });
+    } else {
+        // If not, create a new record
+        reportRecord = await prisma.generatedReport.create({
+            data: {
+                sub_class_id: subClassId,
+                academic_year_id: academicYearId,
+                exam_sequence_id: examSequenceId,
+                report_type: ReportType.SUBCLASS,
+                status: ReportStatus.PENDING,
+            },
+        });
+    }
+
+    // 2. Add the job to the queue
+    await reportGenerationQueue.add('generate-subclass-report', {
+        reportId: reportRecord.id,
+        subClassId,
+        academicYearId,
+        examSequenceId,
+    });
+
+    // 3. Return the initial record to the client
+    return reportRecord;
 }
 
