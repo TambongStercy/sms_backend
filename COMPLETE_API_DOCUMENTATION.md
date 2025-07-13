@@ -6636,6 +6636,88 @@ GET /api/v1/students/:studentId/parents
 Authorization: Bearer <token>
 ```
 
+### Search Students
+```http
+GET /api/v1/students/search
+Authorization: Bearer <token>
+```
+
+**Description:**
+Searches for students by their name or matricule, with optional filtering by academic year and pagination.
+
+**Authorization:**
+- Any authenticated user.
+
+**Query Parameters:**
+```typescript
+{
+  q: string;             // Required: Search query (student name or matricule, minimum 1 character)
+  academicYearId?: number; // Optional: Filter by academic year
+  page?: number;         // Optional: Page number for pagination (default: 1)
+  limit?: number;        // Optional: Number of items per page (default: 10)
+}
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    data: Array<{
+      id: number;
+      matricule: string;
+      name: string;
+      dateOfBirth: string;
+      placeOfBirth: string;
+      gender: "MALE" | "FEMALE";
+      residence: string;
+      formerSchool?: string;
+      isNewStudent: boolean;
+      status: "NOT_ENROLLED" | "ENROLLED" | "ASSIGNED_TO_CLASS" | "GRADUATED" | "TRANSFERRED" | "SUSPENDED";
+      enrollments: Array<{
+        id: number;
+        classId: number;
+        subClassId?: number;
+        academicYearId: number;
+        repeater: boolean;
+        photo?: string;
+        subClass?: {
+          id: number;
+          name: string;
+          class: {
+            id: number;
+            name: string;
+          };
+        };
+      }>;
+      parents: Array<{
+        id: number;
+        parent: {
+          id: number;
+          name: string;
+          email: string;
+          phone: string;
+        };
+      }>;
+    }>;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  };
+}
+```
+
+**Error Responses:**
+```typescript
+{
+  success: false;
+  error: "Search query is required and must be at least 1 character"
+}
+```
+
 ---
 
 ## User Management

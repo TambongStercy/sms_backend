@@ -24,8 +24,8 @@ app.use(
     })
 );
 
-// Enable Cross-Origin Resource Sharing
-app.use(cors());
+// // Enable Cross-Origin Resource Sharing
+// app.use(cors());
 
 // Parse incoming JSON requests
 app.use(express.json());
