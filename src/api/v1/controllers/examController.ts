@@ -784,25 +784,37 @@ export const deleteExamPaper = async (req: Request, res: Response): Promise<any>
  */
 export const regenerateStudentReportCard = async (req: Request, res: Response): Promise<void> => {
     try {
-        const studentId = parseInt(req.params.studentId, 10);
-        const academicYearId = Number(req.body.academicYearId ?? req.body.academic_year_id);
-        const examSequenceId = Number(req.body.examSequenceId ?? req.body.exam_sequence_id);
+        const studentId = parseInt(req.params.studentId);
+        const { academic_year_id, exam_sequence_id } = req.body;
 
-        if (!academicYearId || !examSequenceId) {
-            res.status(400).json({ success: false, error: 'academicYearId and examSequenceId are required in the request body.' });
+        if (isNaN(studentId) || !academic_year_id || !exam_sequence_id) {
+            res.status(400).json({ success: false, error: 'Valid studentId, academicYearId, and examSequenceId must be provided.' });
             return;
         }
 
-        const reportRecord = await examService.regenerateStudentReportCard(studentId, academicYearId, examSequenceId);
-
-        res.status(202).json({
-            success: true,
-            message: 'Report card regeneration has been queued.',
-            data: reportRecord,
+        const filePath = await examService.generateReportCard({
+            studentId,
+            academicYearId: parseInt(academic_year_id),
+            examSequenceId: parseInt(exam_sequence_id)
         });
+
+        res.download(filePath, `report-card-student-${studentId}.pdf`, async (err) => {
+            if (err) {
+                console.error('Error sending file for download:', err);
+            }
+            try {
+                // await fs.promises.unlink(filePath);
+            } catch (cleanupError) {
+                console.error(`Error cleaning up report file ${filePath}:`, cleanupError);
+            }
+        });
+
     } catch (error: any) {
         console.error('Error regenerating student report card:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error while regenerating student report card.'
+        });
     }
 };
 
@@ -812,23 +824,31 @@ export const regenerateStudentReportCard = async (req: Request, res: Response): 
  */
 export const regenerateSubclassReportCards = async (req: Request, res: Response): Promise<void> => {
     try {
-        const subClassId = parseInt(req.params.subClassId as string);
+        const subClassId = parseInt(req.params.subclassId ?? req.params.subClassId ?? req.params.id);
         const academicYearId = Number(req.body.academicYearId ?? req.body.academic_year_id);
         const examSequenceId = Number(req.body.examSequenceId ?? req.body.exam_sequence_id);
 
-        if (isNaN(subClassId) || !academicYearId || !examSequenceId) {
-            res.status(400).json({ success: false, error: 'Valid subClassId, academicYearId, and examSequenceId must be provided.' });
-            return;
+        if (isNaN(subClassId) || isNaN(academicYearId) || isNaN(examSequenceId)) {
+            return res.status(400).json({ success: false, error: 'Valid subClassId, academicYearId, and examSequenceId must be provided.' });
         }
 
-        // Call the service function to queue the job
-        const reportRecord = await examService.regenerateSubclassReportCards(subClassId, academicYearId, examSequenceId);
-
-        res.status(202).json({
-            success: true,
-            message: 'Subclass report card regeneration has been queued.',
-            data: reportRecord,
+        const filePath = await examService.generateReportCard({
+            sub_classId: subClassId,
+            academicYearId: academicYearId,
+            examSequenceId: examSequenceId
         });
+
+        res.download(filePath, `report-cards-subclass-${subClassId}.pdf`, async (err) => {
+            if (err) {
+                console.error('Error sending file for download:', err);
+            }
+            try {
+                // await fs.promises.unlink(filePath);
+            } catch (cleanupError) {
+                console.error(`Error cleaning up report file ${filePath}:`, cleanupError);
+            }
+        });
+
     } catch (error: any) {
         console.error('Error regenerating subclass report cards:', error);
         res.status(500).json({

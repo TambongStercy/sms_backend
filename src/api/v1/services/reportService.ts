@@ -203,7 +203,7 @@ async function generateStudentReportDataForWorker(
         student: {
             name: enrollment.student.name,
             matricule: enrollment.student.matricule,
-            dateOfBirth: new Date(enrollment.student.date_of_birth).toLocaleDateString('en-GB'), // Format to dd/mm/yyyy
+            dateOfBirth: enrollment.student.date_of_birth.toISOString().split('T')[0],
             placeOfBirth: enrollment.student.place_of_birth,
             gender: enrollment.student.gender,
             repeater: enrollment.repeater,

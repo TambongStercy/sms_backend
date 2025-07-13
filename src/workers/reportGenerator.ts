@@ -25,172 +25,172 @@ const processReportJob = async (job: Job) => {
     const { generatedReportId, reportType, studentId, subClassId, academicYearId, examSequenceId } = job.data;
     console.log(`Processing report job ${job.id} (${reportType}) for GeneratedReport ID: ${generatedReportId}`);
 
+    if (reportType !== ReportType.SUBCLASS || !subClassId) {
+        console.warn(`Worker received unexpected job type (${reportType}) or missing subClassId for job ${job.id}. Skipping.`);
+        // Optionally mark the unexpected job record as failed?
+        // await prisma.generatedReport.update({ where: { id: generatedReportId }, data: { status: ReportStatus.FAILED, error_message: "Invalid job type received by worker" }});
+        return; // Only process SUBCLASS jobs now
+    }
+
     let generatedFilePath: string | null = null;
+    let processedStudentIds: number[] = [];
 
     try {
-        // Mark the report record as PROCESSING
+        // 1. Mark the SUBCLASS report record as PROCESSING
         await prisma.generatedReport.update({
             where: { id: generatedReportId },
             data: { status: ReportStatus.PROCESSING, error_message: null },
         });
 
-        // Determine the final save path
+        // Determine the final save path for the combined PDF
         const basePath = path.join(process.cwd(), 'src', 'reports', 'generated');
         const academicYear = await prisma.academicYear.findUnique({ where: { id: academicYearId }, select: { name: true } });
         const yearFolderName = academicYear?.name?.replace(/\//g, '-') || `year-${academicYearId}`;
         const sequenceFolderName = `seq-${examSequenceId}`;
+        const subClassInfo = await prisma.subClass.findUnique({ where: { id: subClassId }, select: { name: true, class: { select: { name: true } } } });
+        const subClassFolderName = `subclass-${subClassInfo?.class?.name || ''}-${subClassInfo?.name || subClassId}`.replace(/\s+/g, '-');
+        const subclassFileName = `Subclass-${subClassId}-Seq-${examSequenceId}-Report.pdf`;
+        const finalSavePath = path.join(basePath, yearFolderName, sequenceFolderName, subClassFolderName, subclassFileName);
+        ensureDirectoryExists(finalSavePath);
 
-        if (reportType === ReportType.SUBCLASS && subClassId) {
-            const subClassInfo = await prisma.subClass.findUnique({ where: { id: subClassId }, select: { name: true, class: { select: { name: true } } } });
-            const subClassFolderName = `subclass-${subClassInfo?.class?.name || ''}-${subClassInfo?.name || subClassId}`.replace(/\s+/g, '-');
-            const subclassFileName = `Subclass-${subClassId}-Seq-${examSequenceId}-Report.pdf`;
-            const finalSavePath = path.join(basePath, yearFolderName, sequenceFolderName, subClassFolderName, subclassFileName);
-            ensureDirectoryExists(finalSavePath);
+        console.log(`[Job ${job.id}] Generating combined subclass PDF at: ${finalSavePath}`);
 
-            console.log(`[Job ${job.id}] Generating combined subclass PDF at: ${finalSavePath}`);
-            generatedFilePath = await reportService.generateAndSaveSubclassPdf(subClassId, academicYearId, examSequenceId, finalSavePath);
+        // 2. Generate the combined PDF for the subclass
+        // This function now handles fetching all students, generating HTML, and creating the multi-page PDF.
+        generatedFilePath = await reportService.generateAndSaveSubclassPdf(
+            subClassId,
+            academicYearId,
+            examSequenceId,
+            finalSavePath
+        );
 
-            if (!generatedFilePath || !fs.existsSync(generatedFilePath)) {
-                throw new Error('Subclass PDF generation failed or file not found.');
-            }
+        if (!generatedFilePath || !fs.existsSync(generatedFilePath)) {
+            throw new Error('Subclass PDF generation failed or file not found after generation.');
+        }
 
-            const relativeFilePath = path.relative(process.cwd(), generatedFilePath);
-            await updateSubclassAndStudentRecords(generatedReportId, relativeFilePath, subClassId, academicYearId, examSequenceId);
+        const relativeFilePath = path.relative(process.cwd(), generatedFilePath);
 
-        } else if (reportType === ReportType.SINGLE_STUDENT && studentId) {
-            const studentInfo = await prisma.student.findUnique({ where: { id: studentId }, select: { name: true, matricule: true } });
-            const studentFileName = `Student-${studentInfo?.matricule || studentId}-Seq-${examSequenceId}-Report.pdf`;
-            const finalSavePath = path.join(basePath, yearFolderName, sequenceFolderName, 'students', studentFileName);
-            ensureDirectoryExists(finalSavePath);
+        // 3. Mark the SUBCLASS report record as COMPLETED
+        await prisma.generatedReport.update({
+            where: { id: generatedReportId },
+            data: {
+                status: ReportStatus.COMPLETED,
+                file_path: relativeFilePath,
+                error_message: null,
+            },
+        });
+        console.log(`[Job ${job.id}] Successfully processed SUBCLASS report job. PDF saved at: ${relativeFilePath}`);
 
-            console.log(`[Job ${job.id}] Generating single student PDF at: ${finalSavePath}`);
-            generatedFilePath = await reportService.generateAndSaveSingleStudentPdf(studentId, academicYearId, examSequenceId, finalSavePath);
+        // 4. Update corresponding SINGLE_STUDENT records
+        console.log(`[Job ${job.id}] Updating individual student report records...`);
+        // Find students who were actually included (assuming 1 page per student)
+        // Need to fetch enrollments again to know the order they were processed in generateAndSaveSubclassPdf
+        const processedEnrollments = await prisma.enrollment.findMany({
+            where: {
+                sub_class_id: subClassId,
+                academic_year_id: academicYearId,
+                // Ensure we only consider students who actually have marks for this sequence
+                marks: { some: { exam_sequence_id: examSequenceId } }
+            },
+            select: { student_id: true },
+            orderBy: { student: { name: 'asc' } } // MUST match the order used in PDF generation
+        });
 
-            if (!generatedFilePath || !fs.existsSync(generatedFilePath)) {
-                throw new Error('Single student PDF generation failed or file not found.');
-            }
+        const studentUpdatePromises = processedEnrollments.map((enrollment, index) => {
+            const studentPageNumber = index + 1; // Assign page number based on sorted order
+            processedStudentIds.push(enrollment.student_id);
+            return prisma.generatedReport.upsert({
+                where: {
+                    report_type_exam_sequence_id_academic_year_id_student_id: {
+                        report_type: ReportType.SINGLE_STUDENT,
+                        exam_sequence_id: examSequenceId,
+                        academic_year_id: academicYearId,
+                        student_id: enrollment.student_id,
+                    }
+                },
+                update: {
+                    status: ReportStatus.COMPLETED,
+                    file_path: relativeFilePath, // Link to the combined PDF
+                    page_number: studentPageNumber,
+                    error_message: null,
+                    sub_class_id: subClassId, // Ensure subclass ID is set
+                },
+                create: {
+                    report_type: ReportType.SINGLE_STUDENT,
+                    exam_sequence_id: examSequenceId,
+                    academic_year_id: academicYearId,
+                    student_id: enrollment.student_id,
+                    sub_class_id: subClassId,
+                    status: ReportStatus.COMPLETED,
+                    file_path: relativeFilePath,
+                    page_number: studentPageNumber,
+                },
+            });
+        });
 
-            const relativeFilePath = path.relative(process.cwd(), generatedFilePath);
+        // Also find any students in the subclass *without* marks for this sequence
+        // and mark their SINGLE_STUDENT report record as FAILED or N/A.
+        const allSubclassEnrollments = await prisma.enrollment.findMany({
+            where: { sub_class_id: subClassId, academic_year_id: academicYearId },
+            select: { student_id: true }
+        });
+        const studentsWithoutMarks = allSubclassEnrollments.filter(e => !processedStudentIds.includes(e.student_id));
+
+        const failedUpdatePromises = studentsWithoutMarks.map(enrollment => {
+            return prisma.generatedReport.upsert({
+                where: {
+                    report_type_exam_sequence_id_academic_year_id_student_id: {
+                        report_type: ReportType.SINGLE_STUDENT,
+                        exam_sequence_id: examSequenceId,
+                        academic_year_id: academicYearId,
+                        student_id: enrollment.student_id,
+                    }
+                },
+                update: {
+                    status: ReportStatus.FAILED,
+                    error_message: "Student had no marks for this sequence.",
+                    file_path: null,
+                    page_number: null,
+                    sub_class_id: subClassId,
+                },
+                create: {
+                    report_type: ReportType.SINGLE_STUDENT,
+                    exam_sequence_id: examSequenceId,
+                    academic_year_id: academicYearId,
+                    student_id: enrollment.student_id,
+                    sub_class_id: subClassId,
+                    status: ReportStatus.FAILED,
+                    error_message: "Student had no marks for this sequence.",
+                },
+            });
+        });
+
+        await Promise.all([...studentUpdatePromises, ...failedUpdatePromises]);
+        console.log(`[Job ${job.id}] Finished updating/creating ${processedEnrollments.length} successful and ${studentsWithoutMarks.length} failed/N/A student report records.`);
+
+    } catch (error: any) {
+        console.error(`[Job ${job.id}] Error processing SUBCLASS report job (GeneratedReport ID: ${generatedReportId}):`, error);
+        // Mark the main SUBCLASS record as FAILED
+        try {
             await prisma.generatedReport.update({
                 where: { id: generatedReportId },
                 data: {
-                    status: ReportStatus.COMPLETED,
-                    file_path: relativeFilePath,
-                    page_number: 1,
-                    error_message: null,
+                    status: ReportStatus.FAILED,
+                    error_message: error.message || 'Unknown error during combined report generation',
                 },
             });
-            console.log(`[Job ${job.id}] Successfully processed SINGLE_STUDENT report job. PDF saved at: ${relativeFilePath}`);
-
-        } else {
-            throw new Error(`Invalid job type (${reportType}) or missing required IDs (studentId/subClassId).`);
+            // Optionally mark associated student records as failed too?
+        } catch (updateError) {
+            console.error(`[Job ${job.id}] Failed to update SUBCLASS GeneratedReport ${generatedReportId} status to FAILED:`, updateError);
         }
-
-    } catch (error: any) {
-        console.error(`[Job ${job.id}] Error processing report job (GeneratedReport ID: ${generatedReportId}):`, error);
-        await prisma.generatedReport.update({
-            where: { id: generatedReportId },
-            data: { status: ReportStatus.FAILED, error_message: error.message || 'Unknown error during report generation' },
-        });
+        // Clean up partially generated file if it exists
         if (generatedFilePath && fs.existsSync(generatedFilePath)) {
             try { fs.unlinkSync(generatedFilePath); } catch (e) { console.error(`Failed to delete partial file ${generatedFilePath}`); }
         }
+        // Re-throw the error to let BullMQ handle retries/failure
         throw error;
     }
 };
-
-async function updateSubclassAndStudentRecords(
-    subclassReportId: number,
-    filePath: string,
-    subClassId: number,
-    academicYearId: number,
-    examSequenceId: number
-) {
-    await prisma.generatedReport.update({
-        where: { id: subclassReportId },
-        data: { status: ReportStatus.COMPLETED, file_path: filePath, error_message: null },
-    });
-
-    const processedEnrollments = await prisma.enrollment.findMany({
-        where: {
-            sub_class_id: subClassId,
-            academic_year_id: academicYearId,
-            marks: { some: { exam_sequence_id: examSequenceId } }
-        },
-        select: { student_id: true },
-        orderBy: { student: { name: 'asc' } }
-    });
-
-    const studentUpdatePromises = processedEnrollments.map((enrollment, index) =>
-        prisma.generatedReport.upsert({
-            where: {
-                report_type_exam_sequence_id_academic_year_id_student_id: {
-                    report_type: ReportType.SINGLE_STUDENT,
-                    exam_sequence_id: examSequenceId,
-                    academic_year_id: academicYearId,
-                    student_id: enrollment.student_id,
-                }
-            },
-            update: {
-                status: ReportStatus.COMPLETED,
-                file_path: filePath,
-                page_number: index + 1,
-                error_message: null,
-                sub_class_id: subClassId,
-            },
-            create: {
-                report_type: ReportType.SINGLE_STUDENT,
-                exam_sequence_id: examSequenceId,
-                academic_year_id: academicYearId,
-                student_id: enrollment.student_id,
-                sub_class_id: subClassId,
-                status: ReportStatus.COMPLETED,
-                file_path: filePath,
-                page_number: index + 1,
-            },
-        })
-    );
-
-    const allSubclassEnrollments = await prisma.enrollment.findMany({
-        where: { sub_class_id: subClassId, academic_year_id: academicYearId },
-        select: { student_id: true }
-    });
-    const processedStudentIds = new Set(processedEnrollments.map(e => e.student_id));
-    const studentsWithoutMarks = allSubclassEnrollments.filter(e => !processedStudentIds.has(e.student_id));
-
-    const failedUpdatePromises = studentsWithoutMarks.map(enrollment =>
-        prisma.generatedReport.upsert({
-            where: {
-                report_type_exam_sequence_id_academic_year_id_student_id: {
-                    report_type: ReportType.SINGLE_STUDENT,
-                    exam_sequence_id: examSequenceId,
-                    academic_year_id: academicYearId,
-                    student_id: enrollment.student_id,
-                }
-            },
-            update: {
-                status: ReportStatus.FAILED,
-                error_message: "Student had no marks for this sequence.",
-                file_path: null,
-                page_number: null,
-                sub_class_id: subClassId,
-            },
-            create: {
-                report_type: ReportType.SINGLE_STUDENT,
-                exam_sequence_id: examSequenceId,
-                academic_year_id: academicYearId,
-                student_id: enrollment.student_id,
-                sub_class_id: subClassId,
-                status: ReportStatus.FAILED,
-                error_message: "Student had no marks for this sequence.",
-            },
-        })
-    );
-
-    await Promise.all([...studentUpdatePromises, ...failedUpdatePromises]);
-    console.log(`Updated ${processedEnrollments.length} successful and ${studentsWithoutMarks.length} failed student report records for subclass ${subClassId}.`);
-}
-
 
 // --- Helper Function to Update ExamSequence Status ---
 
