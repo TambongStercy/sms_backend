@@ -54,7 +54,6 @@ router.get('/search',
 // TEACHER can only view students from their assigned subclasses
 router.get('/',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'DISCIPLINE_MASTER']),
     // Add teacher access validation for TEACHER role
     (req: any, res: any, next: any) => {
         const userRoles = req.user?.roles || [];
@@ -120,7 +119,7 @@ router.delete('/:studentId/parents/:parentId', authenticate, authorize(['SUPER_M
 // GET /students/:studentId/parents - Get all parents linked to a student
 router.get('/:studentId/parents',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'PARENT']),
+    // authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'PARENT']),
     studentController.getParentsByStudentId
 );
 
@@ -132,7 +131,7 @@ router.post('/:id/enroll', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 
 // TEACHER can only view status for students from their assigned subclasses
 router.get('/:id/status',
     authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
+    // authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
     // Add teacher access validation for TEACHER role
     (req: any, res: any, next: any) => {
         const userRoles = req.user?.roles || [];
@@ -153,7 +152,7 @@ router.get('/:id/status',
 // GET /students/subclass/:id - Get all students in a specific subclass
 router.get('/subclass/:id',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
+    // authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
     (req: any, res: any, next: any) => {
         const userRoles = req.user?.roles || [];
         const isTeacher = userRoles.includes('TEACHER');
@@ -173,7 +172,7 @@ router.get('/subclass/:id',
 // GET /students/class/:classId - Get all students in a class
 router.get('/class/:classId',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
+    // authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'BURSAR']),
     (req: any, res: any, next: any) => {
         const userRoles = req.user?.roles || [];
         const isTeacher = userRoles.includes('TEACHER');
@@ -195,7 +194,7 @@ router.get('/class/:classId',
 // PARENT can only view their own students
 router.get('/parent/:parentId',
     authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'PARENT', 'BURSAR']),
+    // authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'PARENT', 'BURSAR']),
     studentController.getStudentsByParent
 );
 
