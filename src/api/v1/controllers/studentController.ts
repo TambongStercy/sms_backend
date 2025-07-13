@@ -510,7 +510,7 @@ export const getStudentsByParent = async (req: Request, res: Response): Promise<
 export const searchStudents = async (req: Request, res: Response): Promise<any> => {
     try {
         const searchQuery = req.query.q as string;
-        
+
         // Validate search query
         if (!searchQuery || searchQuery.trim().length < 1) {
             return res.status(400).json({

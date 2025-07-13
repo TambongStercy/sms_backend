@@ -338,7 +338,7 @@ export const getChildAnalytics = async (req: Request, res: Response): Promise<an
             error: error.message
         });
     }
-}; 
+};
 /**
  * Check if a child's report card is available (for parents)
  */

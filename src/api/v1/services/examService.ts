@@ -1765,7 +1765,8 @@ export async function regenerateStudentReportCard(
 
     // 2. Add the job to the queue
     await reportGenerationQueue.add('generate-single-report', {
-        reportId: reportRecord.id, // Pass the ID of the record to the worker
+        generatedReportId: reportRecord.id,
+        reportType: ReportType.SINGLE_STUDENT,
         studentId,
         academicYearId,
         examSequenceId,
@@ -2068,7 +2069,8 @@ export async function regenerateSubclassReportCards(
 
     // 2. Add the job to the queue
     await reportGenerationQueue.add('generate-subclass-report', {
-        reportId: reportRecord.id,
+        generatedReportId: reportRecord.id,
+        reportType: ReportType.SUBCLASS,
         subClassId,
         academicYearId,
         examSequenceId,
