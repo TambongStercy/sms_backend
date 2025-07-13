@@ -776,7 +776,7 @@ async function generateSubclassReportCards(
         const studentReportData: ReportData = {
             student: {
                 ...s.student,
-                dateOfBirth: moment(s.student.date_of_birth).format('DD/MM/YY'), // Format date of birth here
+                dateOfBirth: moment(s.student.dateOfBirth).format('DD/MM/YY'), // Format date of birth here
             },
             classInfo: {
                 className: `${context.sub_class_name}`, // Only show subclass name
@@ -1069,7 +1069,10 @@ async function generateStudentReportData(
 
     const academicYearName = context ? `${new Date(context.start_date).getFullYear()}-${new Date(context.end_date).getFullYear()}` : '';
     const reportData: ReportData = {
-        student: updatedStudentEntry.student,
+        student: {
+            ...updatedStudentEntry.student,
+            dateOfBirth: moment(updatedStudentEntry.student.dateOfBirth).format('DD/MM/YY'),
+        },
         classInfo: {
             className: `${context.sub_class_name}`, // Only show subclass name
             enrolledStudents: students.length, // Total students considered for class stats
