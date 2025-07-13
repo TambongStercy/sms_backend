@@ -36,7 +36,7 @@ export async function getAllFees(
                 {
                     enrollment: {
                         student: {
-                            parent_students: {
+                            parents: {
                                 some: {
                                     parent: {
                                         name: { contains: searchString, mode: 'insensitive' }
@@ -109,7 +109,7 @@ export async function getAllFees(
         enrollment: {
             include: {
                 student: {
-                    include: { parent_students: { include: { parent: true } } } // Include parents for filtering
+                    include: { parents: { include: { parent: true } } } // Corrected: use 'parents' instead of 'parent_students'
                 },
                 sub_class: {
                     include: { class: true }
