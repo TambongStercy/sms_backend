@@ -6045,10 +6045,103 @@ GET /api/v1/timetables/subclass/:subclassId
 Authorization: Bearer <token>
 ```
 
+**Description:**
+Retrieves the timetable for a specific subclass for a given academic year.
+
+**Authorization:**
+- Any authenticated user.
+
+**Path Parameters:**
+- `subclassId` (number): The ID of the subclass.
+
 **Query Parameters:**
 ```typescript
 {
-  academicYearId?: number;
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year if not provided.
+}
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    subClass: {
+      id: number;
+      name: string;
+      class: {
+        id: number;
+        name: string;
+      };
+    };
+    academicYearId: number;
+    slots: Array<{
+      id: number;
+      subClassId: number;
+      subClassName: string;
+      classId: number;
+      className: string;
+      day: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+      periodId: number;
+      periodName: string;
+      periodStartTime: string;
+      periodEndTime: string;
+      isBreak: boolean;
+      subjectId: number | null;
+      subjectName: string | null;
+      subjectCategory: string | null;
+      teacherId: number | null;
+      teacherName: string | null;
+    }>;
+  };
+}
+```
+
+### Get Full School Timetable
+```http
+GET /api/v1/timetables/full-school
+Authorization: Bearer <token>
+```
+
+**Description:**
+Retrieves the complete timetable for the entire school for a specific academic year.
+
+**Authorization:**
+- `SUPER_MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `MANAGER`
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year if not provided.
+}
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    academicYearId: number;
+    academicYearName: string;
+    timetableSlots: Array<{
+      id: number;
+      subClassId: number;
+      subClassName: string;
+      classId: number;
+      className: string;
+      day: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+      periodId: number;
+      periodName: string;
+      periodStartTime: string;
+      periodEndTime: string;
+      isBreak: boolean;
+      subjectId: number | null;
+      subjectName: string | null;
+      subjectCategory: string | null;
+      teacherId: number | null;
+      teacherName: string | null;
+    }>;
+  };
 }
 ```
 
@@ -6058,33 +6151,101 @@ POST /api/v1/timetables/subclass/:subclassId/bulk-update
 Authorization: Bearer <token>
 ```
 
+**Description:**
+Updates multiple timetable slots at once for a specific subclass. This allows for creating, updating, or deleting assignments for periods within a subclass for a given academic year.
+
+**Authorization:**
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`
+
+**Path Parameters:**
+- `subclassId` (number): The ID of the subclass for which to update the timetable.
+
 **Request Body:**
 ```typescript
 {
-  academicYearId?: number;
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year if not provided.
   slots: Array<{
-    periodId: number;
-    subjectId: number | null;  // null to clear assignment
-    teacherId: number | null;  // null to clear assignment
+    periodId: number;         // Required: The ID of the period to update.
+    subjectId: number | null; // Required: The ID of the subject to assign, or `null` to clear the subject.
+    teacherId: number | null; // Required: The ID of the teacher to assign, or `null` to clear the teacher.
   }>;
 }
 ```
 
-**Response (200/207):**
+**Response (200 - All Successful):**
 ```typescript
 {
-  success: boolean;
+  success: true;
+  message: "Timetable updated successfully.";
   data: {
-    created: number;
-    updated: number;
-    deleted: number;
-    errors: Array<{
-      periodId: number;
-      error: string;
-    }>;
+    updated: number; // Number of existing slots updated.
+    created: number; // Number of new slots created.
+    deleted: number; // Number of slots deleted (where subjectId and teacherId were null).
   };
+  errors: []; // Empty array if no errors.
 }
 ```
+
+**Response (207 - Partial Success):**
+```typescript
+{
+  success: false;
+  message: "Partial success with errors.";
+  data: {
+    updated: number;
+    created: number;
+    deleted: number;
+  };
+  errors: Array<{
+    periodId: number; // The ID of the period that had an error.
+    error: string;    // Description of the error.
+  }>;
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`:
+  ```typescript
+  {
+    success: false;
+    error: "subclassId and slots array are required" | "Invalid periodId format" | "Both subjectId and teacherId must be provided (or both null to clear)" | "Invalid subjectId or teacherId format" | "Teacher with ID X is not authorized to teach subject Y";
+  }
+  ```
+- `401 Unauthorized`:
+  ```typescript
+  {
+    success: false;
+    error: "User not authenticated for assignment.";
+  }
+  ```
+- `404 Not Found`:
+  ```typescript
+  {
+    success: false;
+    error: "No active academic year found for timetable update." | "Subclass not found" | "Period with ID X not found";
+  }
+  ```
+- `409 Conflict`:
+  ```typescript
+  {
+    success: false;
+    error: "Teacher conflict: already assigned to [subclassName] on [dayOfWeek] during period [periodName]";
+  }
+  ```
+- `500 Internal Server Error`:
+  ```typescript
+  {
+    success: false;
+    error: "Internal server error message";
+  }
+  ```
+- `503 Service Unavailable`:
+  ```typescript
+  {
+    success: false;
+    error: "Database connection error. Please ensure the database is running and accessible.";
+  }
+  ```
 
 ---
 
