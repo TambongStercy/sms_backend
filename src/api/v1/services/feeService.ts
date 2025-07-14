@@ -33,42 +33,99 @@ async function generateCSV(data: any[]): Promise<Buffer> {
 async function generatePDF(data: any[]): Promise<Buffer> {
     const pdfDoc = await PDFDocument.create();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    let page = pdfDoc.addPage(); // Start with one page
-    let y = 750; // Initial Y position for content
+    const pageMargin = 50;
+    const tableStartY = 700;
+    const rowHeight = 25;
+    const headerHeight = 30;
+    const columnPadding = 5;
 
-    page.drawText('Fee Report', {
-        x: 50,
-        y: y + 20, // Position above the first item
-        font,
-        size: 24,
-        color: rgb(0, 0.53, 0.71),
-    });
+    const columns = [
+        { header: 'Fee ID', key: 'feeId', width: 60, align: AlignmentType.LEFT },
+        { header: 'Student Name', key: 'studentName', width: 120, align: AlignmentType.LEFT },
+        { header: 'Matricule', key: 'studentMatricule', width: 80, align: AlignmentType.LEFT },
+        { header: 'Class', key: 'className', width: 70, align: AlignmentType.LEFT },
+        { header: 'Expected (FCFA)', key: 'expectedAmount', width: 80, align: AlignmentType.RIGHT },
+        { header: 'Paid (FCFA)', key: 'paidAmount', width: 80, align: AlignmentType.RIGHT },
+        { header: 'Outstanding (FCFA)', key: 'outstanding', width: 80, align: AlignmentType.RIGHT },
+        { header: 'Due Date', key: 'dueDate', width: 70, align: AlignmentType.LEFT },
+    ];
 
-    y -= 50; // Adjust Y for the first content item
+    let page = pdfDoc.addPage();
+    let y = tableStartY;
+
+    const drawHeader = () => {
+        page.drawText('Fee Report', {
+            x: pageMargin,
+            y: y + 50,
+            font: boldFont,
+            size: 20,
+            color: rgb(0, 0.53, 0.71),
+        });
+
+        y -= headerHeight; // Move Y for table header
+        let x = pageMargin;
+        for (const col of columns) {
+            page.drawRectangle({
+                x,
+                y,
+                width: col.width,
+                height: headerHeight,
+                borderColor: rgb(0, 0, 0),
+                borderWidth: 1,
+            });
+            page.drawText(col.header, {
+                x: x + columnPadding,
+                y: y + (headerHeight / 2) - 5, // Center vertically
+                font: boldFont,
+                size: 9,
+                color: rgb(0, 0, 0),
+            });
+            x += col.width;
+        }
+        y -= rowHeight; // Move Y for first data row
+    };
+
+    drawHeader();
 
     for (const item of data) {
-        if (y < 50) { // If content goes off page, add new page
+        if (y < pageMargin + rowHeight) { // Check if new page is needed
             page = pdfDoc.addPage();
-            y = 750; // Reset Y for new page
+            y = tableStartY;
+            drawHeader(); // Redraw header on new page
         }
-        page.drawText(
-            `Student: ${item.studentName} (${item.studentMatricule})
-` +
-            `Class: ${item.className} / ${item.subClassName}
-` +
-            `Expected: FCFA ${item.expectedAmount} | Paid: FCFA ${item.paidAmount} | Outstanding: FCFA ${item.outstanding}
-` +
-            `Due Date: ${item.dueDate}`,
-            {
-                x: 50,
-                y: y,
-                font,
-                size: 10,
-                color: rgb(0, 0, 0),
+
+        let x = pageMargin;
+        for (const col of columns) {
+            page.drawRectangle({
+                x,
+                y,
+                width: col.width,
+                height: rowHeight,
+                borderColor: rgb(0, 0, 0),
+                borderWidth: 0.5,
+            });
+            let text = String(item[col.key]);
+            if (col.key === 'expectedAmount' || col.key === 'paidAmount' || col.key === 'outstanding') {
+                text = `FCFA ${parseFloat(text).toFixed(2)}`;
             }
-        );
-        y -= 70; // Move down for the next item
+
+            let textX = x + columnPadding;
+            if (col.align === AlignmentType.RIGHT) {
+                const textWidth = font.widthOfTextAtSize(text, 9);
+                textX = x + col.width - textWidth - columnPadding;
+            }
+            page.drawText(text, {
+                x: textX,
+                y: y + (rowHeight / 2) - 5,
+                font,
+                size: 9,
+                color: rgb(0, 0, 0),
+            });
+            x += col.width;
+        }
+        y -= rowHeight; // Move to the next row
     }
 
     return Buffer.from(await pdfDoc.save());
