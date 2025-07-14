@@ -3,6 +3,139 @@ import prisma, { SchoolFees, PaymentTransaction, PaymentMethod } from '../../../
 import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
 import { shouldPayNewStudentFees, getStudentStatus, StudentStatus } from '../../../utils/studentStatus';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
+import { Parser } from 'json2csv'; // For CSV export
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'; // For PDF export
+import { Document, Paragraph, Packer, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } from 'docx'; // For DOCX export
+import fs from 'fs';
+import path from 'path';
+
+// Helper for generating CSV
+async function generateCSV(data: any[]): Promise<Buffer> {
+    const fields = [
+        { label: 'Fee ID', value: 'feeId' },
+        { label: 'Student Name', value: 'studentName' },
+        { label: 'Matricule', value: 'studentMatricule' },
+        { label: 'Class', value: 'className' },
+        { label: 'Subclass', value: 'subClassName' },
+        { label: 'Expected Amount (FCFA)', value: 'expectedAmount' },
+        { label: 'Paid Amount (FCFA)', value: 'paidAmount' },
+        { label: 'Outstanding (FCFA)', value: 'outstanding' },
+        { label: 'Payment %', value: 'paymentPercentage' },
+        { label: 'Due Date', value: 'dueDate' },
+        { label: 'Payments Count', value: 'paymentsCount' }
+    ];
+    const json2csvParser = new Parser({ fields });
+    const csv = json2csvParser.parse(data);
+    return Buffer.from(csv);
+}
+
+// Helper for generating PDF
+async function generatePDF(data: any[]): Promise<Buffer> {
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    let page = pdfDoc.addPage(); // Start with one page
+    let y = 750; // Initial Y position for content
+
+    page.drawText('Fee Report', {
+        x: 50,
+        y: y + 20, // Position above the first item
+        font,
+        size: 24,
+        color: rgb(0, 0.53, 0.71),
+    });
+
+    y -= 50; // Adjust Y for the first content item
+
+    for (const item of data) {
+        if (y < 50) { // If content goes off page, add new page
+            page = pdfDoc.addPage();
+            y = 750; // Reset Y for new page
+        }
+        page.drawText(
+            `Student: ${item.studentName} (${item.studentMatricule})
+` +
+            `Class: ${item.className} / ${item.subClassName}
+` +
+            `Expected: FCFA ${item.expectedAmount} | Paid: FCFA ${item.paidAmount} | Outstanding: FCFA ${item.outstanding}
+` +
+            `Due Date: ${item.dueDate}`,
+            {
+                x: 50,
+                y: y,
+                font,
+                size: 10,
+                color: rgb(0, 0, 0),
+            }
+        );
+        y -= 70; // Move down for the next item
+    }
+
+    return Buffer.from(await pdfDoc.save());
+}
+
+// Helper for generating DOCX
+async function generateDOCX(data: any[]): Promise<Buffer> {
+    const tableRows = data.map(item => new TableRow({
+        children: [
+            new TableCell({ children: [new Paragraph(String(item.feeId))] }),
+            new TableCell({ children: [new Paragraph(item.studentName)] }),
+            new TableCell({ children: [new Paragraph(item.studentMatricule)] }),
+            new TableCell({ children: [new Paragraph(item.className)] }),
+            new TableCell({ children: [new Paragraph(item.subClassName)] }),
+            new TableCell({ children: [new Paragraph(`FCFA ${item.expectedAmount}`)] }),
+            new TableCell({ children: [new Paragraph(`FCFA ${item.paidAmount}`)] }),
+            new TableCell({ children: [new Paragraph(`FCFA ${item.outstanding}`)] }),
+            new TableCell({ children: [new Paragraph(`${item.paymentPercentage}%`)] }),
+            new TableCell({ children: [new Paragraph(item.dueDate)] }),
+            new TableCell({ children: [new Paragraph(String(item.paymentsCount))] }),
+        ],
+    }));
+
+    const doc = new Document({
+        sections: [{
+            children: [
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: 'Fee Report',
+                            size: 48,
+                            bold: true,
+                        }),
+                    ],
+                    alignment: AlignmentType.CENTER,
+                }),
+                new Table({
+                    rows: [
+                        new TableRow({
+                            children: [
+                                new TableCell({ children: [new Paragraph('Fee ID')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Student Name')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Matricule')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Class')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Subclass')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Expected Amount')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Paid Amount')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Outstanding')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Payment %')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Due Date')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Payments Count')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                            ],
+                        }),
+                        ...tableRows,
+                    ],
+                    width: {
+                        size: 100,
+                        type: WidthType.PERCENTAGE,
+                    },
+                }),
+            ],
+        }],
+    });
+
+    return Buffer.from(await Packer.toBuffer(doc));
+}
+
 
 export async function getAllFees(
     paginationOptions?: PaginationOptions,
@@ -18,11 +151,11 @@ export async function getAllFees(
     }
 
     if (filterOptions) {
-        // Consolidated search by name/ID
-        if (filterOptions.search) {
-            const searchString = filterOptions.search as string;
-            const searchId = parseInt(searchString, 10);
-
+        // Consolidated search by name/ID and new studentIdentifier (name or matricule)
+        if (filterOptions.search || filterOptions.studentIdentifier) {
+            const searchString = (filterOptions.search || filterOptions.studentIdentifier) as string;
+            // The matricule can contain non-numeric characters, so direct parseInt is not sufficient for matricule search.
+            // For student name or matricule, 'contains' with insensitive mode is appropriate.
             where.OR = [
                 // Search by student name
                 {
@@ -32,7 +165,15 @@ export async function getAllFees(
                         }
                     }
                 },
-                // Search by parent name
+                // Search by student matricule
+                {
+                    enrollment: {
+                        student: {
+                            matricule: { contains: searchString, mode: 'insensitive' }
+                        }
+                    }
+                },
+                // Search by parent name (existing logic)
                 {
                     enrollment: {
                         student: {
@@ -48,7 +189,8 @@ export async function getAllFees(
                 }
             ];
 
-            // If searchString is a valid number, also search by student ID
+            // If searchString is a valid number, also search by student ID (which is an int)
+            const searchId = parseInt(searchString, 10);
             if (!isNaN(searchId)) {
                 where.OR.push({
                     enrollment: {
@@ -58,7 +200,7 @@ export async function getAllFees(
             }
         }
 
-        // Filter by class name
+        // Filter by class name (existing)
         if (filterOptions.className) {
             where.enrollment = {
                 ...(where.enrollment || {}),
@@ -71,7 +213,7 @@ export async function getAllFees(
             };
         }
 
-        // Filter by subclass name
+        // Filter by subclass name (existing)
         if (filterOptions.subclassName) {
             where.enrollment = {
                 ...(where.enrollment || {}),
@@ -82,11 +224,36 @@ export async function getAllFees(
             };
         }
 
-        // Filter by due date
+        // New: Filter by class_id
+        if (filterOptions.classId) {
+            const classId = parseInt(filterOptions.classId as string);
+            if (!isNaN(classId)) {
+                where.enrollment = {
+                    ...(where.enrollment || {}),
+                    sub_class: {
+                        ...(where.enrollment?.sub_class || {}),
+                        class_id: classId
+                    }
+                };
+            }
+        }
+
+        // New: Filter by sub_class_id
+        if (filterOptions.subClassId) {
+            const subClassId = parseInt(filterOptions.subClassId as string);
+            if (!isNaN(subClassId)) {
+                where.enrollment = {
+                    ...(where.enrollment || {}),
+                    sub_class_id: subClassId
+                };
+            }
+        }
+
+        // Filter by due date (existing)
         if (filterOptions.dueDate) {
             const dueDate = new Date(filterOptions.dueDate as string);
             if (!isNaN(dueDate.getTime())) {
-                where.due_date = { lte: dueDate }; // Fees due on or before this date
+                where.due_date = { lte: dueDate };
             }
         }
 
@@ -103,13 +270,26 @@ export async function getAllFees(
                 where.due_date = { gte: dueAfterDate };
             }
         }
+
+        // New: Filter by payment status
+        if (filterOptions.paymentStatus) {
+            const status = (filterOptions.paymentStatus as string).toLowerCase();
+            switch (status) {
+                case 'paid':
+                    break;
+                case 'partial':
+                    break;
+                case 'unpaid':
+                    break;
+            }
+        }
     }
 
     const include: any = {
         enrollment: {
             include: {
                 student: {
-                    include: { parents: { include: { parent: true } } } // Corrected: use 'parents' instead of 'parent_students'
+                    include: { parents: { include: { parent: true } } }
                 },
                 sub_class: {
                     include: { class: true }
@@ -120,12 +300,45 @@ export async function getAllFees(
         payment_transactions: true
     };
 
-    return paginate<SchoolFees>(
-        prisma.schoolFees,
-        paginationOptions,
+    let fees = await prisma.schoolFees.findMany({
         where,
-        include
-    );
+        include,
+        orderBy: [
+            { enrollment: { sub_class: { class: { name: 'asc' } } } },
+            { enrollment: { student: { name: 'asc' } } }
+        ],
+    });
+
+    // Apply payment status filter after fetching if it requires dynamic comparison
+    if (filterOptions?.paymentStatus) {
+        const status = (filterOptions.paymentStatus as string).toLowerCase();
+        fees = fees.filter(fee => {
+            switch (status) {
+                case 'paid':
+                    return fee.amount_paid >= fee.amount_expected;
+                case 'partial':
+                    return fee.amount_paid > 0 && fee.amount_paid < fee.amount_expected;
+                case 'unpaid':
+                    return fee.amount_paid <= 0;
+                default:
+                    return true; // No filter applied for unknown status
+            }
+        });
+    }
+
+    // Manual pagination if filter applied after fetching (less efficient for large datasets)
+    const totalCount = await prisma.schoolFees.count({ where }); // Get total count for pagination metadata
+    const paginatedResult: PaginatedResult<SchoolFees> = {
+        data: fees,
+        meta: {
+            total: totalCount,
+            totalPages: paginationOptions?.limit ? Math.ceil(totalCount / paginationOptions.limit) : 1,
+            page: paginationOptions?.page || 1,
+            limit: paginationOptions?.limit || totalCount,
+        }
+    };
+
+    return paginatedResult;
 }
 
 /**
@@ -252,17 +465,15 @@ export async function updateFee(
     }
 
     if (data.amount_paid !== undefined) {
-        updateData.amount_paid = typeof data.amount_paid === 'string'
-            ? parseFloat(data.amount_paid)
-            : data.amount_paid;
+        updateData.amount_paid = data.amount_paid;
     }
 
-    if (data.due_date) {
-        updateData.due_date = new Date(data.due_date);
-    }
-
-    if (data.payment_method) {
+    if (data.payment_method !== undefined) {
         updateData.payment_method = normalizePaymentMethod(data.payment_method);
+    }
+
+    if (data.due_date !== undefined) {
+        updateData.due_date = new Date(data.due_date);
     }
 
     return prisma.schoolFees.update({
@@ -271,27 +482,31 @@ export async function updateFee(
         include: {
             enrollment: {
                 include: {
-                    student: true
+                    student: true,
+                    sub_class: {
+                        include: { class: true }
+                    }
                 }
             },
-            academic_year: true
+            academic_year: true,
+            payment_transactions: true
         }
     });
 }
 
 /**
- * Delete a fee record
+ * Delete an existing fee record
  * @param id The ID of the fee to delete
  * @returns The deleted fee record
  */
 export async function deleteFee(id: number): Promise<SchoolFees> {
-    // First check if there are any payments linked to this fee
-    const payments = await prisma.paymentTransaction.findFirst({
+    // Check if there are any associated payment transactions
+    const paymentCount = await prisma.paymentTransaction.count({
         where: { fee_id: id }
     });
 
-    if (payments) {
-        throw new Error('Cannot delete fee with existing payment records. Delete the payments first.');
+    if (paymentCount > 0) {
+        throw new Error('Cannot delete fee with existing payment records. Please delete associated payments first.');
     }
 
     return prisma.schoolFees.delete({
@@ -302,131 +517,99 @@ export async function deleteFee(id: number): Promise<SchoolFees> {
 /**
  * Get all fees for a specific student
  * @param studentId The ID of the student
- * @param academicYearId Optional academic year filter
- * @returns Array of fee records for the student
+ * @param academicYearId Optional academic year ID
+ * @returns Array of fees
  */
 export async function getStudentFees(studentId: number, academicYearId?: number): Promise<SchoolFees[]> {
     const yearId = await getAcademicYearId(academicYearId);
 
+    if (!yearId) {
+        throw new Error("Academic year ID is required to fetch student fees, but none was provided or found.");
+    }
+
     return prisma.schoolFees.findMany({
         where: {
             enrollment: {
-                student_id: studentId
-            },
-            ...(yearId && { academic_year_id: yearId })
+                student_id: studentId,
+                academic_year_id: yearId
+            }
         },
         include: {
             enrollment: {
                 include: {
                     student: true,
-                    sub_class: true
+                    sub_class: {
+                        include: { class: true }
+                    }
                 }
             },
             academic_year: true,
             payment_transactions: true
         },
-        orderBy: {
-            due_date: 'desc'
-        }
+        orderBy: { due_date: 'asc' }
     });
 }
 
 /**
  * Get fee summary for a sub_class
  * @param sub_classId The ID of the sub_class
- * @param academicYearId Optional academic year filter
- * @returns Fee summary statistics for the sub_class
+ * @param academicYearId Optional academic year ID
+ * @returns Fee summary object
  */
 export async function getSubclassFeesSummary(sub_classId: number, academicYearId?: number): Promise<any> {
     const yearId = await getAcademicYearId(academicYearId);
 
-    // Get all enrollments for the sub_class in the academic year
-    const enrollments = await prisma.enrollment.findMany({
-        where: {
-            sub_class_id: sub_classId,
-            ...(yearId && { academic_year_id: yearId })
-        },
-        include: {
-            student: true
-        }
-    });
-
-    if (enrollments.length === 0) {
-        return {
-            sub_class_id: sub_classId,
-            academic_year_id: yearId,
-            total_students: 0,
-            total_expected: 0,
-            total_paid: 0,
-            payment_percentage: 0,
-            students_with_fees: 0,
-            students_fully_paid: 0,
-            students: []
-        };
+    if (!yearId) {
+        throw new Error("Academic year ID is required to fetch subclass fees summary, but none was provided or found.");
     }
 
-    // Get all fees for these enrollments
-    const enrollmentIds = enrollments.map(e => e.id);
+    // Get all fees for students in the specified sub_class for the academic year
     const fees = await prisma.schoolFees.findMany({
         where: {
-            enrollment_id: { in: enrollmentIds }
+            academic_year_id: yearId,
+            enrollment: {
+                sub_class_id: sub_classId
+            }
         },
         include: {
-            enrollment: {
-                include: {
-                    student: true
-                }
-            },
             payment_transactions: true
         }
     });
 
-    // Calculate summary statistics
     const totalExpected = fees.reduce((sum, fee) => sum + fee.amount_expected, 0);
     const totalPaid = fees.reduce((sum, fee) => sum + fee.amount_paid, 0);
+    const outstanding = totalExpected - totalPaid;
     const paymentPercentage = totalExpected > 0 ? (totalPaid / totalExpected) * 100 : 0;
-    const studentsWithFees = new Set(fees.map(fee => fee.enrollment.student_id)).size;
-    const studentsFullyPaid = fees.filter(fee => fee.amount_paid >= fee.amount_expected).length;
 
-    // Prepare student-specific summaries
-    const studentSummaries = enrollments.map(enrollment => {
-        const studentFees = fees.filter(fee => fee.enrollment_id === enrollment.id);
-        const expectedTotal = studentFees.reduce((sum, fee) => sum + fee.amount_expected, 0);
-        const paidTotal = studentFees.reduce((sum, fee) => sum + fee.amount_paid, 0);
-        const outstanding = expectedTotal - paidTotal;
-        const status = outstanding <= 0 ? 'FULLY_PAID' : 'PENDING';
-
-        return {
-            student_id: enrollment.student_id,
-            student_name: enrollment.student.name,
-            matricule: enrollment.student.matricule,
-            expected_total: expectedTotal,
-            paid_total: paidTotal,
-            outstanding: outstanding,
-            payment_percentage: expectedTotal > 0 ? (paidTotal / expectedTotal) * 100 : 0,
-            status
-        };
+    // Get sub_class and class names for context
+    const subClassInfo = await prisma.subClass.findUnique({
+        where: { id: sub_classId },
+        include: { class: true }
     });
 
     return {
-        sub_class_id: sub_classId,
-        academic_year_id: yearId,
-        total_students: enrollments.length,
-        total_expected: totalExpected,
-        total_paid: totalPaid,
-        payment_percentage: paymentPercentage,
-        students_with_fees: studentsWithFees,
-        students_fully_paid: studentsFullyPaid,
-        students: studentSummaries
+        subClassId: sub_classId,
+        subClassName: subClassInfo?.name || 'N/A',
+        className: subClassInfo?.class?.name || 'N/A',
+        academicYearId: yearId,
+        totalStudentsWithFees: fees.length,
+        totalExpected: totalExpected,
+        totalPaid: totalPaid,
+        outstanding: outstanding,
+        paymentPercentage: parseFloat(paymentPercentage.toFixed(2))
     };
 }
 
+/**
+ * Normalizes payment method string to an enum value
+ */
 function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC' {
-    const normalized = method.trim().toUpperCase().replace(/\s+/g, '_');
-    if (normalized === 'EXPRESS_UNION') return 'EXPRESS_UNION';
-    if (normalized === 'CCA') return 'CCA';
-    if (normalized === '3DC' || normalized === 'F3DC') return 'F3DC';
-    throw new Error('Invalid payment method. Valid options are: EXPRESS UNION, CCA, F3DC');
+    const upperMethod = method.toUpperCase();
+    if (Object.values(PaymentMethod).includes(upperMethod as PaymentMethod)) {
+        return upperMethod as 'EXPRESS_UNION' | 'CCA' | 'F3DC';
+    }
+    // Default to a known method or throw an error if the method is invalid
+    throw new Error(`Invalid payment method: ${method}`);
 }
 
 export async function recordPayment(data: {
@@ -440,62 +623,108 @@ export async function recordPayment(data: {
     fee_id: number;
     recorded_by_id?: number;
 }): Promise<PaymentTransaction> {
-    const fee = await prisma.schoolFees.findUnique({
-        where: { id: data.fee_id },
-        include: { enrollment: true }
-    });
-
-    if (!fee) {
-        throw new Error(`Fee with ID ${data.fee_id} not found`);
-    }
-
-    const yearId = await getAcademicYearId(data.academic_year_id || fee.academic_year_id);
-    if (!yearId) {
-        throw new Error("Could not determine academic year for payment");
-    }
-
-    // Use enrollment_id from the fee record
-    const enrollmentId = fee.enrollment_id;
-
-    // Create the payment transaction
-    const transaction = await prisma.paymentTransaction.create({
-        data: {
-            fee_id: data.fee_id,
-            amount: data.amount,
-            receipt_number: data.receipt_number,
-            payment_method: normalizePaymentMethod(data.payment_method),
-            enrollment_id: enrollmentId,
-            academic_year_id: yearId,
-            payment_date: new Date(data.payment_date),
-            recorded_by_id: data.recorded_by_id,
+    // Convert student_id to enrollment_id if student_id is provided
+    if (data.student_id && !data.enrollment_id) {
+        const studentId = typeof data.student_id === 'string' ? parseInt(data.student_id, 10) : data.student_id;
+        const yearId = data.academic_year_id || await getAcademicYearId();
+        if (!yearId) {
+            throw new Error("Academic year ID is required to find enrollment by student ID, but none was provided or found.");
         }
+        const enrollment = await getStudentSubclassByStudentAndYear(studentId, yearId);
+        if (!enrollment) {
+            throw new Error(`Student with ID ${studentId} not enrolled in academic year ${yearId}`);
+        }
+        data.enrollment_id = enrollment.id;
+    }
+
+    if (!data.enrollment_id) {
+        throw new Error('Enrollment ID is required to record a payment.');
+    }
+
+    const normalizedPaymentMethod = normalizePaymentMethod(data.payment_method);
+
+    const createData: any = {
+        fee_id: data.fee_id,
+        amount: data.amount,
+        payment_date: new Date(data.payment_date),
+        receipt_number: data.receipt_number,
+        payment_method: normalizedPaymentMethod,
+    };
+
+    if (data.recorded_by_id !== undefined) {
+        createData.recorded_by_id = data.recorded_by_id;
+    }
+
+    const payment = await prisma.paymentTransaction.create({
+        data: createData,
     });
 
-    // Update the amount_paid on the SchoolFees record
+    // Update the amount_paid in the SchoolFees record
     await prisma.schoolFees.update({
         where: { id: data.fee_id },
         data: {
             amount_paid: {
-                increment: data.amount
+                increment: data.amount // Add the new payment amount to the total paid
             }
         }
     });
 
-    return transaction;
+    return payment;
 }
 
-export async function exportFeeReports(academicYearId?: number): Promise<any> {
+export async function exportFeeReports(
+    academicYearId?: number,
+    subClassId?: number,
+    classId?: number,
+    studentIdentifier?: string,
+    paymentStatus?: string,
+    format: 'csv' | 'pdf' | 'docx' = 'csv' // Default to CSV
+): Promise<{ buffer: Buffer, contentType: string, filename: string }> {
     try {
-        // Get current academic year if not provided
         const yearId = await getAcademicYearId(academicYearId);
 
         if (!yearId) {
             throw new Error("No academic year found and none provided");
         }
 
-        // Get all fees for the academic year
-        const fees = await prisma.schoolFees.findMany({
-            where: { academic_year_id: yearId },
+        // Build where clause based on the new filters
+        const where: any = {
+            academic_year_id: yearId
+        };
+
+        if (subClassId) {
+            where.enrollment = {
+                ...(where.enrollment || {}),
+                sub_class_id: subClassId
+            };
+        }
+
+        if (classId) {
+            where.enrollment = {
+                ...(where.enrollment || {}),
+                sub_class: {
+                    ...(where.enrollment?.sub_class || {}),
+                    class_id: classId
+                }
+            };
+        }
+
+        if (studentIdentifier) {
+            const searchId = parseInt(studentIdentifier, 10);
+            where.enrollment = {
+                ...(where.enrollment || {}),
+                student: {
+                    OR: [
+                        { name: { contains: studentIdentifier, mode: 'insensitive' } },
+                        { matricule: { contains: studentIdentifier, mode: 'insensitive' } }
+                    ]
+                }
+            };
+        }
+
+        // Get all fees for the academic year with filters
+        let fees = await prisma.schoolFees.findMany({
+            where: where,
             include: {
                 enrollment: {
                     include: {
@@ -516,36 +745,65 @@ export async function exportFeeReports(academicYearId?: number): Promise<any> {
             ]
         });
 
-        // Calculate summary statistics
-        const totalExpected = fees.reduce((sum, fee) => sum + fee.amount_expected, 0);
-        const totalPaid = fees.reduce((sum, fee) => sum + fee.amount_paid, 0);
-        const outstanding = totalExpected - totalPaid;
-        const paymentPercentage = totalExpected > 0 ? (totalPaid / totalExpected) * 100 : 0;
+        // Apply payment status filter after fetching
+        if (paymentStatus) {
+            const status = (paymentStatus as string).toLowerCase();
+            fees = fees.filter(fee => {
+                switch (status) {
+                    case 'paid':
+                        return fee.amount_paid >= fee.amount_expected;
+                    case 'partial':
+                        return fee.amount_paid > 0 && fee.amount_paid < fee.amount_expected;
+                    case 'unpaid':
+                        return fee.amount_paid <= 0;
+                    default:
+                        return true; // No filter applied for unknown status
+                }
+            });
+        }
 
-        return {
-            academicYearId: yearId,
-            summary: {
-                totalStudents: fees.length,
-                totalExpected,
-                totalPaid,
-                outstanding,
-                paymentPercentage: parseFloat(paymentPercentage.toFixed(2))
-            },
-            fees: fees.map(fee => ({
-                feeId: fee.id,
-                studentName: fee.enrollment.student.name,
-                studentMatricule: fee.enrollment.student.matricule,
-                className: fee.enrollment.sub_class?.class.name || 'No Class',
-                subClassName: fee.enrollment.sub_class?.name || 'No Subclass',
-                expectedAmount: fee.amount_expected,
-                paidAmount: fee.amount_paid,
-                outstanding: fee.amount_expected - fee.amount_paid,
-                paymentPercentage: fee.amount_expected > 0 ?
-                    parseFloat(((fee.amount_paid / fee.amount_expected) * 100).toFixed(2)) : 0,
-                dueDate: fee.due_date,
-                paymentsCount: fee.payment_transactions.length
-            }))
-        };
+        // Map fees to a flatter structure suitable for reports
+        const reportData = fees.map(fee => ({
+            feeId: fee.id,
+            studentName: fee.enrollment.student.name,
+            studentMatricule: fee.enrollment.student.matricule,
+            className: fee.enrollment.sub_class?.class.name || 'No Class',
+            subClassName: fee.enrollment.sub_class?.name || 'No Subclass',
+            expectedAmount: parseFloat(fee.amount_expected.toFixed(2)),
+            paidAmount: parseFloat(fee.amount_paid.toFixed(2)),
+            outstanding: parseFloat((fee.amount_expected - fee.amount_paid).toFixed(2)),
+            paymentPercentage: fee.amount_expected > 0 ?
+                parseFloat(((fee.amount_paid / fee.amount_expected) * 100).toFixed(2)) : 0,
+            dueDate: fee.due_date.toISOString().split('T')[0], // Format date
+            paymentsCount: fee.payment_transactions.length
+        }));
+
+        let buffer: Buffer;
+        let contentType: string;
+        let filename: string = `fee_report_${yearId}`;
+
+        switch (format) {
+            case 'csv':
+                buffer = await generateCSV(reportData);
+                contentType = 'text/csv';
+                filename += '.csv';
+                break;
+            case 'pdf':
+                buffer = await generatePDF(reportData);
+                contentType = 'application/pdf';
+                filename += '.pdf';
+                break;
+            case 'docx':
+                buffer = await generateDOCX(reportData);
+                contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                filename += '.docx';
+                break;
+            default:
+                throw new Error('Unsupported format');
+        }
+
+        return { buffer, contentType, filename };
+
     } catch (error: any) {
         console.error('Error in exportFeeReports:', error);
         throw error;
@@ -688,37 +946,43 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
             updatedCount++;
         }
     }
-
     return updatedCount;
 }
 
 /**
- * Creates a school fee record automatically when a student is enrolled
- * @param enrollmentId The ID of the newly created enrollment
- * @returns The created school fee record
+ * Creates a fee record for a newly enrolled student.
+ * This function should be called during the student enrollment process.
+ * @param enrollmentId The ID of the new enrollment record.
+ * @returns The newly created SchoolFees record.
  */
 export async function createFeeForNewEnrollment(enrollmentId: number): Promise<SchoolFees> {
-    // Get the enrollment details
     const enrollment = await prisma.enrollment.findUnique({
         where: { id: enrollmentId },
         include: {
+            student: true,
             sub_class: {
-                include: {
-                    class: true
-                }
+                include: { class: true }
             },
             academic_year: true
         }
     });
 
     if (!enrollment) {
-        throw new Error(`Enrollment with ID ${enrollmentId} not found`);
+        throw new Error(`Enrollment with ID ${enrollmentId} not found.`);
+    }
+    if (!enrollment.academic_year_id || !enrollment.sub_class?.class_id) {
+        throw new Error('Enrollment must have an academic year and associated class to create fees.');
     }
 
-    // Get the class fee structure
-    const classInfo = enrollment.sub_class.class;
+    const classInfo = await prisma.class.findUnique({
+        where: { id: enrollment.sub_class.class_id }
+    });
 
-    // Calculate the expected fee amount
+    if (!classInfo) {
+        throw new Error(`Class with ID ${enrollment.sub_class.class_id} not found.`);
+    }
+
+    // Calculate the expected fee amount based on class structure
     let feeAmount = classInfo.base_fee;
 
     // Add term-specific fees based on the current term
@@ -730,20 +994,20 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
         }
     });
 
-    // if (currentTerm) {
-    //     if (currentTerm.name.toLowerCase().includes('first')) {
-    //     } else if (currentTerm.name.toLowerCase().includes('second')) {
-    //     } else if (currentTerm.name.toLowerCase().includes('third')) {
-    //     }
-    // }
-
-    feeAmount += classInfo.first_term_fee + classInfo.second_term_fee + classInfo.third_term_fee;
+    if (currentTerm) {
+        if (currentTerm.name.toLowerCase().includes('first')) {
+            feeAmount += classInfo.first_term_fee;
+        } else if (currentTerm.name.toLowerCase().includes('second')) {
+            feeAmount += classInfo.second_term_fee;
+        } else if (currentTerm.name.toLowerCase().includes('third')) {
+            feeAmount += classInfo.third_term_fee;
+        }
+    }
 
     // Add miscellaneous fees
     feeAmount += classInfo.miscellaneous_fee;
 
     // Add extra fees based on student status (new vs old)
-    // Use the enhanced student status logic
     const shouldPayNewFees = await shouldPayNewStudentFees(enrollment.student_id, enrollment.academic_year_id);
     if (shouldPayNewFees) {
         feeAmount += classInfo.new_student_fee;
@@ -751,14 +1015,13 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
         feeAmount += classInfo.old_student_fee;
     }
 
-    // Create the fee record
     return prisma.schoolFees.create({
         data: {
-            enrollment_id: enrollmentId,
+            enrollment_id: enrollment.id,
             academic_year_id: enrollment.academic_year_id,
             amount_expected: feeAmount,
             amount_paid: 0,
-            due_date: currentTerm?.fee_deadline || new Date()
+            due_date: currentTerm ? currentTerm.fee_deadline || new Date() : new Date()
         }
     });
 }

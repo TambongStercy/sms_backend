@@ -3424,12 +3424,17 @@ GET /api/v1/bursar/available-parents
 Authorization: Bearer <token>
 ```
 
+**Description:**
+Retrieves a paginated list of existing parent accounts that can be linked to students. Supports searching by name, phone, or email.
+
+**Authorization:**
+- `BURSAR`, `SUPER_MANAGER`
+
 **Query Parameters:**
 ```typescript
 {
-  search?: string;        // Search by name, phone, or email
-  page?: number;
-  limit?: number;
+  search?: string;        // Optional: Search term for parent name, phone, or email.
+  limit?: number;         // Optional: Number of results to return (default: 20).
 }
 ```
 
@@ -3437,6 +3442,7 @@ Authorization: Bearer <token>
 ```typescript
 {
   success: true;
+  message: "Available parents retrieved successfully";
   data: Array<{
     id: number;
     matricule: string;
@@ -3451,12 +3457,15 @@ Authorization: Bearer <token>
       className?: string;
     }>;
   }>;
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
+  count: number; // Total number of parents matching the criteria
+}
+```
+
+**Error Response (500):**
+```typescript
+{
+  success: false;
+  error: "Error fetching available parents: [error message]";
 }
 ```
 
@@ -3604,56 +3613,545 @@ GET /api/v1/fees/subclass/:subClassId/summary
 Authorization: Bearer <token>
 ```
 
+**Description:**
+Retrieves a financial summary of fees for all students within a specific subclass for a given academic year. This endpoint supports both the `/api/v1/fees/subclass/:id/summary` and `/api/v1/fees/sub_class/:id/summary` paths for backward compatibility.
+
+**Authorization:**
+- Any authenticated user.
+
+**Path Parameters:**
+- `id` (number): The ID of the subclass.
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year.
+}
+```
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  data: {
+    subClassId: number;
+    subClassName: string;
+    className: string;
+    academicYearId: number;
+    totalStudentsWithFees: number;
+    totalExpected: number;
+    totalPaid: number;
+    outstanding: number;
+    paymentPercentage: number;
+  };
+}
+```
+
+**Error Response (500):**
+```typescript
+{
+  success: false;
+  error: "Academic year ID is required to fetch subclass fees summary, but none was provided or found." | "Error fetching subclass fees summary: [error message]";
+}
+```
+
 ### Get All Fees
 ```http
 GET /api/v1/fees
 Authorization: Bearer <token>
 ```
 
+**Description:**
+Retrieves a paginated list of all fee records with extensive filtering capabilities.
+
+**Authorization:**
+- Any authenticated user (access might be restricted based on role, e.g., TEACHER can only see fees related to their students/classes if configured).
+
 **Query Parameters:**
 ```typescript
 {
-  academicYearId?: number;
-  page?: number;
-  limit?: number;
-  search?: string;           // Student name, parent name, or student ID
-  classId?: number;
-  subClassId?: number;
-  dueDate?: string;          // "YYYY-MM-DD" - Fees due on or before this date
-  dueBeforeDate?: string;    // "YYYY-MM-DD" - Fees due on or before this date
-  dueAfterDate?: string;     // "YYYY-MM-DD" - Fees due on or after this date
-  paymentStatus?: "PAID" | "PARTIAL" | "UNPAID"; // Filter by payment status (existing parameter)
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year if not provided.
+  page?: number; // Optional: Page number for pagination.
+  limit?: number; // Optional: Number of items per page for pagination.
+  search?: string; // Optional: Search term for student name or parent name.
+  studentIdentifier?: string; // Optional: Search by student name or matricule.
+  classId?: number; // Optional: Filter by class ID.
+  subClassId?: number; // Optional: Filter by subclass ID.
+  className?: string; // Optional: Filter by class name (case-insensitive).
+  subclassName?: string; // Optional: Filter by subclass name (case-insensitive).
+  dueDate?: string; // Optional: Fees due on or before this date (YYYY-MM-DD).
+  dueBeforeDate?: string; // Optional: Fees due on or before this date (YYYY-MM-DD).
+  dueAfterDate?: string; // Optional: Fees due on or after this date (YYYY-MM-DD).
+  paymentStatus?: "paid" | "partial" | "unpaid"; // Optional: Filter by payment status.
 }
 ```
 
-### Get Fee by ID
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  data: {
+    data: Array<{
+      id: number;
+      amountExpected: number;
+      amountPaid: number;
+      dueDate: string;
+      enrollmentId: number;
+      academicYearId: number;
+      createdAt: string;
+      updatedAt: string;
+      enrollment: {
+        id: number;
+        studentId: number;
+        academicYearId: number;
+        subClassId: number;
+        student: {
+          id: number;
+          name: string;
+          matricule: string;
+          // ... other student details
+        };
+        subClass: {
+          id: number;
+          name: string;
+          classId: number;
+          class: {
+            id: number;
+            name: string;
+          };
+        };
+      };
+      academicYear: {
+        id: number;
+        name: string;
+        startDate: string;
+        endDate: string;
+      };
+      paymentTransactions: Array<{
+        id: number;
+        amount: number;
+        paymentDate: string;
+        receiptNumber?: string;
+        paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC";
+        feeId: number;
+        recordedById?: number;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>;
+    meta: {
+      total: number;
+      lastPage: number;
+      currentPage: number;
+      perPage: number;
+    };
+  };
+}
+```
+
+### Export Fee Reports
+```http
+GET /api/v1/fees/export
+Authorization: Bearer <token>
+```
+
+**Description:**
+Exports fee data in specified formats (CSV, PDF, DOCX) based on various filters.
+
+**Authorization:**
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `BURSAR`
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year if not provided.
+  subClassId?: number; // Optional: Filter by subclass ID.
+  classId?: number; // Optional: Filter by class ID.
+  studentIdentifier?: string; // Optional: Filter by student name or matricule.
+  paymentStatus?: "paid" | "partial" | "unpaid"; // Optional: Filter by payment status.
+  format?: "csv" | "pdf" | "docx"; // Optional: Output format. Defaults to "csv".
+}
+```
+
+**Response (Success - 200 - File Download):**
+```
+Content-Type: text/csv | application/pdf | application/vnd.openxmlformats-officedocument.wordprocessingml.document
+Content-Disposition: attachment; filename="fee_report_<academicYearId>.<format_extension>"
+
+[File Content]
+```
+
+**Example Data in Report (JSON Structure before conversion):**
+```typescript
+{
+  academicYearId: number;
+  summary: {
+    totalStudents: number;
+    totalExpected: number;
+    totalPaid: number;
+    outstanding: number;
+    paymentPercentage: number;
+  };
+  fees: Array<{
+    feeId: number;
+    studentName: string;
+    studentMatricule: string;
+    className: string;
+    subClassName: string;
+    expectedAmount: number;
+    paidAmount: number;
+    outstanding: number;
+    paymentPercentage: number;
+    dueDate: string;
+    paymentsCount: number;
+  }>;
+}
+```
+
+### Get a Specific Fee by ID
 ```http
 GET /api/v1/fees/:id
 Authorization: Bearer <token>
 ```
 
-### Update Fee
+**Description:**
+Retrieves details of a specific fee record by its ID.
+
+**Authorization:**
+- Any authenticated user.
+
+**Path Parameters:**
+- `id` (number): The ID of the fee record.
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    amountExpected: number;
+    amountPaid: number;
+    dueDate: string;
+    enrollmentId: number;
+    academicYearId: number;
+    createdAt: string;
+    updatedAt: string;
+    enrollment: {
+      id: number;
+      studentId: number;
+      academicYearId: number;
+      subClassId: number;
+      student: {
+        id: number;
+        name: string;
+        matricule: string;
+        // ... other student details
+      };
+      subClass: {
+        id: number;
+        name: string;
+        classId: number;
+        class: {
+          id: number;
+          name: string;
+        };
+      };
+    };
+    academicYear: {
+      id: number;
+      name: string;
+      startDate: string;
+      endDate: string;
+    };
+    paymentTransactions: Array<{
+      id: number;
+      amount: number;
+      paymentDate: string;
+      receiptNumber?: string;
+      paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC";
+      feeId: number;
+      recordedById?: number;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+}
+```
+
+### Create a Fee Record
+```http
+POST /api/v1/fees
+Authorization: Bearer <token>
+```
+
+**Description:**
+Creates a new fee record for a student.
+
+**Authorization:**
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `BURSAR`
+
+**Request Body:**
+```typescript
+{
+  amountExpected: number;
+  amountPaid: number;
+  dueDate: string; // YYYY-MM-DD
+  enrollmentId?: number; // Required if studentId is not provided
+  studentId?: number; // Required if enrollmentId is not provided
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year.
+  paymentMethod?: "EXPRESS_UNION" | "CCA" | "F3DC"; // Optional: Default payment method for the fee.
+}
+```
+
+**Response (Success - 201):**
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    amountExpected: number;
+    amountPaid: number;
+    dueDate: string;
+    enrollmentId: number;
+    academicYearId: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+```
+
+### Update a Fee Record
 ```http
 PUT /api/v1/fees/:id
 Authorization: Bearer <token>
 ```
 
-### Delete Fee
+**Description:**
+Updates an existing fee record.
+
+**Authorization:**
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `BURSAR`
+
+**Path Parameters:**
+- `id` (number): The ID of the fee record to update.
+
+**Request Body:**
+```typescript
+{
+  amountExpected?: number;
+  amountPaid?: number;
+  paymentMethod?: "EXPRESS_UNION" | "CCA" | "F3DC";
+  dueDate?: string; // YYYY-MM-DD
+}
+```
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    amountExpected: number;
+    amountPaid: number;
+    dueDate: string;
+    enrollmentId: number;
+    academicYearId: number;
+    createdAt: string;
+    updatedAt: string;
+    // ... potentially other included relations as per getFeeById
+  };
+}
+```
+
+### Delete a Fee Record
 ```http
 DELETE /api/v1/fees/:id
 Authorization: Bearer <token>
 ```
 
-### Get Fee Payments
+**Description:**
+Deletes a fee record. Fails if there are existing payment transactions associated with it.
+
+**Authorization:**
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `BURSAR`
+
+**Path Parameters:**
+- `id` (number): The ID of the fee record to delete.
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  message: "Fee deleted successfully";
+}
+```
+
+### Get All Fees for a Specific Student
+```http
+GET /api/v1/fees/student/:studentId
+Authorization: Bearer <token>
+```
+
+**Description:**
+Retrieves all fee records for a specific student for a given academic year.
+
+**Authorization:**
+- Any authenticated user.
+
+**Path Parameters:**
+- `studentId` (number): The ID of the student.
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year.
+}
+```
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  data: Array<{
+    id: number;
+    amountExpected: number;
+    amountPaid: number;
+    dueDate: string;
+    enrollmentId: number;
+    academicYearId: number;
+    createdAt: string;
+    updatedAt: string;
+    // ... potentially other included relations as per getFeeById
+  }>;
+}
+```
+
+### Get Fee Summary for a Subclass
+```http
+GET /api/v1/fees/subclass/:id/summary
+GET /api/v1/fees/sub_class/:id/summary
+Authorization: Bearer <token>
+```
+
+**Description:**
+Retrieves a financial summary of fees for all students within a specific subclass for a given academic year. This endpoint supports both the `/api/v1/fees/subclass/:id/summary` and `/api/v1/fees/sub_class/:id/summary` paths for backward compatibility.
+
+**Authorization:**
+- Any authenticated user.
+
+**Path Parameters:**
+- `id` (number): The ID of the subclass.
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year.
+}
+```
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  data: {
+    subClassId: number;
+    subClassName: string;
+    className: string;
+    academicYearId: number;
+    totalStudentsWithFees: number;
+    totalExpected: number;
+    totalPaid: number;
+    outstanding: number;
+    paymentPercentage: number;
+  };
+}
+```
+
+**Error Response (500):**
+```typescript
+{
+  success: false;
+  error: "Academic year ID is required to fetch subclass fees summary, but none was provided or found." | "Error fetching subclass fees summary: [error message]";
+}
+```
+
+### Get All Payments for a Fee
 ```http
 GET /api/v1/fees/:feeId/payments
 Authorization: Bearer <token>
 ```
 
-### Export Fee Reports
+**Description:**
+Retrieves all payment transactions associated with a specific fee record.
+
+**Authorization:**
+- Any authenticated user.
+
+**Path Parameters:**
+- `feeId` (number): The ID of the fee record.
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  data: Array<{
+    id: number;
+    amount: number;
+    paymentDate: string;
+    receiptNumber?: string;
+    paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC";
+    feeId: number;
+    recordedById?: number;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+```
+
+### Record a Payment for a Specific Fee
 ```http
-GET /api/v1/fees/reports
+POST /api/v1/fees/:feeId/payments
 Authorization: Bearer <token>
+```
+
+**Description:**
+Records a new payment transaction for a specific fee record and updates the fee's paid amount.
+
+**Authorization:**
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `BURSAR`
+
+**Path Parameters:**
+- `feeId` (number): The ID of the fee record to record a payment for.
+
+**Request Body:**
+```typescript
+{
+  amount: number;
+  paymentDate: string; // YYYY-MM-DD
+  receiptNumber?: string; // Optional
+  paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC";
+  enrollmentId?: number; // Optional: Can be derived from feeId, but can be provided for clarity
+  studentId?: number; // Optional: Can be derived from feeId, but can be provided for clarity
+  academicYearId?: number; // Optional: Can be derived from feeId, but can be provided for clarity
+}
+```
+
+**Response (Success - 201):**
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    amount: number;
+    paymentDate: string;
+    receiptNumber?: string;
+    paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC";
+    feeId: number;
+    recordedById?: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
 ```
 
 ---
@@ -6196,7 +6694,7 @@ Updates multiple timetable slots at once for a specific subclass. This allows fo
     created: number;
     deleted: number;
   };
-  errors: Array<{
+    errors: Array<{
     periodId: number; // The ID of the period that had an error.
     error: string;    // Description of the error.
   }>;
@@ -6244,8 +6742,8 @@ Updates multiple timetable slots at once for a specific subclass. This allows fo
   {
     success: false;
     error: "Database connection error. Please ensure the database is running and accessible.";
-  }
-  ```
+}
+```
 
 ---
 
@@ -9448,4 +9946,185 @@ Same parameters and responses as general subclass availability check.
 - Full access to all students and subclasses
 - Can check availability for any student or subclass in the system
 - Same response format as general endpoints
+
+### Get Collection Analytics
+```http
+GET /api/v1/bursar/collection-analytics
+Authorization: Bearer <token>
+```
+
+**Description:**
+Retrieves analytics related to fee collection, including monthly trends and payment method breakdowns.
+**Note:** This endpoint currently returns placeholder data; actual implementation is pending.
+
+**Authorization:**
+- `BURSAR`, `SUPER_MANAGER`, `PRINCIPAL`, `MANAGER`
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year if not provided.
+  startDate?: string;    // Optional: "YYYY-MM-DD"
+  endDate?: string;      // Optional: "YYYY-MM-DD"
+}
+```
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  message: "Collection analytics retrieved successfully";
+  data: {
+    monthlyTrends: Array<{
+      month: string;
+      collected: number;
+      target: number;
+      variance: number;
+    }>;
+    paymentMethods: Array<{
+      method: string; // e.g., "EXPRESS_UNION", "CCA", "3DC"
+      count: number;
+      totalAmount: number;
+    }>;
+    collectionRate: number; // Overall collection rate
+    targetVsActual: {
+      target: number;
+      actual: number;
+      variance: number;
+    };
+  };
+}
+```
+
+**Error Response (500):**
+```typescript
+{
+  success: false;
+  error: "Error fetching collection analytics: [error message]";
+}
+```
+
+### Get Payment Trends
+```http
+GET /api/v1/bursar/payment-trends
+Authorization: Bearer <token>
+```
+
+**Description:**
+Retrieves analysis of payment trends over time, including daily collections and peak collection days.
+**Note:** This endpoint currently returns placeholder data; actual implementation is pending.
+
+**Authorization:**
+- `BURSAR`, `SUPER_MANAGER`, `PRINCIPAL`, `MANAGER`
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year if not provided.
+  period?: "daily" | "weekly" | "monthly" | "yearly"; // Optional: Period for aggregation. Defaults to "monthly".
+}
+```
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  message: "Payment trends retrieved successfully";
+  data: {
+    dailyCollections: Array<{
+      date: string; // "YYYY-MM-DD"
+      amount: number;
+      transactionCount: number;
+    }>;
+    weeklySummary: Array<{
+      week: string; // e.g., "Week 1", "2024-W1"
+      totalAmount: number;
+      averageDaily: number;
+    }>;
+    paymentMethodsBreakdown: Array<{
+      method: string;
+      totalAmount: number;
+      transactionCount: number;
+    }>;
+    peakCollectionDays: Array<{
+      date: string;
+      amount: number;
+    }>;
+  };
+}
+```
+
+**Error Response (500):**
+```typescript
+{
+  success: false;
+  error: "Error fetching payment trends: [error message]";
+}
+```
+
+### Get Defaulters Report
+```http
+GET /api/v1/bursar/defaulters-report
+Authorization: Bearer <token>
+```
+
+**Description:**
+Generates a report of students with outstanding fee balances (defaulters).
+**Note:** This endpoint currently returns placeholder data; actual implementation is pending.
+
+**Authorization:**
+- `BURSAR`, `SUPER_MANAGER`, `PRINCIPAL`, `MANAGER`
+
+**Query Parameters:**
+```typescript
+{
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year if not provided.
+  minimumAmount?: number;  // Optional: Filter for students with outstanding balances greater than or equal to this amount.
+  classId?: number;        // Optional: Filter for defaulters within a specific class.
+  subClassId?: number;     // Optional: Filter for defaulters within a specific subclass.
+  includeDetails?: boolean; // Optional: If true, includes more detailed student/fee info. Defaults to false.
+}
+```
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  message: "Defaulters report retrieved successfully";
+  data: {
+    totalDefaulters: number;
+    totalOutstanding: number;
+    byClass: Array<{
+      classId: number;
+      className: string;
+      defaultersCount: number;
+      outstandingAmount: number;
+    }>;
+    byAmountRange: Array<{
+      range: string; // e.g., "0-10000", "10001-50000", "50000+"
+      count: number;
+      totalAmount: number;
+    }>;
+    students: Array<{ // Detailed list of defaulters
+      studentId: number;
+      studentName: string;
+      matricule: string;
+      className: string;
+      subClassName: string;
+      outstandingAmount: number;
+      dueDate: string; // Of the oldest outstanding fee
+      daysOverdue: number;
+      contactParentPhone?: string;
+    }>;
+  };
+}
+```
+
+**Error Response (500):**
+```typescript
+{
+  success: false;
+  error: "Error fetching defaulters report: [error message]";
+}
+```
 

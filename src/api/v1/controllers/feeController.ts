@@ -5,8 +5,8 @@ import { PaginationOptions, FilterOptions } from '../../../utils/pagination';
 
 export const getAllFees = async (req: Request, res: Response) => {
     try {
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.query.academicYearId ?
+            parseInt(req.query.academicYearId as string) : undefined;
 
         const paginationOptions: PaginationOptions = {
             page: req.query.page ? parseInt(req.query.page as string) : undefined,
@@ -20,6 +20,10 @@ export const getAllFees = async (req: Request, res: Response) => {
             dueDate: req.query.dueDate as string,
             dueBeforeDate: req.query.dueBeforeDate as string,
             dueAfterDate: req.query.dueAfterDate as string,
+            classId: req.query.classId as string,
+            subClassId: req.query.subClassId as string,
+            studentIdentifier: req.query.studentIdentifier as string,
+            paymentStatus: req.query.paymentStatus as string
         };
 
         const fees = await feeService.getAllFees(paginationOptions, filterOptions, academic_year_id);
@@ -241,27 +245,42 @@ export const getFeePayments = async (req: Request, res: Response): Promise<any> 
 
 export const exportFeeReports = async (req: Request, res: Response) => {
     try {
-        // Use snake_case directly - middleware handles the conversion
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.query.academicYearId ?
+            parseInt(req.query.academicYearId as string) : undefined;
+        const sub_class_id = req.query.subClassId ?
+            parseInt(req.query.subClassId as string) : undefined;
+        const class_id = req.query.classId ?
+            parseInt(req.query.classId as string) : undefined;
+        const student_identifier = req.query.studentIdentifier as string;
+        const payment_status = req.query.paymentStatus as string;
+        const format = (req.query.format as string || 'csv').toLowerCase();
 
-        const format = req.query.format as string || 'excel';
+        // Validate format
+        if (!['csv', 'pdf', 'docx'].includes(format)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid format requested. Supported formats are: csv, pdf, docx.'
+            });
+        }
 
-        const sub_class_id = req.query.sub_class_id ?
-            parseInt(req.query.sub_class_id as string) : undefined;
+        const { buffer, contentType, filename } = await feeService.exportFeeReports(
+            academic_year_id,
+            sub_class_id,
+            class_id,
+            student_identifier,
+            payment_status,
+            format as 'csv' | 'pdf' | 'docx'
+        );
 
-        const report = await feeService.exportFeeReports(academic_year_id);
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
 
-        res.json({
-            success: true,
-            message: "Fee report exported successfully",
-            data: report
-        });
     } catch (error: any) {
         console.error('Error exporting fee reports:', error);
         res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Internal server error during fee report export.'
         });
     }
 };

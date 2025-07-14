@@ -9,9 +9,9 @@ const router = Router();
 // All authenticated users can view fees list
 router.get('/', authenticate, feeController.getAllFees);
 
-// GET /fees/reports - Export fee data (Excel/Word)
+// GET /fees/export - Export fee data (Excel/Word) - Moved before /:id
 // Only SUPER_MANAGER, PRINCIPAL, BURSAR can export fee reports
-router.get('/reports', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), feeController.exportFeeReports);
+router.get('/export', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), feeController.exportFeeReports);
 
 // GET /fees/:id - Get a specific fee by ID
 router.get('/:id', authenticate, feeController.getFeeById);
