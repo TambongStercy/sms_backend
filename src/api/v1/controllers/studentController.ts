@@ -362,16 +362,16 @@ export const assignStudentToSubclass = async (req: Request, res: Response): Prom
             return res.status(400).json({ success: false, error: 'Invalid Student ID format' });
         }
 
-        const { subClassId, academicYearId } = req.body; // Expect camelCase from middleware
+        const { sub_class_id, academic_year_id } = req.body; // Expect camelCase from middleware
 
-        const parsedSubClassId = parseInt(subClassId);
+        const parsedSubClassId = parseInt(sub_class_id);
         if (isNaN(parsedSubClassId)) {
             return res.status(400).json({ success: false, error: 'Invalid Subclass ID format' });
         }
 
         let parsedAcademicYearId: number | undefined = undefined;
-        if (academicYearId !== undefined) {
-            parsedAcademicYearId = parseInt(academicYearId);
+        if (academic_year_id !== undefined) {
+            parsedAcademicYearId = parseInt(academic_year_id);
             if (isNaN(parsedAcademicYearId)) {
                 return res.status(400).json({ success: false, error: 'Invalid Academic Year ID format' });
             }
