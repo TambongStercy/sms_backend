@@ -459,7 +459,6 @@ export async function getInterviewManagement(
         const enrollments = await prisma.enrollment.findMany({
             where: {
                 academic_year_id: yearId,
-                class_id: { not: null }, // Must be assigned to a class
                 sub_class_id: null,      // But not to a subclass
             },
             include: {
@@ -473,7 +472,9 @@ export async function getInterviewManagement(
                 },
                 class: true,
             },
-            orderBy: { created_at: 'asc' },
+            orderBy: {
+                created_at: 'asc',
+            },
         });
 
         const filteredAndMappedResult = enrollments
