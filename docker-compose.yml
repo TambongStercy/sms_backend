@@ -29,11 +29,3 @@
     networks:
       sms-network:
         driver: bridge
-
-    # volumes: # Define the volume if using the DB service
-    #   sms-db-data:ng an init container if your setup supports it.
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
-
-# --- Alternative CMD if you run migrations manually ---
-# CMD ["npm", "start"]
-# --- End Alternative CMD ---

@@ -7377,6 +7377,190 @@ Searches for students by their name or matricule, with optional filtering by aca
 }
 ```
 
+### Enroll Student
+```http
+POST /api/v1/students/:id/enroll
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+```typescript
+{
+  subClassId: number;
+  academicYearId?: number;
+  photo?: string;
+  repeater?: boolean;      // Defaults to false
+}
+```
+
+### Assign Student to Subclass
+```http
+POST /api/v1/students/:id/assign-subclass
+Authorization: Bearer <token>
+```
+
+**Description:**
+Assigns a student to a subclass. The student must have an existing enrollment in the specified academic year and not currently be assigned to a subclass.
+
+**Authorization:**
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `BURSAR`
+
+**Path Parameters:**
+- `id` (number): The ID of the student.
+
+**Request Body:**
+```typescript
+{
+  subClassId: number;   // Required: The ID of the subclass to assign.
+  academicYearId?: number; // Optional: The ID of the academic year. Defaults to current year.
+}
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  message: "Student successfully assigned to subclass.";
+  data: {
+    id: number;
+    studentId: number;
+    classId: number;
+    subClassId: number;
+    academicYearId: number;
+    repeater: boolean;
+    enrollmentDate: string;
+    createdAt: string;
+    updatedAt: string;
+    // ... other updated enrollment details
+  };
+}
+```
+
+**Error Responses:**
+- `400`: `Invalid Student ID format` or `Invalid Subclass ID format` or `Invalid Academic Year ID format`
+- `404`: `Student with ID X is not enrolled in academic year Y.` or `Subclass with ID X not found.`
+- `409`: `Student with ID X is already assigned to a subclass (Subclass Name/ID) for academic year Y.`
+- `500`: `Error assigning student to subclass: [error message]`
+
+### Link Parent
+```http
+POST /api/v1/students/:id/link-parent
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+```typescript
+{
+  parentId: number;
+}
+```
+
+### Unlink Parent
+```http
+DELETE /api/v1/students/:studentId/parents/:parentId
+Authorization: Bearer <token>
+```
+
+### Get Students by Subclass
+```http
+GET /api/v1/students/subclass/:subClassId
+Authorization: Bearer <token>
+```
+
+### Get Students by Parent
+```http
+GET /api/v1/students/parent/:parentId
+Authorization: Bearer <token>
+```
+
+### Get Parents by Student
+```http
+GET /api/v1/students/:studentId/parents
+Authorization: Bearer <token>
+```
+
+### Search Students
+```http
+GET /api/v1/students/search
+Authorization: Bearer <token>
+```
+
+**Description:**
+Searches for students by their name or matricule, with optional filtering by academic year and pagination.
+
+**Authorization:**
+- Any authenticated user.
+
+**Query Parameters:**
+```typescript
+{
+  q: string;             // Required: Search query (student name or matricule, minimum 1 character)
+  academicYearId?: number; // Optional: Filter by academic year
+  page?: number;         // Optional: Page number for pagination (default: 1)
+  limit?: number;        // Optional: Number of items per page (default: 10)
+}
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    data: Array<{
+      id: number;
+      matricule: string;
+      name: string;
+      dateOfBirth: string;
+      placeOfBirth: string;
+      gender: "MALE" | "FEMALE";
+      residence: string;
+      formerSchool?: string;
+      isNewStudent: boolean;
+      status: "NOT_ENROLLED" | "ENROLLED" | "ASSIGNED_TO_CLASS" | "GRADUATED" | "TRANSFERRED" | "SUSPENDED";
+      enrollments: Array<{
+        id: number;
+        classId: number;
+        subClassId?: number;
+        academicYearId: number;
+        repeater: boolean;
+        photo?: string;
+        subClass?: {
+          id: number;
+          name: string;
+          class: {
+            id: number;
+            name: string;
+          };
+        };
+      }>;
+      parents: Array<{
+        id: number;
+        parent: {
+          id: number;
+          name: string;
+          email: string;
+          phone: string;
+        };
+      }>;
+    }>;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  };
+}
+```
+
+**Error Responses:**
+```typescript
+{
+  success: false;
+  error: "Search query is required and must be at least 1 character"
+}
+```
+
 ---
 
 ## User Management

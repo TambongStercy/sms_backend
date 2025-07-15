@@ -8,21 +8,21 @@ import * as bursarService from '../services/bursarService';
 export const createStudentWithParent = async (req: Request, res: Response): Promise<void> => {
     try {
         const {
-            studentName,
-            dateOfBirth,
-            placeOfBirth,
-            gender,
-            residence,
-            formerSchool,
-            classId,
-            isNewStudent,
-            academicYearId,
-            parentName,
-            parentPhone,
-            parentWhatsapp,
-            parentEmail,
-            parentAddress,
-            relationship
+            student_name: studentName,
+            date_of_birth: dateOfBirth,
+            place_of_birth: placeOfBirth,
+            gender: gender,
+            residence: residence,
+            former_school: formerSchool,
+            class_id: classId,
+            is_new_student: isNewStudent,
+            academic_year_id: academicYearId,
+            parent_name: parentName,
+            parent_phone: parentPhone,
+            parent_whatsapp: parentWhatsapp,
+            parent_email: parentEmail,
+            parent_address: parentAddress,
+            relationship: relationship
         } = req.body;
 
         // Validate required fields
