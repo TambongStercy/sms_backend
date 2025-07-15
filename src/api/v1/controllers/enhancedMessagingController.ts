@@ -95,7 +95,9 @@ export async function getThreadMessages(req: Request, res: Response) {
 export async function createMessageThread(req: Request, res: Response) {
     try {
         const creatorId = req.user.id;
-        const { subject, participants, category, priority, initialMessage, tags } = req.body;
+        const { subject, participants, category, priority, initial_message, tags } = req.body;
+
+        console.log('Received initial_message:', initial_message);
 
         // Validation
         if (!subject || !participants || !Array.isArray(participants) || participants.length === 0) {
@@ -105,7 +107,7 @@ export async function createMessageThread(req: Request, res: Response) {
             });
         }
 
-        if (!initialMessage || initialMessage.trim().length === 0) {
+        if (!initial_message || initial_message.trim().length === 0) {
             return res.status(400).json({
                 success: false,
                 error: 'Initial message is required'
@@ -117,7 +119,7 @@ export async function createMessageThread(req: Request, res: Response) {
             participants,
             category: category || 'GENERAL',
             priority: priority || 'MEDIUM',
-            initialMessage: initialMessage.trim(),
+            initialMessage: initial_message.trim(),
             tags: tags || []
         };
 
