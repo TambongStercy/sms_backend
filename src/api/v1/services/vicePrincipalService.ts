@@ -446,81 +446,83 @@ export async function getStudentManagementOverview(academicYearId?: number): Pro
 /**
  * Get interview management data with advanced tracking
  */
-export async function getInterviewManagement(academicYearId?: number, status?: string): Promise<InterviewManagement[]> {
+export async function getInterviewManagement(
+    academicYearId?: number,
+    status?: string
+): Promise<InterviewManagement[]> {
     try {
-        const currentYear = academicYearId ?
-            await prisma.academicYear.findUnique({ where: { id: academicYearId } }) :
-            await getCurrentAcademicYear();
-
-        if (!currentYear) {
-            throw new Error('No academic year found');
+        const yearId = academicYearId || (await getCurrentAcademicYear())?.id;
+        if (!yearId) {
+            throw new Error('No academic year found and none provided.');
         }
 
-        // Get students with their enrollment and interview status
-        const students = await prisma.student.findMany({
+        const enrollments = await prisma.enrollment.findMany({
             where: {
-                enrollments: {
-                    some: { academic_year_id: currentYear.id }
-                }
+                academic_year_id: yearId,
+                class_id: { not: null }, // Must be assigned to a class
+                sub_class_id: null,      // But not to a subclass
             },
             include: {
-                enrollments: {
-                    where: { academic_year_id: currentYear.id },
+                student: {
                     include: {
-                        class: true
-                    }
+                        interview_marks: {
+                            orderBy: { created_at: 'desc' },
+                            take: 1,
+                        },
+                    },
                 },
-                interview_marks: true
-            }
+                class: true,
+            },
+            orderBy: { created_at: 'asc' },
         });
 
-        const interviewData: InterviewManagement[] = students.map(student => {
-            const enrollment = student.enrollments[0];
-            const interview = student.interview_marks[0];
-
-            let interviewStatus: 'PENDING' | 'COMPLETED' | 'OVERDUE';
-            let daysOverdue = 0;
-
-            if (interview) {
-                interviewStatus = 'COMPLETED';
-            } else {
-                const daysSinceRegistration = Math.floor(
-                    (new Date().getTime() - new Date(enrollment.created_at).getTime()) / (1000 * 60 * 60 * 24)
-                );
-
-                if (daysSinceRegistration > 7) {
-                    interviewStatus = 'OVERDUE';
-                    daysOverdue = daysSinceRegistration - 7;
-                } else {
-                    interviewStatus = 'PENDING';
+        const filteredAndMappedResult = enrollments
+            .filter((enr) => {
+                const hasInterviewMark = enr.student.interview_marks.length > 0;
+                if (status === 'PENDING') {
+                    return !hasInterviewMark;
+                } else if (status === 'COMPLETED') {
+                    return hasInterviewMark;
+                } else if (status === 'OVERDUE') {
+                    if (!hasInterviewMark) {
+                        // Define overdue: e.g., enrollment created more than 7 days ago and no interview mark
+                        const daysSinceEnrollment = Math.floor((Date.now() - enr.created_at.getTime()) / (1000 * 60 * 60 * 24));
+                        return daysSinceEnrollment > 7; // Example threshold for overdue
+                    }
+                    return false;
                 }
-            }
+                return true; // No status filter or unknown status, include all matching main criteria
+            })
+            .map((enr) => {
+                const latestInterview = enr.student.interview_marks[0];
+                const currentInterviewStatus: InterviewManagement['interviewStatus'] = latestInterview ? 'COMPLETED' : 'PENDING';
+                let daysOverdue: number | undefined = undefined;
 
-            return {
-                id: student.id,
-                studentId: student.id,
-                studentName: student.name,
-                studentMatricule: student.matricule,
-                className: enrollment.class.name,
-                interviewStatus,
-                scheduledDate: undefined, // Not implemented yet
-                completedDate: interview?.created_at?.toISOString(),
-                score: interview?.marks,
-                comments: interview?.notes || undefined,
-                interviewerName: undefined, // No interviewer relation in schema
-                daysOverdue: daysOverdue > 0 ? daysOverdue : undefined,
-                registrationDate: enrollment.created_at.toISOString()
-            };
-        });
+                if (currentInterviewStatus === 'PENDING') {
+                    daysOverdue = Math.floor((Date.now() - enr.created_at.getTime()) / (1000 * 60 * 60 * 24));
+                }
 
-        // Filter by status if provided
-        if (status) {
-            return interviewData.filter(data => data.interviewStatus === status);
-        }
+                return {
+                    id: enr.student.id, // Using student.id as the primary ID for the report item
+                    studentId: enr.student.id,
+                    studentName: enr.student.name,
+                    studentMatricule: enr.student.matricule,
+                    className: enr.class.name,
+                    interviewStatus: currentInterviewStatus,
+                    scheduledDate: undefined,
+                    completedDate: latestInterview?.created_at.toISOString().split('T')[0],
+                    score: latestInterview?.marks,
+                    comments: latestInterview?.notes,
+                    interviewerName: undefined, // Not directly available from current includes without schema change
+                    daysOverdue: daysOverdue,
+                    registrationDate: enr.created_at.toISOString().split('T')[0],
+                };
+            });
 
-        return interviewData;
-    } catch (error) {
-        throw new Error(`Failed to fetch interview management data: ${error}`);
+        return filteredAndMappedResult;
+    } catch (error: any) {
+        console.error('Error fetching interview management data:', error);
+        throw new Error(`Failed to fetch interview management data: ${error.message}`);
     }
 }
 
