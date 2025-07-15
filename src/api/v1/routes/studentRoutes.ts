@@ -126,6 +126,9 @@ router.get('/:studentId/parents',
 // POST /students/:id/enroll - Enroll student into a subclass
 router.post('/:id/enroll', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.enrollStudent);
 
+// POST /students/:id/assign-subclass - Assign student to a subclass (if enrolled in academic year but no subclass)
+router.post('/:id/assign-subclass', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.assignStudentToSubclass);
+
 // GET /students/:id/status - Get student status information (new/old/repeater)
 // SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can view any student status
 // TEACHER can only view status for students from their assigned subclasses

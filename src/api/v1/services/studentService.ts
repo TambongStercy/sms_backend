@@ -489,6 +489,75 @@ export async function getParentsByStudentId(studentId: number): Promise<ParentSt
 }
 
 /**
+ * Assigns a student to a subclass if they have an existing enrollment in the academic year and no current subclass.
+ * @param studentId The ID of the student.
+ * @param subClassId The ID of the subclass to assign.
+ * @param academicYearId Optional academic year ID (defaults to current).
+ * @returns The updated Enrollment record.
+ */
+export async function assignStudentToSubclass(
+    studentId: number,
+    subClassId: number,
+    academicYearId?: number
+): Promise<Enrollment> {
+    const yearId = academicYearId ?? await getAcademicYearId();
+    if (!yearId) {
+        throw new Error("No academic year found and none provided.");
+    }
+
+    // Find the existing enrollment for the student in the specified academic year
+    const enrollment = await prisma.enrollment.findUnique({
+        where: {
+            student_id_academic_year_id: {
+                student_id: studentId,
+                academic_year_id: yearId
+            }
+        },
+        include: { sub_class: true }
+    });
+
+    if (!enrollment) {
+        throw new Error(`Student with ID ${studentId} is not enrolled in academic year ${yearId}.`);
+    }
+
+    if (enrollment.sub_class_id !== null) {
+        throw new Error(`Student with ID ${studentId} is already assigned to a subclass (${enrollment.sub_class?.name || enrollment.sub_class_id}) for academic year ${yearId}.`);
+    }
+
+    // Verify the subclass exists
+    const subClass = await prisma.subClass.findUnique({
+        where: { id: subClassId }
+    });
+
+    if (!subClass) {
+        throw new Error(`Subclass with ID ${subClassId} not found.`);
+    }
+
+    // Update the enrollment with the new subclass ID
+    const updatedEnrollment = await prisma.enrollment.update({
+        where: {
+            id: enrollment.id
+        },
+        data: {
+            sub_class_id: subClassId,
+            // status: 'ASSIGNED_TO_CLASS' as StudentStatus // Update student status if applicable
+        },
+        include: {
+            student: true,
+            sub_class: { include: { class: true } }
+        }
+    });
+
+    // Optionally, update the student's main status if they were previously NOT_ENROLLED
+    await prisma.student.update({
+        where: { id: studentId },
+        data: { status: StudentStatus.ASSIGNED_TO_CLASS }
+    });
+
+    return updatedEnrollment;
+}
+
+/**
  * Search students by name or matricule
  */
 export async function searchStudents(
@@ -500,7 +569,7 @@ export async function searchStudents(
     try {
         // Determine target academic year
         const targetAcademicYearId = academicYearId ?? await getAcademicYearId();
-        
+
         // Build search criteria
         const searchCriteria: Prisma.StudentWhereInput = {
             OR: [

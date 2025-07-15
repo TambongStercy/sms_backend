@@ -353,6 +353,51 @@ export const enrollStudent = async (req: Request, res: Response): Promise<any> =
 };
 
 /**
+ * Assign a student to a subclass after enrollment
+ */
+export const assignStudentToSubclass = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const studentId = parseInt(req.params.id);
+        if (isNaN(studentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Student ID format' });
+        }
+
+        const { subClassId, academicYearId } = req.body; // Expect camelCase from middleware
+
+        const parsedSubClassId = parseInt(subClassId);
+        if (isNaN(parsedSubClassId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Subclass ID format' });
+        }
+
+        let parsedAcademicYearId: number | undefined = undefined;
+        if (academicYearId !== undefined) {
+            parsedAcademicYearId = parseInt(academicYearId);
+            if (isNaN(parsedAcademicYearId)) {
+                return res.status(400).json({ success: false, error: 'Invalid Academic Year ID format' });
+            }
+        }
+
+        const updatedEnrollment = await studentService.assignStudentToSubclass(
+            studentId,
+            parsedSubClassId,
+            parsedAcademicYearId
+        );
+
+        res.json({ success: true, data: updatedEnrollment });
+
+    } catch (error: any) {
+        console.error('Error assigning student to subclass:', error);
+        if (error.message.includes('not enrolled')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        if (error.message.includes('already assigned') || error.message.includes('not found')) {
+            return res.status(409).json({ success: false, error: error.message });
+        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
  * Get student status information (new/old/repeater)
  */
 export const getStudentStatusInfo = async (req: Request, res: Response): Promise<any> => {
