@@ -4,7 +4,7 @@ import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../
 import { shouldPayNewStudentFees, getStudentStatus, StudentStatus } from '../../../utils/studentStatus';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 import { Parser } from 'json2csv'; // For CSV export
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'; // For PDF export
+import { PDFDocument, rgb, StandardFonts, PageSizes } from 'pdf-lib'; // For PDF export
 import { Document, Paragraph, Packer, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } from 'docx'; // For DOCX export
 import fs from 'fs';
 import path from 'path';
@@ -42,14 +42,14 @@ async function generatePDF(data: any[]): Promise<Buffer> {
     const columnPadding = 5;
 
     const columns = [
-        { header: 'Fee ID', key: 'feeId', width: 60, align: AlignmentType.LEFT },
-        { header: 'Student Name', key: 'studentName', width: 120, align: AlignmentType.LEFT },
-        { header: 'Matricule', key: 'studentMatricule', width: 80, align: AlignmentType.LEFT },
-        { header: 'Class', key: 'className', width: 70, align: AlignmentType.LEFT },
-        { header: 'Expected (FCFA)', key: 'expectedAmount', width: 80, align: AlignmentType.RIGHT },
-        { header: 'Paid (FCFA)', key: 'paidAmount', width: 80, align: AlignmentType.RIGHT },
-        { header: 'Outstanding (FCFA)', key: 'outstanding', width: 80, align: AlignmentType.RIGHT },
-        { header: 'Due Date', key: 'dueDate', width: 70, align: AlignmentType.LEFT },
+        { header: 'Fee ID', key: 'feeId', width: 45, align: AlignmentType.LEFT },
+        { header: 'Student Name', key: 'studentName', width: 90, align: AlignmentType.LEFT },
+        { header: 'Matricule', key: 'studentMatricule', width: 60, align: AlignmentType.LEFT },
+        { header: 'Class', key: 'className', width: 55, align: AlignmentType.LEFT },
+        { header: 'Expected (FCFA)', key: 'expectedAmount', width: 60, align: AlignmentType.RIGHT },
+        { header: 'Paid (FCFA)', key: 'paidAmount', width: 60, align: AlignmentType.RIGHT },
+        { header: 'Outstanding (FCFA)', key: 'outstanding', width: 60, align: AlignmentType.RIGHT },
+        { header: 'Due Date', key: 'dueDate', width: 60, align: AlignmentType.LEFT },
     ];
 
     let page = pdfDoc.addPage();

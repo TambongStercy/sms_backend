@@ -364,7 +364,16 @@ export async function getBursarDashboard(academicYearId?: number): Promise<any> 
                 include: {
                     enrollment: {
                         include: {
-                            student: true
+                            student: {
+                                include: {
+                                    parents: {
+                                        include: {
+                                            parent: true
+                                        }
+                                    }
+                                }
+                            },
+                            class: true // Include the class directly from enrollment
                         }
                     }
                 },
@@ -421,9 +430,9 @@ export async function getBursarDashboard(academicYearId?: number): Promise<any> 
             ],
             recentRegistrations: recentPayments.slice(0, 5).map(payment => ({
                 studentName: payment.enrollment.student.name,
-                parentName: 'N/A', // Would need to join with parent_students
+                parentName: payment.enrollment.student.parents[0]?.parent?.name || 'N/A', // Get the first parent's name
                 registrationDate: payment.enrollment.created_at,
-                className: 'N/A' // Would need to join with class
+                className: payment.enrollment.class?.name || 'N/A'
             }))
         };
     } catch (error) {
