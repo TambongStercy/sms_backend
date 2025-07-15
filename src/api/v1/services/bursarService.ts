@@ -106,7 +106,7 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
                     name: data.student_name,
                     date_of_birth: new Date(data.date_of_birth),
                     place_of_birth: data.place_of_birth,
-                    gender: data.gender,
+                    gender: data.gender.charAt(0).toUpperCase() + data.gender.slice(1).toLowerCase() as Gender,
                     residence: data.residence,
                     former_school: data.former_school,
                     is_new_student: data.is_new_student ?? true,

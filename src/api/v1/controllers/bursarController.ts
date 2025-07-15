@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as bursarService from '../services/bursarService';
+import { Gender } from '@prisma/client';
 
 /**
  * Create student with automatic parent account creation
@@ -38,7 +39,7 @@ export const createStudentWithParent = async (req: Request, res: Response): Prom
             student_name: studentName,
             date_of_birth: dateOfBirth,
             place_of_birth: placeOfBirth,
-            gender,
+            gender: gender.toUpperCase() === 'MALE' ? Gender.Male : Gender.Female,
             residence,
             former_school: formerSchool,
             class_id: parseInt(classId),

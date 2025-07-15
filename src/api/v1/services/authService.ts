@@ -43,7 +43,7 @@ export const login = async (credentials: LoginCredentials): Promise<any> => {
         throw new Error('Email/Matricule and password are required');
     }
 
-    const findCondition = email ? { email } : { matricule };
+    const findCondition = email ? { email: email?.toLowerCase() } : { matricule: matricule?.toLowerCase() };
 
     const user = await prisma.user.findUnique({
         where: findCondition,
@@ -98,7 +98,7 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
     } = userData;
 
     // Check if email already exists
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email: email?.toLowerCase() } });
     if (existingUser) {
         throw new Error('Email already in use');
     }
@@ -108,7 +108,7 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
     const createdUser = await prisma.user.create({
         data: {
             name,
-            email,
+            email: email?.toLowerCase(),
             password: hashedPassword,
             gender: gender,
             date_of_birth: new Date(dateOfBirth),
