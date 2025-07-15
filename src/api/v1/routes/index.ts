@@ -18,7 +18,6 @@ import enrollmentRoutes from './enrollmentRoutes';
 import enhancedDashboardRoutes from './enhancedDashboardRoutes';
 import notificationRoutes from './notificationRoutes';
 import parentRoutes from './parentRoutes';
-import messagingRoutes from './messagingRoutes';
 import auditTrailRoutes from './auditTrailRoutes';
 import teacherAttendanceAnalyticsRoutes from './teacherAttendanceAnalyticsRoutes';
 import classProfileAnalyticsRoutes from './classProfileAnalyticsRoutes';
@@ -112,9 +111,6 @@ router.use('/notifications', notificationRoutes);
 
 // Parent portal endpoints
 router.use('/parents', parentRoutes);
-
-// Direct messaging endpoints
-router.use('/messaging', messagingRoutes);
 
 // Audit trail endpoints
 router.use('/audit', auditTrailRoutes);

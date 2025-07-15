@@ -74,14 +74,16 @@ export async function getAllSubclasses(
         delete processedFilters.classId;
     }
 
-    // Check if subjects should be included
+    // Check if subjects should be included and prepare include object
     if (filterOptions?.includeSubjects === 'true') {
         include.sub_class_subjects = {
             include: {
                 subject: true // Include the subject details
             }
         };
-        // Remove the flag from filters passed to paginate
+    }
+    // Always remove the flag from filters passed to paginate
+    if (filterOptions?.includeSubjects !== undefined) {
         delete processedFilters.includeSubjects;
     }
 
