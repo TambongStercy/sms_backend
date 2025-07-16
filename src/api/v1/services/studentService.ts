@@ -656,5 +656,11 @@ export async function getStudentByEnrollmentId(enrollmentId: number): Promise<an
         return null;
     }
 
-    return enrollment.student;
+    const { student, sub_class } = enrollment;
+
+    return {
+        ...student,
+        class: sub_class?.class?.name || null,
+        subClass: sub_class?.name || null,
+    };
 }
