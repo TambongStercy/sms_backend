@@ -57,7 +57,7 @@ export async function registerStudentToClass(data: BursarRegistrationData) {
         residence: data.residence,
         former_school: data.former_school,
         is_new_student: data.is_new_student ?? true,
-        status: StudentStatus.ENROLLED,
+        status: StudentStatus.ASSIGNED_TO_CLASS,
         first_enrollment_year_id: yearId,
         matricule: `TEMP_${Date.now()}` // Will be updated by matricule generator
     };

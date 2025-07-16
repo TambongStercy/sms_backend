@@ -353,7 +353,71 @@ export const enrollStudent = async (req: Request, res: Response): Promise<any> =
 };
 
 /**
- * Assign a student to a subclass after enrollment
+ * Assign a student to a class (creates enrollment with class only)
+ * Sets student status to ASSIGNED_TO_CLASS
+ */
+export const assignStudentToClass = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const studentId = parseInt(req.params.id);
+        if (isNaN(studentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Student ID format' });
+        }
+
+        // Expect snake_case from middleware
+        const { class_id, academic_year_id, photo, repeater } = req.body;
+
+        // Validate and parse class_id
+        const parsedClassId = parseInt(class_id);
+        if (isNaN(parsedClassId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Class ID format' });
+        }
+
+        // Validate and parse academic_year_id if present
+        let parsedAcademicYearId: number | undefined = undefined;
+        if (academic_year_id !== undefined) {
+            parsedAcademicYearId = parseInt(academic_year_id);
+            if (isNaN(parsedAcademicYearId)) {
+                return res.status(400).json({ success: false, error: 'Invalid Academic Year ID format' });
+            }
+        }
+
+        // Photo is optional
+        if (photo !== undefined && photo !== null && typeof photo !== 'string') {
+            return res.status(400).json({ success: false, error: 'If provided, photo must be a string or null.' });
+        }
+
+        // Prepare data for the service
+        const assignmentData = {
+            class_id: parsedClassId,
+            academic_year_id: parsedAcademicYearId,
+            photo: photo,
+            repeater: repeater !== undefined ? Boolean(repeater) : false
+        };
+
+        const enrollment = await studentService.assignStudentToClass(studentId, assignmentData);
+        res.status(201).json({
+            success: true,
+            data: enrollment
+        });
+    } catch (error: any) {
+        console.error('Error assigning student to class:', error);
+        if (error.message.includes('already assigned to a subclass')) {
+            return res.status(409).json({ success: false, error: error.message });
+        }
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Enroll a student in a subclass (assigns to subclass)
+ * Sets student status to ENROLLED
+ * This is the final level of enrollment
  */
 export const assignStudentToSubclass = async (req: Request, res: Response): Promise<any> => {
     try {

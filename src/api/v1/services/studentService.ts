@@ -366,12 +366,16 @@ export async function linkParent(student_id: number, data: { parent_id: number }
     });
 }
 
-export async function enrollStudent(
+/**
+ * Assigns a student to a class (creates enrollment with class only)
+ * Sets student status to ASSIGNED_TO_CLASS
+ */
+export async function assignStudentToClass(
     student_id: number,
     data: {
-        sub_class_id: number;
+        class_id: number;
         academic_year_id?: number;
-        photo: string | null;
+        photo?: string | null;
         repeater?: boolean;
     }
 ): Promise<Enrollment & { fee_id: number }> {
@@ -381,7 +385,106 @@ export async function enrollStudent(
         throw new Error("No academic year found and none provided");
     }
 
-    // Get sub_class and its parent class to access fee details
+    // Get class details
+    const classData = await prisma.class.findUnique({
+        where: { id: data.class_id }
+    });
+
+    if (!classData) {
+        throw new Error(`Class with ID ${data.class_id} not found`);
+    }
+
+    // Check if student is already enrolled in this academic year
+    const existingEnrollment = await prisma.enrollment.findUnique({
+        where: {
+            student_id_academic_year_id: {
+                student_id: student_id,
+                academic_year_id: yearId
+            }
+        },
+        include: {
+            school_fees: true
+        }
+    });
+
+    let enrollment: Enrollment;
+    let fee_id: number;
+
+    if (existingEnrollment) {
+        // Check if already assigned to a subclass
+        if (existingEnrollment.sub_class_id) {
+            throw new Error("Student is already assigned to a subclass. Cannot reassign to class only.");
+        }
+
+        // Update existing enrollment with class assignment
+        enrollment = await prisma.enrollment.update({
+            where: { id: existingEnrollment.id },
+            data: {
+                class_id: data.class_id,
+                photo: data.photo ?? existingEnrollment.photo,
+                repeater: data.repeater ?? existingEnrollment.repeater,
+            }
+        });
+
+        // Use existing fee if available, otherwise create new one
+        if (existingEnrollment.school_fees.length > 0) {
+            fee_id = existingEnrollment.school_fees[0].id;
+        } else {
+            const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
+            fee_id = fee.id;
+        }
+    } else {
+        // Create new enrollment with class only
+        enrollment = await prisma.enrollment.create({
+            data: {
+                student_id,
+                class_id: data.class_id,
+                sub_class_id: null, // No subclass assignment yet
+                academic_year_id: yearId,
+                repeater: data.repeater ?? false,
+                photo: data.photo ?? null,
+            },
+        });
+
+        // Set first enrollment year if this is the student's first enrollment
+        await setFirstEnrollmentYear(student_id, yearId);
+
+        // Create fee record for the enrollment
+        const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
+        fee_id = fee.id;
+    }
+
+    // Update student status to ASSIGNED_TO_CLASS
+    await prisma.student.update({
+        where: { id: student_id },
+        data: { status: StudentStatus.ASSIGNED_TO_CLASS }
+    });
+
+    console.log('Student assigned to class:', enrollment);
+    return { ...enrollment, fee_id };
+}
+
+/**
+ * Enrolls a student in a subclass (assigns to subclass)
+ * Sets student status to ENROLLED
+ * Can be used for both new enrollments and updating existing ones
+ */
+export async function enrollStudentInSubclass(
+    student_id: number,
+    data: {
+        sub_class_id: number;
+        academic_year_id?: number;
+        photo?: string | null;
+        repeater?: boolean;
+    }
+): Promise<Enrollment & { fee_id: number }> {
+    // Get current academic year if not provided
+    const yearId = data.academic_year_id ?? await getAcademicYearId();
+    if (!yearId) {
+        throw new Error("No academic year found and none provided");
+    }
+
+    // Get sub_class and its parent class
     const sub_class = await prisma.subClass.findUnique({
         where: { id: data.sub_class_id },
         include: { class: true }
@@ -391,26 +494,84 @@ export async function enrollStudent(
         throw new Error(`Subclass with ID ${data.sub_class_id} or its parent Class not found`);
     }
 
-    // Use a transaction to create enrollment and set first enrollment year
-    const enrollment = await prisma.enrollment.create({
-        data: {
-            student_id,
-            class_id: sub_class.class_id, // Required: parent class
-            sub_class_id: data.sub_class_id, // Optional: specific subclass
-            academic_year_id: yearId,
-            repeater: data.repeater ?? false,
-            photo: data.photo ?? null,
+    // Check if student is already enrolled in this academic year
+    const existingEnrollment = await prisma.enrollment.findUnique({
+        where: {
+            student_id_academic_year_id: {
+                student_id: student_id,
+                academic_year_id: yearId
+            }
         },
+        include: {
+            school_fees: true
+        }
     });
 
-    // Set first enrollment year if this is the student's first enrollment
-    await setFirstEnrollmentYear(student_id, yearId);
+    let enrollment: Enrollment;
+    let fee_id: number;
 
-    // Create fee record for the enrollment
-    const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
-    console.log('Fee created:', fee);
+    if (existingEnrollment) {
+        // Update existing enrollment with subclass assignment
+        enrollment = await prisma.enrollment.update({
+            where: { id: existingEnrollment.id },
+            data: {
+                sub_class_id: data.sub_class_id,
+                class_id: sub_class.class_id,
+                photo: data.photo ?? existingEnrollment.photo,
+                repeater: data.repeater ?? existingEnrollment.repeater,
+            }
+        });
 
-    return { ...enrollment, fee_id: fee.id };
+        // Use existing fee if available, otherwise create new one
+        if (existingEnrollment.school_fees.length > 0) {
+            fee_id = existingEnrollment.school_fees[0].id;
+        } else {
+            const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
+            fee_id = fee.id;
+        }
+    } else {
+        // Create new enrollment with subclass (for old students directly enrolling in subclass)
+        enrollment = await prisma.enrollment.create({
+            data: {
+                student_id,
+                class_id: sub_class.class_id,
+                sub_class_id: data.sub_class_id,
+                academic_year_id: yearId,
+                repeater: data.repeater ?? false,
+                photo: data.photo ?? null,
+            },
+        });
+
+        // Set first enrollment year if this is the student's first enrollment
+        await setFirstEnrollmentYear(student_id, yearId);
+
+        // Create fee record for the enrollment
+        const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
+        fee_id = fee.id;
+    }
+
+    // Update student status to ENROLLED when assigned to subclass
+    await prisma.student.update({
+        where: { id: student_id },
+        data: { status: StudentStatus.ENROLLED }
+    });
+
+    console.log('Student enrolled in subclass:', enrollment);
+    return { ...enrollment, fee_id };
+}
+
+// Keep the old enrollStudent function for backward compatibility
+// but make it call enrollStudentInSubclass
+export async function enrollStudent(
+    student_id: number,
+    data: {
+        sub_class_id: number;
+        academic_year_id?: number;
+        photo: string | null;
+        repeater?: boolean;
+    }
+): Promise<Enrollment & { fee_id: number }> {
+    return enrollStudentInSubclass(student_id, data);
 }
 
 // Get students by sub_class for a specific academic year
@@ -569,7 +730,7 @@ export async function searchStudents(
     try {
         // Determine target academic year
         const targetAcademicYearId = academicYearId ?? await getAcademicYearId();
-        
+
         // Build search criteria
         const searchCriteria: Prisma.StudentWhereInput = {
             OR: [

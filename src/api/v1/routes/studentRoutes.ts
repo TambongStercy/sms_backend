@@ -123,7 +123,10 @@ router.get('/:studentId/parents',
     studentController.getParentsByStudentId
 );
 
-// POST /students/:id/enroll - Enroll student into a subclass
+// POST /students/:id/assign-class - Assign student to a class (creates enrollment with class only)
+router.post('/:id/assign-class', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.assignStudentToClass);
+
+// POST /students/:id/enroll - Enroll student into a subclass (final enrollment level)
 router.post('/:id/enroll', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), studentController.enrollStudent);
 
 // POST /students/:id/assign-subclass - Assign student to a subclass (if enrolled in academic year but no subclass)

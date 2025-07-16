@@ -467,7 +467,7 @@ async function seedUserRoles(users: any[], academicYears: any[]) {
     ];
 
     // Filter out any assignments where academic year ID is undefined
-    const validUserRoles = userRoles.filter(role => 
+    const validUserRoles = userRoles.filter(role =>
         role.academic_year_id === null || role.academic_year_id !== undefined
     );
 
@@ -762,21 +762,22 @@ async function seedStudents() {
 
     const students: Student[] = [];
     const studentData = [
-        { name: 'John Student One', gender: 'Male', residence: 'Yaounde', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'Mary Student Two', gender: 'Female', residence: 'Douala', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'Peter Student Three', gender: 'Male', residence: 'Bafoussam', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'Grace Student Four', gender: 'Female', residence: 'Yaounde', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'David Student Five', gender: 'Male', residence: 'Bamenda', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'Sarah Student Six', gender: 'Female', residence: 'Limbe', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'Michael Student Seven', gender: 'Male', residence: 'Yaounde', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'Emma Student Eight', gender: 'Female', residence: 'Douala', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'James Student Nine', gender: 'Male', residence: 'Kribi', status: 'ASSIGNED_TO_CLASS' },
-        { name: 'Linda Student Ten', gender: 'Female', residence: 'Yaounde', status: 'ASSIGNED_TO_CLASS' },
+        // Students with subclass assignments should have ENROLLED status
+        { name: 'John Student One', gender: 'Male', residence: 'Yaounde', status: 'ENROLLED' },
+        { name: 'Mary Student Two', gender: 'Female', residence: 'Douala', status: 'ENROLLED' },
+        { name: 'Peter Student Three', gender: 'Male', residence: 'Bafoussam', status: 'ENROLLED' },
+        { name: 'Grace Student Four', gender: 'Female', residence: 'Yaounde', status: 'ENROLLED' },
+        { name: 'David Student Five', gender: 'Male', residence: 'Bamenda', status: 'ENROLLED' },
+        { name: 'Sarah Student Six', gender: 'Female', residence: 'Limbe', status: 'ENROLLED' },
+        { name: 'Michael Student Seven', gender: 'Male', residence: 'Yaounde', status: 'ENROLLED' },
+        { name: 'Emma Student Eight', gender: 'Female', residence: 'Douala', status: 'ENROLLED' },
+        { name: 'James Student Nine', gender: 'Male', residence: 'Kribi', status: 'ENROLLED' },
+        { name: 'Linda Student Ten', gender: 'Female', residence: 'Yaounde', status: 'ENROLLED' },
 
         // New students awaiting assignment
         { name: 'Robert New Student', gender: 'Male', residence: 'Yaounde', status: 'NOT_ENROLLED' },
         { name: 'Alice New Student', gender: 'Female', residence: 'Douala', status: 'NOT_ENROLLED' },
-        { name: 'Kevin New Student', gender: 'Male', residence: 'Bamenda', status: 'ENROLLED' }, // Awaiting interview
+        { name: 'Kevin New Student', gender: 'Male', residence: 'Bamenda', status: 'ASSIGNED_TO_CLASS' }, // Assigned to class but not subclass yet
     ];
 
     for (let i = 0; i < studentData.length; i++) {
