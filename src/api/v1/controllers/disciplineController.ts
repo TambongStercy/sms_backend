@@ -12,6 +12,7 @@ export const getAllDisciplineIssues = async (req: Request, res: Response) => {
             'sub_class_id',
             'start_date',
             'end_date',
+            'issue_type',
             'description',
             'include_assigned_by',
             'include_reviewed_by',
