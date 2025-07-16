@@ -426,13 +426,9 @@ export async function assignStudentToClass(
             }
         });
 
-        // Use existing fee if available, otherwise create new one
-        if (existingEnrollment.school_fees.length > 0) {
-            fee_id = existingEnrollment.school_fees[0].id;
-        } else {
-            const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
-            fee_id = fee.id;
-        }
+        // Create or update fee record based on the new class assignment
+        const fee = await feeService.createOrUpdateFeeForEnrollment(enrollment.id, data.class_id);
+        fee_id = fee.id;
     } else {
         // Create new enrollment with class only
         enrollment = await prisma.enrollment.create({
@@ -449,8 +445,8 @@ export async function assignStudentToClass(
         // Set first enrollment year if this is the student's first enrollment
         await setFirstEnrollmentYear(student_id, yearId);
 
-        // Create fee record for the enrollment
-        const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
+        // Create fee record for the enrollment based on class
+        const fee = await feeService.createOrUpdateFeeForEnrollment(enrollment.id, data.class_id);
         fee_id = fee.id;
     }
 
@@ -522,13 +518,9 @@ export async function enrollStudentInSubclass(
             }
         });
 
-        // Use existing fee if available, otherwise create new one
-        if (existingEnrollment.school_fees.length > 0) {
-            fee_id = existingEnrollment.school_fees[0].id;
-        } else {
-            const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
-            fee_id = fee.id;
-        }
+        // Create or update fee record based on the class of the subclass
+        const fee = await feeService.createOrUpdateFeeForEnrollment(enrollment.id, sub_class.class_id);
+        fee_id = fee.id;
     } else {
         // Create new enrollment with subclass (for old students directly enrolling in subclass)
         enrollment = await prisma.enrollment.create({
@@ -545,8 +537,8 @@ export async function enrollStudentInSubclass(
         // Set first enrollment year if this is the student's first enrollment
         await setFirstEnrollmentYear(student_id, yearId);
 
-        // Create fee record for the enrollment
-        const fee = await feeService.createFeeForNewEnrollment(enrollment.id);
+        // Create fee record for the enrollment based on the class of the subclass
+        const fee = await feeService.createOrUpdateFeeForEnrollment(enrollment.id, sub_class.class_id);
         fee_id = fee.id;
     }
 

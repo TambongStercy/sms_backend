@@ -380,7 +380,7 @@ model TeacherPeriod {
   teacher_id       Int
   subject_id       Int
   period_id        Int
-  academic_year_id Int
+  academic_year_id Int 
   assigned_by_id   Int
   created_at       DateTime         @default(now())
   updated_at       DateTime         @updatedAt

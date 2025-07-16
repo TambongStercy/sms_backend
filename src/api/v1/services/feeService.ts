@@ -942,24 +942,10 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
         // This can be customized based on your fee structure logic
         let feeAmount = classInfo.base_fee;
 
-        // Add term-specific fees based on the current term
-        const currentTerm = await prisma.term.findFirst({
-            where: {
-                academic_year_id: yearId,
-                start_date: { lte: new Date() },
-                end_date: { gte: new Date() }
-            }
-        });
-
-        if (currentTerm) {
-            if (currentTerm.name.toLowerCase().includes('first')) {
-                feeAmount += classInfo.first_term_fee;
-            } else if (currentTerm.name.toLowerCase().includes('second')) {
-                feeAmount += classInfo.second_term_fee;
-            } else if (currentTerm.name.toLowerCase().includes('third')) {
-                feeAmount += classInfo.third_term_fee;
-            }
-        }
+        // Add all term fees together (simplified workflow for bursar)
+        feeAmount += classInfo.first_term_fee;
+        feeAmount += classInfo.second_term_fee;
+        feeAmount += classInfo.third_term_fee;
 
         // Add miscellaneous fees
         feeAmount += classInfo.miscellaneous_fee;
@@ -990,13 +976,18 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
             }
         } else {
             // Create a new fee record if none exists
+            // Get academic year for due date
+            const academicYear = await prisma.academicYear.findUnique({
+                where: { id: yearId }
+            });
+
             const newFee = await prisma.schoolFees.create({
                 data: {
                     enrollment_id: enrollment.id,
                     academic_year_id: yearId,
                     amount_expected: feeAmount,
                     amount_paid: 0,
-                    due_date: currentTerm ? currentTerm.fee_deadline || new Date() : new Date()
+                    due_date: academicYear?.end_date || new Date(new Date().getFullYear(), 11, 31)
                 }
             });
             console.log(`Created new fee record ${newFee.id} for student ${enrollment.student.name}. Expected amount: ${newFee.amount_expected}`);
@@ -1007,10 +998,113 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
 }
 
 /**
+ * Calculates the expected fee amount for a student based on class structure
+ * @param classId The ID of the class
+ * @param studentId The ID of the student
+ * @param academicYearId The ID of the academic year
+ * @returns The calculated fee amount
+ */
+async function calculateFeeAmount(classId: number, studentId: number, academicYearId: number): Promise<number> {
+    const classInfo = await prisma.class.findUnique({
+        where: { id: classId }
+    });
+
+    if (!classInfo) {
+        throw new Error(`Class with ID ${classId} not found.`);
+    }
+
+    // Calculate the expected fee amount based on class structure
+    let feeAmount = classInfo.base_fee;
+
+    // Add all term fees together (simplified workflow for bursar)
+    feeAmount += classInfo.first_term_fee;
+    feeAmount += classInfo.second_term_fee;
+    feeAmount += classInfo.third_term_fee;
+
+    // Add miscellaneous fees
+    feeAmount += classInfo.miscellaneous_fee;
+
+    // Add extra fees based on student status (new vs old)
+    const shouldPayNewFees = await shouldPayNewStudentFees(studentId, academicYearId);
+    if (shouldPayNewFees) {
+        feeAmount += classInfo.new_student_fee;
+    } else {
+        feeAmount += classInfo.old_student_fee;
+    }
+
+    return feeAmount;
+}
+
+/**
+ * Creates or updates a fee record for a student enrollment
+ * @param enrollmentId The ID of the enrollment record
+ * @param classId The ID of the class (for fee calculation)
+ * @returns The created or updated SchoolFees record
+ */
+export async function createOrUpdateFeeForEnrollment(enrollmentId: number, classId: number): Promise<SchoolFees> {
+    const enrollment = await prisma.enrollment.findUnique({
+        where: { id: enrollmentId },
+        include: {
+            student: true,
+            academic_year: true,
+            school_fees: {
+                where: { academic_year_id: { not: null } }
+            }
+        }
+    });
+
+    if (!enrollment) {
+        throw new Error(`Enrollment with ID ${enrollmentId} not found.`);
+    }
+
+    if (!enrollment.academic_year_id) {
+        throw new Error('Enrollment must have an academic year to create/update fees.');
+    }
+
+    // Calculate the expected fee amount
+    const feeAmount = await calculateFeeAmount(classId, enrollment.student_id, enrollment.academic_year_id);
+
+    // Set due date to end of academic year or a reasonable default
+    const academicYear = await prisma.academicYear.findUnique({
+        where: { id: enrollment.academic_year_id }
+    });
+
+    const dueDate = academicYear?.end_date || new Date(new Date().getFullYear(), 11, 31); // Default to end of current year
+
+    // Check if fee record already exists for this enrollment and academic year
+    const existingFee = enrollment.school_fees.find(fee =>
+        fee.academic_year_id === enrollment.academic_year_id
+    );
+
+    if (existingFee) {
+        // Update existing fee with new amount
+        return prisma.schoolFees.update({
+            where: { id: existingFee.id },
+            data: {
+                amount_expected: feeAmount,
+                due_date: dueDate
+            }
+        });
+    } else {
+        // Create new fee record
+        return prisma.schoolFees.create({
+            data: {
+                enrollment_id: enrollment.id,
+                academic_year_id: enrollment.academic_year_id,
+                amount_expected: feeAmount,
+                amount_paid: 0,
+                due_date: dueDate
+            }
+        });
+    }
+}
+
+/**
  * Creates a fee record for a newly enrolled student.
  * This function should be called during the student enrollment process.
  * @param enrollmentId The ID of the new enrollment record.
  * @returns The newly created SchoolFees record.
+ * @deprecated Use createOrUpdateFeeForEnrollment instead
  */
 export async function createFeeForNewEnrollment(enrollmentId: number): Promise<SchoolFees> {
     const enrollment = await prisma.enrollment.findUnique({
@@ -1027,58 +1121,11 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
     if (!enrollment) {
         throw new Error(`Enrollment with ID ${enrollmentId} not found.`);
     }
-    if (!enrollment.academic_year_id || !enrollment.sub_class?.class_id) {
+
+    const classId = enrollment.sub_class?.class_id || enrollment.class_id;
+    if (!enrollment.academic_year_id || !classId) {
         throw new Error('Enrollment must have an academic year and associated class to create fees.');
     }
 
-    const classInfo = await prisma.class.findUnique({
-        where: { id: enrollment.sub_class.class_id }
-    });
-
-    if (!classInfo) {
-        throw new Error(`Class with ID ${enrollment.sub_class.class_id} not found.`);
-    }
-
-    // Calculate the expected fee amount based on class structure
-    let feeAmount = classInfo.base_fee;
-
-    // Add term-specific fees based on the current term
-    const currentTerm = await prisma.term.findFirst({
-        where: {
-            academic_year_id: enrollment.academic_year_id,
-            start_date: { lte: new Date() },
-            end_date: { gte: new Date() }
-        }
-    });
-
-    if (currentTerm) {
-        if (currentTerm.name.toLowerCase().includes('first')) {
-            feeAmount += classInfo.first_term_fee;
-        } else if (currentTerm.name.toLowerCase().includes('second')) {
-            feeAmount += classInfo.second_term_fee;
-        } else if (currentTerm.name.toLowerCase().includes('third')) {
-            feeAmount += classInfo.third_term_fee;
-        }
-    }
-
-    // Add miscellaneous fees
-    feeAmount += classInfo.miscellaneous_fee;
-
-    // Add extra fees based on student status (new vs old)
-    const shouldPayNewFees = await shouldPayNewStudentFees(enrollment.student_id, enrollment.academic_year_id);
-    if (shouldPayNewFees) {
-        feeAmount += classInfo.new_student_fee;
-    } else {
-        feeAmount += classInfo.old_student_fee;
-    }
-
-    return prisma.schoolFees.create({
-        data: {
-            enrollment_id: enrollment.id,
-            academic_year_id: enrollment.academic_year_id,
-            amount_expected: feeAmount,
-            amount_paid: 0,
-            due_date: currentTerm ? currentTerm.fee_deadline || new Date() : new Date()
-        }
-    });
+    return createOrUpdateFeeForEnrollment(enrollmentId, classId);
 }
