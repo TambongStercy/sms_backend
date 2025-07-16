@@ -73,7 +73,7 @@ export async function getAllSubjectsForSubclass(subClassId: number, academicYear
             st.teacher_id AS teacher_id
          FROM "SubClassSubject" scs
          JOIN "Subject" s ON scs.subject_id = s.id
-         LEFT JOIN "SubjectTeacher" st ON st.subject_id = s.id AND st.academic_year_id = :academicYearId
+         LEFT JOIN "SubjectTeacher" st ON st.subject_id = s.id
          LEFT JOIN "User" u ON st.teacher_id = u.id
          WHERE scs.sub_class_id = :subClassId
            AND scs.academic_year_id = :academicYearId

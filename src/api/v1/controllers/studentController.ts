@@ -586,3 +586,24 @@ export const searchStudents = async (req: Request, res: Response): Promise<any> 
         });
     }
 };
+
+export const getStudentByEnrollmentId = async (req: Request, res: Response) => {
+    try {
+        const enrollmentId = parseInt(req.params.enrollmentId, 10);
+
+        if (isNaN(enrollmentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid enrollment ID' });
+        }
+
+        const student = await studentService.getStudentByEnrollmentId(enrollmentId);
+
+        if (!student) {
+            return res.status(404).json({ success: false, error: 'Student not found for the given enrollment ID' });
+        }
+
+        res.json({ success: true, data: student });
+    } catch (error: any) {
+        console.error('Error fetching student by enrollment ID:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};

@@ -569,7 +569,7 @@ export async function searchStudents(
     try {
         // Determine target academic year
         const targetAcademicYearId = academicYearId ?? await getAcademicYearId();
-
+        
         // Build search criteria
         const searchCriteria: Prisma.StudentWhereInput = {
             OR: [
@@ -623,4 +623,38 @@ export async function searchStudents(
         console.error('Error searching students:', error);
         throw error;
     }
+}
+
+
+/**
+ * Retrieves a student's data based on their enrollment ID.
+ * @param enrollmentId The ID of the enrollment.
+ * @returns The student object with their latest enrollment details.
+ */
+export async function getStudentByEnrollmentId(enrollmentId: number): Promise<any> {
+    const enrollment = await prisma.enrollment.findUnique({
+        where: { id: enrollmentId },
+        include: {
+            student: {
+                include: {
+                    parents: {
+                        include: {
+                            parent: true,
+                        },
+                    },
+                },
+            },
+            sub_class: {
+                include: {
+                    class: true,
+                },
+            },
+        },
+    });
+
+    if (!enrollment) {
+        return null;
+    }
+
+    return enrollment.student;
 }

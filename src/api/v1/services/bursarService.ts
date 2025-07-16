@@ -58,6 +58,7 @@ export interface RegistrationResult {
         id: number;
         matricule: string;
         name: string;
+        phone: string;
         email: string;
         temporary_password: string;
     };
@@ -182,6 +183,7 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
                     matricule: parentUser.matricule,
                     name: parentUser.name,
                     email: parentUser.email,
+                    phone: parentUser.phone,
                     temporary_password: 'defaultPassword123' // In production, send this securely
                 },
                 enrollment: {

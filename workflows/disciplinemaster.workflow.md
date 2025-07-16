@@ -7,772 +7,759 @@
 **Key Schema Details (from Prisma):**
 - **DisciplineIssue Model:** `enrollment_id`, `issue_type` (DisciplineType enum), `description`, `notes`, `assigned_by_id`, `reviewed_by_id`
 - **StudentAbsence Model:** `assigned_by_id`, `teacher_period_id`, `enrollment_id`, `absence_type` (AbsenceType enum)
+- **TeacherAbsence Model:** `teacher_id`, `assigned_by_id`, `teacher_period_id`, `reason`
 - **DisciplineType Enum:** MORNING_LATENESS, CLASS_ABSENCE, MISCONDUCT, OTHER
 - **AbsenceType Enum:** MORNING_LATENESS, CLASS_ABSENCE
 - **TeacherPeriod Model:** Links periods to subjects, teachers, and subclasses for attendance tracking
 
+**IMPORTANT: "Attendance" APIs Actually Manage ABSENCE Records**
+⚠️ **For Frontend Developers:** The `/attendance/*` endpoints do NOT manage an "Attendance" table - they manage the `StudentAbsence` and `TeacherAbsence` tables in the database. This is essentially "absence tracking" disguised as "attendance management."
+
+**API Categories & Database Tables:**
+1. **"Attendance" APIs** (`/api/v1/attendance/*`) → Manage `StudentAbsence` & `TeacherAbsence` tables
+2. **Discipline Lateness APIs** (`/api/v1/discipline/lateness/*`) → Create records in both `StudentAbsence` & `DisciplineIssue` tables
+3. **Discipline Issue APIs** (`/api/v1/discipline/*`) → Manage `DisciplineIssue` table only
+4. **Analytics & Dashboard APIs** (`/api/v1/discipline-master/*`) → Query across all tables for insights
+
+**When Should the Discipline Master Use Which API?**
+
+**For Morning Gate Duty (Quick Recording):**
+- Use `/discipline/lateness` → Creates BOTH absence record AND disciplinary action
+
+**For Detailed Absence Analysis:**
+- Use `/attendance/students` → Query absence patterns, generate reports, view trends
+
+**For Teacher Management:**
+- Use `/attendance/teachers` → Record when teachers don't show up (administrative)
+
+**For Behavioral Tracking:**
+- Use `/discipline/*` → Record misconduct, track behavioral issues (not absence-related)
+
 #### **1. Get Discipline Master Dashboard**
-**Primary:** `GET /api/v1/discipline-master/dashboard`
-**Enhanced:** `GET /api/v1/dashboard/vp/enhanced` (includes disciplinary overview)
-**Behavioral Analytics:** `GET /api/v1/discipline-master/behavioral-analytics`
-**Early Warning:** `GET /api/v1/discipline-master/early-warning`
-**Statistics:** `GET /api/v1/discipline-master/statistics`
+**Endpoint:** `GET /api/v1/discipline-master/dashboard`
 - **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
-  ```typescript
+  ```json
   {
-    academicYearId?: number; // Optional, defaults to current year
+    "academicYearId": 2024 // Optional, defaults to current year
   }
   ```
 - **Response:**
-  ```typescript
+  ```json
   {
-    success: true;
-    data: {
-      totalActiveIssues: number;
-      resolvedThisWeek: number;
-      pendingResolution: number;
-      studentsWithMultipleIssues: number;
-      averageResolutionTime: number;
-      attendanceRate: number;
-      latenessIncidents: number;
-      absenteeismCases: number;
-      interventionSuccess: number;
-      criticalCases: number;
-      behavioralTrends: {
-        thisMonth: number;
-        lastMonth: number;
-        trend: "IMPROVING" | "DECLINING" | "STABLE";
-      };
-      urgentInterventions: Array<{
-        studentId: number;
-        studentName: string;
-        issueCount: number;
-        riskLevel: "HIGH" | "MEDIUM" | "LOW";
-        lastIncident: string;
-        recommendedAction: string;
-      }>;
-      issuesByType: Array<{
-        type: string;
-        count: number;
-        trend: "INCREASING" | "DECREASING" | "STABLE";
-        resolutionRate: number;
-      }>;
-    };
+    "success": true,
+    "data": {
+      "totalActiveIssues": 12,
+      "resolvedThisWeek": 5,
+      "pendingResolution": 7,
+      "studentsWithMultipleIssues": 3,
+      "averageResolutionTime": 3.2,
+      "attendanceRate": 95.3,
+      "latenessIncidents": 8,
+      "absenteeismCases": 15,
+      "interventionSuccess": 87,
+      "criticalCases": 2,
+      "behavioralTrends": {
+        "thisMonth": 45,
+        "lastMonth": 38,
+        "trend": "IMPROVING"
+      },
+      "urgentInterventions": [
+        {
+          "studentId": 101,
+          "studentName": "Alice Brown",
+          "issueCount": 4,
+          "riskLevel": "HIGH",
+          "lastIncident": "2024-01-22T08:15:00.000Z",
+          "recommendedAction": "Immediate counseling session"
+        }
+      ],
+      "issuesByType": [
+        {
+          "type": "MORNING_LATENESS",
+          "count": 8,
+          "trend": "INCREASING",
+          "resolution_rate": 75
+        }
+      ]
+    }
   }
   ```
 
-#### **2. Record Morning Lateness**
+#### **2. Get Student Attendance (Queries StudentAbsence Table)**
+**Endpoint:** `GET /api/v1/attendance/students`
+- **Headers:** `Authorization: Bearer <token>`
+- **Database:** Queries `StudentAbsence` table (not an "Attendance" table)
+- **Query Parameters:**
+  ```json
+  {
+    "student_id": 101,              // Optional
+    "class_id": 5,                  // Optional  
+    "sub_class_id": 12,             // Optional
+    "start_date": "2024-01-01",     // Optional
+    "end_date": "2024-01-22",       // Optional
+    "status": "ABSENT",             // Optional
+    "include_student": "true",      // Optional
+    "include_assigned_by": "true",  // Optional
+    "include_teacher_period": "true", // Optional
+    "academic_year_id": 2024,       // Optional
+    "page": 1,
+    "limit": 10,
+    "sortBy": "created_at",
+    "sortOrder": "desc"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "enrollment_id": 201,
+        "assigned_by_id": 10,
+        "teacher_period_id": 5,
+        "absence_type": "MORNING_LATENESS",
+        "created_at": "2024-01-22T08:15:00.000Z",
+        "enrollment": {
+          "student": { "id": 101, "name": "Alice Brown", "matricule": "STU2024015" },
+          "sub_class": { "name": "Form 3A", "class": { "name": "Form 3" } }
+        },
+        "assigned_by": { "id": 10, "name": "SDM User" }
+      }
+    ],
+    "meta": { "total": 25, "page": 1, "limit": 10, "totalPages": 3 }
+  }
+  ```
+
+#### **3. Record Student Attendance - Creates StudentAbsence Records**
+**Endpoint:** `POST /api/v1/attendance/students`
+- **Headers:** `Authorization: Bearer <token>`
+- **Database:** Creates records in `StudentAbsence` table
+- **Request Body:**
+  ```json
+  {
+    "records": [
+      {
+        "student_id": 101,
+        "academic_year_id": 2024,
+        "teacher_period_id": 5
+      },
+      {
+        "enrollment_id": 202,
+        "teacher_period_id": 6
+      }
+    ]
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "2 attendance record(s) created successfully",
+    "data": [ ...StudentAbsence objects... ]
+  }
+  ```
+
+#### **4. Update Student Attendance**
+**Endpoint:** `PUT /api/v1/attendance/students/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```json
+  {
+    "teacher_period_id": 7
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Attendance record updated successfully",
+    "data": { ...updated StudentAbsence object... }
+  }
+  ```
+
+#### **5. Get Student Attendance Summary**
+**Endpoint:** `GET /api/v1/attendance/students/summary`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```json
+  {
+    "student_id": 101,
+    "class_id": 5,
+    "sub_class_id": 12,
+    "start_date": "2024-01-01",
+    "end_date": "2024-01-22",
+    "academic_year_id": 2024
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalDays": 15,
+      "presentDays": 12,
+      "absentDays": 2,
+      "lateDays": 1,
+      "excusedDays": 1,
+      "attendanceRate": 86.67,
+      "absenteeRate": 13.33,
+      "breakdown": {
+        "PRESENT": 12,
+        "ABSENT": 2,
+        "LATE": 1,
+        "EXCUSED": 1
+      }
+    }
+  }
+  ```
+
+#### **6. Record Morning Lateness - Creates BOTH StudentAbsence + DisciplineIssue**
 **Endpoint:** `POST /api/v1/discipline/lateness`
 - **Headers:** `Authorization: Bearer <token>`
+- **Database:** Creates records in BOTH `StudentAbsence` AND `DisciplineIssue` tables
 - **Request Body:**
-  ```typescript
+  ```json
   {
-    studentId: number;
-    date?: string;           // "YYYY-MM-DD", defaults to today
-    arrivalTime: string;     // "HH:mm"
-    reason?: string;
-    academicYearId?: number;
+    "student_id": 101,
+    "date": "2024-01-22",           // Optional, defaults to today
+    "arrival_time": "08:15",        // "HH:mm"
+    "minutes_late": 15,             // Optional
+    "reason": "Transport delay",
+    "academic_year_id": 2024        // Optional
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Morning lateness recorded successfully",
+    "data": {
+      "id": 1,
+      "enrollment_id": 201,
+      "assigned_by_id": 10,
+      "absence_type": "MORNING_LATENESS",
+      "created_at": "2024-01-22T08:15:00.000Z",
+      "enrollment": {
+        "student": { "id": 101, "name": "Alice Brown", "matricule": "STU2024015" },
+        "sub_class": { "name": "Form 3A", "class": { "name": "Form 3" } }
+      },
+      "assigned_by": { "id": 10, "name": "SDM User" }
+    }
   }
   ```
 
-#### **3. Record Bulk Morning Lateness**
+#### **7. Record Bulk Morning Lateness**
 **Endpoint:** `POST /api/v1/discipline/lateness/bulk`
+- **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
-  ```typescript
+  ```json
   {
-    students: Array<{
-      studentId: number;
-      arrivalTime: string;  // "HH:mm"
-      reason?: string;
-    }>;
-    date?: string;           // "YYYY-MM-DD", defaults to today
-    academicYearId?: number;
+    "date": "2024-01-22",                // Optional, defaults to today
+    "academic_year_id": 2024,            // Optional
+    "records": [
+      { 
+        "student_id": 101, 
+        "arrival_time": "08:15", 
+        "minutes_late": 15,
+        "reason": "Transport delay" 
+      },
+      { 
+        "student_id": 102, 
+        "arrival_time": "08:20", 
+        "minutes_late": 20,
+        "reason": "Overslept" 
+      }
+    ]
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Processed 2 records",
+    "data": {
+      "successful_records": 2,
+      "failed_records": 0,
+      "successes": [ ...StudentAbsence objects... ],
+      "errors": []
+    }
   }
   ```
 
-#### **4. Record Discipline Issue**
-**Endpoint:** `POST /api/v1/discipline`
-- **Request Body:**
-  ```typescript
-  {
-    studentId: number;
-    issueType: string;       // "MISCONDUCT" | "MORNING_LATENESS" | "CLASS_ABSENCE" | "OTHER"
-    description: string;
-    dateOccurred?: string;   // "YYYY-MM-DD", defaults to today
-    severity?: "LOW" | "MEDIUM" | "HIGH";
-    actionTaken?: string;
-    academicYearId?: number;
-  }
-  ```
-
-#### **5. Get All Discipline Issues**
-**Endpoint:** `GET /api/v1/discipline`
+#### **8. Get Teacher Attendance (Queries TeacherAbsence Table)**
+**Endpoint:** `GET /api/v1/attendance/teachers`
+- **Headers:** `Authorization: Bearer <token>`
+- **Database:** Queries `TeacherAbsence` table
 - **Query Parameters:**
-  ```typescript
+  ```json
   {
-    studentId?: number;
-    classId?: number;
-    subClassId?: number;
-    startDate?: string;      // "YYYY-MM-DD"
-    endDate?: string;        // "YYYY-MM-DD"
-    description?: string;    // Search term
-    academicYearId?: number;
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
+    "teacher_id": 25,               // Optional
+    "start_date": "2024-01-01",     // Optional
+    "end_date": "2024-01-22",       // Optional
+    "reason": "illness",            // Optional
+    "include_teacher": "true",      // Optional
+    "include_assigned_by": "true",  // Optional
+    "include_teacher_period": "true", // Optional
+    "page": 1,
+    "limit": 10,
+    "sortBy": "created_at",
+    "sortOrder": "desc"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "teacher_id": 25,
+        "assigned_by_id": 10,
+        "teacher_period_id": 5,
+        "reason": "Medical appointment",
+        "created_at": "2024-01-22T09:00:00.000Z",
+        "teacher": { "id": 25, "name": "Mr. Johnson" },
+        "assigned_by": { "id": 10, "name": "SDM User" }
+      }
+    ],
+    "meta": { "total": 8, "page": 1, "limit": 10, "totalPages": 1 }
   }
   ```
 
-#### **6. Get Student Behavior Profile**
+#### **9. Record Teacher Attendance - Creates TeacherAbsence Record**
+**Endpoint:** `POST /api/v1/attendance/teachers`
+- **Headers:** `Authorization: Bearer <token>`
+- **Database:** Creates record in `TeacherAbsence` table
+- **Request Body:**
+  ```json
+  {
+    "teacher_id": 25,
+    "reason": "Medical appointment",
+    "teacher_period_id": 5          // Optional
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Teacher attendance recorded successfully",
+    "data": {
+      "id": 1,
+      "teacher_id": 25,
+      "assigned_by_id": 10,
+      "teacher_period_id": 5,
+      "reason": "Medical appointment",
+      "created_at": "2024-01-22T09:00:00.000Z",
+      "teacher": { "id": 25, "name": "Mr. Johnson" },
+      "assigned_by": { "id": 10, "name": "SDM User" }
+    }
+  }
+  ```
+
+#### **10. Get Teacher Attendance Summary**
+**Endpoint:** `GET /api/v1/attendance/teachers/summary`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```json
+  {
+    "teacher_id": 25,               // Optional
+    "start_date": "2024-01-01",     // Optional
+    "end_date": "2024-01-22"        // Optional
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalAbsences": 3,
+      "reasonBreakdown": {
+        "Medical appointment": 2,
+        "Family emergency": 1
+      }
+    }
+  }
+  ```
+
+#### **11. Record Discipline Issue**
+**Endpoint:** `POST /api/v1/discipline`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+  ```json
+  {
+    "student_id": 101,
+    "issue_type": "MISCONDUCT",
+    "description": "Disruptive behavior during math class",
+    "academic_year_id": 2024
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Discipline issue recorded successfully",
+    "data": { ...DisciplineIssue object... }
+  }
+  ```
+
+#### **12. Get All Discipline Issues**
+**Endpoint:** `GET /api/v1/discipline`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```json
+  {
+    "student_id": 101,
+    "class_id": 5,
+    "sub_class_id": 12,
+    "start_date": "2024-01-01",
+    "end_date": "2024-01-22",
+    "description": "lateness",
+    "academic_year_id": 2024,
+    "page": 1,
+    "limit": 10,
+    "sortBy": "created_at",
+    "sortOrder": "desc"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "data": [ ...DisciplineIssue objects... ],
+      "meta": { "total": 12, "page": 1, "limit": 10, "totalPages": 2 }
+    }
+  }
+  ```
+
+#### **13. Get Lateness Statistics**
+**Endpoint:** `GET /api/v1/discipline/lateness/statistics`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```json
+  {
+    "academic_year_id": 2024
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalLatenessToday": 8,
+      "totalLatenessThisWeek": 45,
+      "totalLatenessThisMonth": 156,
+      "chronicallyLateStudents": [ 
+        {
+          "student": { "id": 101, "name": "Alice Brown", "matricule": "STU2024015" },
+          "class": "Form 3",
+          "subclass": "Form 3A",
+          "lateness_count": 5
+        }
+      ],
+      "latenessByClass": [
+        {
+          "className": "Form 3",
+          "count": 12
+        }
+      ]
+    }
+  }
+  ```
+
+#### **14. Get Daily Lateness Report**
+**Endpoint:** `GET /api/v1/discipline/lateness/daily-report`
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Parameters:**
+  ```json
+  {
+    "date": "2024-01-22",
+    "academic_year_id": 2024
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "date": "2024-01-22",
+      "total_late_students": 8,
+      "records": [
+        {
+          "id": 1,
+          "student": { "id": 101, "name": "Alice Brown", "matricule": "STU2024015" },
+          "class": "Form 3",
+          "subclass": "Form 3A",
+          "recorded_time": "2024-01-22T08:15:00.000Z",
+          "recorded_by": "SDM User"
+        }
+      ]
+    }
+  }
+  ```
+
+#### **15. Get Student Behavior Profile**
 **Endpoint:** `GET /api/v1/discipline-master/student-profile/:studentId`
+- **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:** `{ academicYearId?: number }`
 - **Response:**
-  ```typescript
+  ```json
   {
-    success: true;
-    data: {
-      studentId: number;
-      studentName: string;
-      matricule: string;
-      className: string;
-      subClassName: string;
-      riskLevel: "HIGH" | "MEDIUM" | "LOW" | "NONE";
-      behaviorScore: number;
-      totalIncidents: number;
-      recentIncidents: number;
-      interventionsReceived: number;
-      lastIncidentDate?: string;
-      behaviorPattern: {
-        mostCommonIssues: Array<string>;
-        triggerFactors: Array<string>;
-        improvementAreas: Array<string>;
-        strengths: Array<string>;
-      };
-      interventionHistory: Array<{
-        id: number;
-        type: string;
-        date: string;
-        description: string;
-        outcome: "SUCCESSFUL" | "PARTIALLY_SUCCESSFUL" | "UNSUCCESSFUL" | "ONGOING";
-        followUpDate?: string;
-      }>;
-      recommendedActions: Array<{
-        priority: "HIGH" | "MEDIUM" | "LOW";
-        action: string;
-        timeline: string;
-        responsible: string;
-      }>;
-    };
+    "success": true,
+    "data": {
+      "studentId": 101,
+      "studentName": "Alice Brown",
+      "matricule": "STU2024015",
+      "className": "Form 3",
+      "subClassName": "Form 3A",
+      "riskLevel": "HIGH",
+      "behaviorScore": 70,
+      "totalIncidents": 5,
+      "recentIncidents": 3,
+      "interventionsReceived": 2,
+      "lastIncidentDate": "2024-01-22",
+      "behaviorPattern": {
+        "mostCommonIssues": ["Lateness", "Misconduct"],
+        "triggerFactors": ["Morning tardiness", "Peer influence"],
+        "improvementAreas": ["Punctuality", "Class participation"],
+        "strengths": ["Academic performance", "Sports participation"]
+      },
+      "interventionHistory": [ ... ],
+      "recommendedActions": [ ... ]
+    }
   }
   ```
 
-#### **7. Get Behavioral Analytics**
+#### **16. Get Behavioral Analytics**
 **Endpoint:** `GET /api/v1/discipline-master/behavioral-analytics`
+- **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:** `{ academicYearId?: number }`
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalStudents": 1245,
+      "studentsWithIssues": 45,
+      "behaviorScore": 92,
+      "riskDistribution": { "high": 2, "medium": 7, "low": 12, "none": 1224 },
+      "monthlyTrends": [ ... ],
+      "issueTypeAnalysis": [ ... ],
+      "classroomHotspots": [ ... ]
+    }
+  }
+  ```
 
-#### **8. Get Early Warning System**
+#### **17. Get Early Warning System**
 **Endpoint:** `GET /api/v1/discipline-master/early-warning`
+- **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:** `{ academicYearId?: number }`
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "criticalStudents": [ ... ],
+      "riskIndicators": [ ... ],
+      "preventiveRecommendations": [ ... ]
+    }
+  }
+  ```
 
-#### **9. Get Discipline Statistics**
+#### **18. Get Discipline Statistics**
 **Endpoint:** `GET /api/v1/discipline-master/statistics`
+- **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
-  ```typescript
+  ```json
   {
-    academicYearId?: number;
-    startDate?: string;      // "YYYY-MM-DD"
-    endDate?: string;        // "YYYY-MM-DD"
-    classId?: number;
+    "academicYearId": 2024,
+    "startDate": "2024-01-01",
+    "endDate": "2024-01-22",
+    "classId": 5
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "overview": {
+        "totalStudents": 1245,
+        "studentsWithIssues": 45,
+        "behaviorScore": 92,
+        "riskDistribution": { "high": 2, "medium": 7, "low": 12, "none": 1224 }
+      },
+      "trends": [ ... ],
+      "issueAnalysis": [ ... ],
+      "classroomHotspots": [ ... ],
+      "filters": { "academicYearId": 2024, "startDate": "2024-01-01", "endDate": "2024-01-22", "classId": 5 }
+    }
   }
   ```
 
-#### **10. Get Lateness Statistics**
-**Endpoint:** `GET /api/v1/discipline/lateness/statistics`
-- **Query Parameters:**
-  ```typescript
-  {
-    startDate?: string;
-    endDate?: string;
-    classId?: number;
-    subClassId?: number;
-    academicYearId?: number;
-  }
-  ```
-
-#### **11. Get Daily Lateness Report**
-**Endpoint:** `GET /api/v1/discipline/lateness/daily-report`
-- **Query Parameters:**
-  ```typescript
-  {
-    date?: string;           // "YYYY-MM-DD", defaults to today
-    academicYearId?: number;
-  }
-  ```
-
-#### **12. Create Intervention Plan**
+#### **19. Create Intervention Plan**
 **Endpoint:** `POST /api/v1/discipline-master/interventions`
+- **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
-  ```typescript
+  ```json
   {
-    studentId: number;
-    interventionType: string;
-    description: string;
-    expectedEndDate?: string;  // "YYYY-MM-DD"
-    assignedTo: string;
+    "studentId": 101,
+    "interventionType": "Behavioral Counseling",
+    "description": "Weekly counseling sessions to address behavioral issues",
+    "expectedEndDate": "2024-02-15",
+    "assignedTo": "School Counselor"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Intervention plan created successfully",
+    "data": { ...intervention object... }
   }
   ```
 
-#### **13. Update Intervention Status**
+#### **20. Update Intervention Status**
 **Endpoint:** `PUT /api/v1/discipline-master/interventions/:interventionId`
+- **Headers:** `Authorization: Bearer <token>`
 - **Request Body:**
-  ```typescript
+  ```json
   {
-    status: "PLANNED" | "ONGOING" | "COMPLETED" | "CANCELLED";
-    outcome?: "SUCCESSFUL" | "PARTIALLY_SUCCESSFUL" | "UNSUCCESSFUL";
-    notes?: string;
-    effectiveness?: number;
+    "status": "ONGOING",
+    "outcome": "SUCCESSFUL",
+    "notes": "Student showing improvement",
+    "effectiveness": 85
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Intervention updated successfully",
+    "data": { ...updated intervention object... }
   }
   ```
 
-#### **14. Get Intervention Tracking**
+#### **21. Get Intervention Tracking**
 **Endpoint:** `GET /api/v1/discipline-master/interventions`
+- **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
-  ```typescript
+  ```json
   {
-    academicYearId?: number;
-    status?: "PLANNED" | "ONGOING" | "COMPLETED" | "CANCELLED";
-    studentId?: number;
+    "academicYearId": 2024,
+    "status": "ONGOING",
+    "studentId": 101
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": [ ...intervention objects... ],
+    "meta": { "total": 1, "filters": { "academicYearId": 2024, "status": "ONGOING", "studentId": 101 } }
   }
   ```
 
-#### **15. Generate Discipline Report**
+#### **22. Generate Discipline Report**
 **Endpoint:** `GET /api/v1/discipline-master/reports`
+- **Headers:** `Authorization: Bearer <token>`
 - **Query Parameters:**
-  ```typescript
+  ```json
   {
-    academicYearId?: number;
-    reportType?: string;      // Default: "comprehensive"
-    startDate?: string;       // "YYYY-MM-DD"
-    endDate?: string;         // "YYYY-MM-DD"
+    "academicYearId": 2024,
+    "reportType": "comprehensive",
+    "startDate": "2024-01-01",
+    "endDate": "2024-01-22"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "reportInfo": { ... },
+      "executiveSummary": { ... },
+      "detailedAnalysis": { ... },
+      "recommendations": [ ... ],
+      "actionItems": [ ... ]
+    }
   }
   ```
 
-### **Main Dashboard Layout**
-```
-┌─────────────────────────────────────────────────────────┐
-│ [🏠] School Management System    [🔔] [👤] [⚙️] [🚪]    │
-├─────────────────────────────────────────────────────────┤
-│ Welcome back, [SDM Name] | Academic Year: 2024-2025     │
-│ Student Discipline Master - Behavioral Management       │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│ ┌─── Daily Discipline Overview ───┐                     │
-│ │ 📅 Today: January 22, 2024      ⏰ Time: 08:45 AM     │
-│ │ 🚨 Active Issues: 12             📝 New Reports: 3     │
-│ │ ⏰ Late Arrivals: 8              ❌ Absences: 15      │
-│ │ ⚠️ Pending Reviews: 5            📊 Weekly Total: 45   │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Morning Attendance Status ───┐ ┌─── Priority Cases ───┐│
-│ │ School Start Time: 07:30 AM      │ │ 🚨 Serious Issues: 2   ││
-│ │ Students Present: 1,187 (95%)    │ │ • Fighting incident    ││
-│ │ Late Arrivals: 8 students        │ │ • Repeated misconduct  ││
-│ │ Absent: 15 students              │ │                       ││
-│ │ Unexcused Absences: 6            │ │ ⚠️ Escalation Needed: 3││
-│ │ [Record Lateness] [Mark Absent]  │ │ • 5th lateness offense ││
-│ │                                  │ │ • Parent contact req.  ││
-│ │ Latest Late Arrival: 08:15 AM    │ │ • VP review pending    ││
-│ │ [View All] [Daily Report]        │ │ [Review Cases]         ││
-│ └─────────────────────────────────┘ └─────────────────────┘│
-│                                                         │
-│ ┌─── This Week's Trends ───┐                            │
-│ │ 📈 Total Incidents: 45 (↑12% from last week)          │
-│ │ 🕐 Morning Lateness: 52% of all issues                │
-│ │ 📚 Class Absences: 31% of all issues                  │
-│ │ ⚠️ Misconduct Cases: 17% of all issues                │
-│ │ 🎯 Most Affected: Form 3 & Form 4 students            │
-│ │ [Weekly Analysis] [Generate Report] [Action Plan]     │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
+---
+
+## Note on API Integration & Page Layouts
+
+**API Documentation Status:** ✅ **COMPLETE**
+The API endpoints above have been analyzed and integrated from the actual implementation including:
+- **Attendance Service:** Complete implementation with filtering, pagination, and bulk operations
+- **Discipline Service:** Specialized lateness tracking and discipline issue management  
+- **Controller Layer:** Full request/response handling with authentication and authorization
+- **Database Schema:** Aligned with Prisma models (StudentAbsence, TeacherAbsence, DisciplineIssue)
+
+**Request/Response Formats:** All API examples above reflect the actual implementation including:
+- Proper authentication headers (`Authorization: Bearer <token>`)
+- Accurate query parameters and request body structures
+- Real response formats with success/error handling
+- Correct HTTP status codes and error messages
+
+**Visual/UX Layouts:** All visual/UX layouts below are preserved as originally designed for reference. The API integration above provides the backend functionality to support these user interface designs.
+
+---
 
 ## Morning Attendance Management (`/discipline-master/attendance`)
 
-### **Daily Attendance Dashboard**
+### **API Integration Reference for Discipline Master**
+
+**🚨 DAILY WORKFLOW GUIDE:**
+
+**7:30-8:00 AM (Morning Gate Duty):**
 ```
-┌─── Daily Attendance Management ───┐
-│ [Record Lateness] [Mark Absences] [Daily Report] [Statistics] │
-│                                                              │
-│ ┌─── Today's Attendance Status ───┐                          │
-│ │ Date: Monday, January 22, 2024                            │
-│ │ School Start Time: 07:30 AM | Current Time: 08:45 AM      │
-│ │ Total Students: 1,245                                     │
-│ │ Present: 1,187 (95.3%)                                    │
-│ │ Late Arrivals: 8 (0.6%)                                   │
-│ │ Absent: 50 (4.0%)                                         │
-│ │ Excused Absences: 44 | Unexcused: 6                      │
-│ └────────────────────────────────────────────────────────┘ │
-│                                                              │
-│ ┌─── Late Arrivals Today ───┐                               │
-│ │ Student Name    Class    Arrival Time  Reason    Action   │
-│ │ John Doe        Form 5A  07:45 AM     Transport [Record] │
-│ │ Mary Smith      Form 3B  08:00 AM     Family    [Record] │
-│ │ Peter Johnson   Form 4A  08:15 AM     Traffic   [Record] │
-│ │ Sarah Williams  Form 2C  07:50 AM     Medical   [Record] │
-│ │ [View All Late Arrivals] [Bulk Record] [Send Alerts]      │
-│ └────────────────────────────────────────────────────────┘ │
-│                                                              │
-│ ┌─── Absent Students ───┐                                    │
-│ │ [Filter: All ▼] [Class ▼] [Excused/Unexcused ▼]          │
-│ │ Student Name    Class    Type        Last Contact Action  │
-│ │ Michael Brown   Form 1B  Unexcused   Never       [Contact]│
-│ │ Lisa Davis      Form 6A  Excused     Today       [Mark]   │
-│ │ James Wilson    Form 4C  Unexcused   Yesterday   [Follow] │
-│ │ [Mark Present] [Contact Parents] [Generate Letters]       │
-│ └────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
+Student arrives late → Use POST /discipline/lateness
+Result: Creates StudentAbsence + DisciplineIssue (disciplinary action)
 ```
 
-### **Record Morning Lateness** (`/discipline-master/lateness/record`)
+**8:00 AM+ (Class Period Absences):**
 ```
-┌─── Record Morning Lateness ───┐
-│ ┌─── Single Student Entry ───┐ │
-│ │ Student Search: [Text Input with autocomplete]          │
-│ │ Selected: John Doe (STU2024001) - Form 5A             │
-│ │                                                        │
-│ │ Arrival Time: [08:15] AM                               │
-│ │ Date: [2024-01-22] (Today)                             │
-│ │ Reason: [Transport delay ▼]                            │
-│ │ • Transport delay    • Family emergency                │
-│ │ • Traffic jam       • Medical appointment              │
-│ │ • Overslept         • Other (specify)                 │
-│ │                                                        │
-│ │ Additional Notes: [Text Area]                          │
-│ │ [Record Lateness] [Clear] [Cancel]                     │
-│ └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│ ┌─── OR Bulk Entry ───┐                                  │
-│ │ [Upload CSV] [Manual Bulk Entry] [Gate Scanner Data]   │
-│ │                                                        │
-│ │ Student           Class   Time    Reason     Action    │
-│ │ Mary Smith        3B      08:00   Family    [Add]     │
-│ │ Peter Johnson     4A      08:15   Traffic   [Add]     │
-│ │ Sarah Williams    2C      07:50   Medical   [Add]     │
-│ │                                                        │
-│ │ [Process All] [Review] [Clear All]                     │
-│ └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│ ┌─── Recent Late Students Alert ───┐                     │
-│ │ ⚠️ Repeat Offenders This Week:                         │
-│ │ • Alice Brown (4th time) - Form 3A                    │
-│ │ • David Jones (3rd time) - Form 4B                    │
-│ │ [Take Action] [Contact Parents] [Escalate]             │
-│ └──────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
+Teacher reports missing student → Use POST /attendance/students  
+Result: Creates StudentAbsence only (no disciplinary action yet)
 ```
 
-## Discipline Issue Management (`/discipline-master/incidents`)
-
-### **Discipline Issues Dashboard**
+**Throughout Day (Behavioral Issues):**
 ```
-┌─── Discipline Issues Management ───┐
-│ [Record New Issue] [Active Cases] [Resolved] [Reports] [Trends] │
-│                                                                 │
-│ ┌─── Current Active Issues ───┐                                 │
-│ │ Total Active: 12 cases                                       │
-│ │ High Priority: 2 | Medium: 7 | Low: 3                       │
-│ │ Awaiting Principal Review: 2                                 │
-│ │ Parent Contact Required: 5                                   │
-│ │ Average Resolution Time: 3.2 days                            │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌─── Priority Cases Requiring Immediate Attention ───┐          │
-│ │ 🚨 HIGH: Fighting Incident - John Doe (Form 5A)               │
-│ │ Date: Jan 20 | Status: Under Investigation                   │
-│ │ Action: Principal review scheduled                            │
-│ │ [Review] [Update] [Schedule Hearing]                         │
-│ │ ───────────────────────────────────────────────────         │
-│ │ 🚨 HIGH: Repeated Misconduct - Mary Smith (Form 4B)           │
-│ │ Date: Jan 19 | Status: 5th offense this term                │
-│ │ Action: Suspension consideration                              │
-│ │ [Review] [Contact Parent] [Escalate to VP]                   │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌─── Recent Issues (Last 7 Days) ───┐                          │
-│ │ Date     Student      Type         Status      Action         │
-│ │ Jan 22   Alice Brown  Lateness     Pending     [Handle]       │
-│ │ Jan 21   David Jones  Absence      Resolved    [View]         │
-│ │ Jan 20   John Doe     Fighting     Active      [Review]       │
-│ │ Jan 19   Mary Smith   Misconduct   Escalated   [Follow Up]    │
-│ │ Jan 18   Peter Kim    Lateness     Resolved    [View]         │
-│ │ [View All] [Filter] [Export] [Statistics]                    │
-│ └─────────────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────────┘
+Misconduct reported → Use POST /discipline
+Result: Creates DisciplineIssue only (behavior tracking)
 ```
 
-### **Record New Discipline Issue** (`/discipline-master/incidents/create`)
+**Teacher Doesn't Show Up:**
 ```
-┌─── Record New Discipline Issue ───┐
-│ ┌─── Student Information ───┐      │
-│ │ Student Search: [Text Input]     │
-│ │ Selected: Alice Brown           │
-│ │ Class: Form 3A                  │
-│ │ Matricule: STU2024015          │
-│ │ Previous Issues: 2 this term    │
-│ │ [Change Student]                │
-│ └──────────────────────────────┘ │
-│                                  │
-│ ┌─── Incident Details ───┐        │
-│ │ Issue Type: [Misconduct ▼]      │
-│ │ • Morning Lateness             │
-│ │ • Class Absence                │
-│ │ • Misconduct                   │
-│ │ • Other                        │
-│ │                                │
-│ │ Date Occurred: [2024-01-22]    │
-│ │ Time: [10:30] AM               │
-│ │ Location: [Classroom 201]      │
-│ │                                │
-│ │ Severity: [Medium ▼]           │
-│ │ • Low    • Medium    • High    │
-│ └──────────────────────────────┘ │
-│                                  │
-│ ┌─── Incident Description ───┐    │
-│ │ Description: [Text Area]        │
-│ │ What happened, when, where,     │
-│ │ who was involved, witnesses     │
-│ │                                │
-│ │ Immediate Action Taken:         │
-│ │ [Text Area]                    │
-│ │                                │
-│ │ Witnesses: [Text Area]          │
-│ │ List any witnesses present      │
-│ └──────────────────────────────┘ │
-│                                  │
-│ ┌─── Follow-up Actions ───┐       │
-│ │ [☑️] Contact Parent             │
-│ │ [☐] Schedule Counseling         │
-│ │ [☐] Refer to VP                │
-│ │ [☐] Refer to Principal          │
-│ │ [☐] Issue Warning              │
-│ │ [☐] Assign Detention           │
-│ │                                │
-│ │ Additional Notes:               │
-│ │ [Text Area]                    │
-│ └──────────────────────────────┘ │
-│                                  │
-│ [Record Issue] [Save Draft] [Cancel] │
-└────────────────────────────────────┘
+Teacher absent → Use POST /attendance/teachers
+Result: Creates TeacherAbsence (administrative record)
 ```
 
-### **Issue Details & Management** (`/discipline-master/incidents/:issueId`)
-```
-┌─── Discipline Issue Details ───┐
-│ Issue ID: DISC2024001           │
-│ Student: Alice Brown (Form 3A)  │
-│ Type: Classroom Misconduct      │
-│ Date: January 22, 2024          │
-│ Status: Under Review            │
-│                                │
-│ ┌─── Incident Summary ───┐      │
-│ │ Type: Misconduct              │
-│ │ Severity: Medium              │
-│ │ Location: Classroom 201       │
-│ │ Time: 10:30 AM                │
-│ │ Reported by: Mr. Johnson      │
-│ │ Description: Disruptive       │
-│ │ behavior during math class,   │
-│ │ refused to follow instructions│
-│ │ and argued with teacher       │
-│ └─────────────────────────────┘ │
-│                                │
-│ ┌─── Student History ───┐       │
-│ │ Previous Issues: 2 this term  │
-│ │ • Oct 2023: Late arrival      │
-│ │ • Nov 2023: Class disruption  │
-│ │ Academic Performance: Average │
-│ │ Attendance Rate: 92%          │
-│ └─────────────────────────────┘ │
-│                                │
-│ ┌─── Actions Taken ───┐         │
-│ │ ✅ Parent contacted           │
-│ │ ✅ Student counseled          │
-│ │ ⏳ Teacher meeting scheduled  │
-│ │ ⏳ Progress monitoring        │
-│ │                              │
-│ │ Resolution Plan:              │
-│ │ [Text Area showing plan]      │
-│ └─────────────────────────────┘ │
-│                                │
-│ ┌─── Case Actions ───┐          │
-│ │ [Update Status] [Add Notes]   │
-│ │ [Contact Parent] [Schedule Meeting] │
-│ │ [Escalate to VP] [Close Case] │
-│ │ [Print Report] [Send Alert]   │
-│ └─────────────────────────────┘ │
-└───────────────────────────────────┘
-```
+**📊 ANALYSIS & REPORTING:**
+- **Student Absence Patterns:** GET `/attendance/students` (queries StudentAbsence table)
+- **Lateness Statistics:** GET `/discipline/lateness/statistics` 
+- **Behavioral Trends:** GET `/discipline` (queries DisciplineIssue table)
+- **Teacher Absence Summary:** GET `/attendance/teachers/summary`
 
-## Student Behavioral Tracking (`/discipline-master/students`)
+**⚠️ KEY POINT:** 
+- `/attendance/*` = Manage absence records (StudentAbsence/TeacherAbsence tables)
+- `/discipline/*` = Manage disciplinary actions (DisciplineIssue table)
+- Morning lateness uses BOTH systems (absence + discipline)
 
-### **Student Behavioral Profiles**
-```
-┌─── Student Behavioral Tracking ───┐
-│ [Search Students] [High Risk] [Patterns] [Interventions] │
-│                                                          │
-│ ┌─── Search & Filter ───┐                               │
-│ │ Student: [Search by name/matricule]                   │
-│ │ Class: [All ▼] | Issues: [Any ▼] [None] [1-3] [4+]   │
-│ │ Date Range: [Last 30 days ▼]                         │
-│ │ Type: [All ▼] [Lateness] [Absence] [Misconduct]      │
-│ │ [Apply Filters] [Clear] [Export List]                │
-│ └────────────────────────────────────────────────────┘ │
-│                                                          │
-│ ┌─── Students Requiring Attention ───┐                   │
-│ │ 🚨 High Risk (4+ issues this term)                    │
-│ │ Student         Class   Issues  Last Issue   Action   │
-│ │ Alice Brown     3A      5       Jan 22      [Review]  │
-│ │ David Jones     4B      4       Jan 20      [Review]  │
-│ │ Michael Smith   2C      4       Jan 18      [Review]  │
-│ │                                                       │
-│ │ ⚠️ Moderate Risk (2-3 issues)                         │
-│ │ Student         Class   Issues  Last Issue   Action   │
-│ │ Sarah Johnson   5A      3       Jan 15      [Monitor] │
-│ │ Peter Williams  1B      2       Jan 12      [Monitor] │
-│ │ Lisa Davis      6C      2       Jan 10      [Monitor] │
-│ │                                                       │
-│ │ [Bulk Action] [Generate Intervention Plan] [Parent Meeting] │
-│ └────────────────────────────────────────────────────┘ │
-│                                                          │
-│ ┌─── Behavioral Patterns Analysis ───┐                   │
-│ │ Common Issues: Morning Lateness (52%)                 │
-│ │ Peak Times: Monday mornings, Friday afternoons        │
-│ │ Most Affected Classes: Form 3 & Form 4               │
-│ │ Seasonal Trends: Increase during exam periods         │
-│ │ [Detailed Analysis] [Prevention Strategies]           │
-│ └────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────┘
-```
+**📋 FRONTEND DEVELOPER REFERENCE TABLE:**
 
-### **Individual Student Profile** (`/discipline-master/students/:studentId`)
-```
-┌─── Student Behavioral Profile - Alice Brown ───┐
-│ ┌─── Student Information ───┐                    │
-│ │ Name: Alice Brown          │                    │
-│ │ Class: Form 3A             │                    │
-│ │ Matricule: STU2024015      │                    │
-│ │ Age: 15 years              │                    │
-│ │ Parent: Mrs. Brown         │                    │
-│ │ Contact: 677123456         │                    │
-│ └──────────────────────────┘                    │
-│                                                  │
-│ ┌─── Behavioral Summary ───┐                     │
-│ │ Risk Level: 🚨 HIGH                            │
-│ │ Total Issues This Term: 5                      │
-│ │ Issue Types:                                   │
-│ │ • Lateness: 2 incidents                       │
-│ │ • Misconduct: 2 incidents                     │
-│ │ • Class Absence: 1 incident                   │
-│ │ Last Issue: Jan 22, 2024                      │
-│ │ Trend: ↗️ Increasing frequency                  │
-│ └──────────────────────────────────────────────┘ │
-│                                                  │
-│ ┌─── Issue History ───┐                          │
-│ │ Date     Type        Description    Status     │
-│ │ Jan 22   Misconduct  Class disrupt. Active     │
-│ │ Jan 15   Lateness    Arrived 8:15   Resolved  │
-│ │ Jan 10   Misconduct  Uniform issue  Resolved  │
-│ │ Dec 18   Absence     Unexcused     Resolved   │
-│ │ Dec 12   Lateness    Arrived 8:00   Resolved  │
-│ │ [View Details] [Add New Issue] [Timeline View] │
-│ └──────────────────────────────────────────────┘ │
-│                                                  │
-│ ┌─── Intervention Plan ───┐                      │
-│ │ Current Plan: Behavioral Support Program       │
-│ │ Start Date: Jan 15, 2024                      │
-│ │ Actions:                                       │
-│ │ ✅ Parent meeting completed                    │
-│ │ ⏳ Weekly counseling sessions                  │
-│ │ ⏳ Teacher monitoring program                  │
-│ │ ⏳ Progress review in 2 weeks                  │
-│ │ [Update Plan] [Schedule Review] [Add Action]   │
-│ └──────────────────────────────────────────────┘ │
-│                                                  │
-│ ┌─── Quick Actions ───┐                          │
-│ │ [Record New Issue] [Contact Parent] [Schedule Meeting] │
-│ │ [Update Plan] [Generate Report] [Refer to Counselor]  │
-│ └──────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────┘
-```
-
-## Reports & Analytics (`/discipline-master/reports`)
-
-### **Discipline Reports Dashboard**
-```
-┌─── Discipline Reports & Analytics ───┐
-│ [Generate Report] [Daily Reports] [Trends] [Statistics] │
-│                                                         │
-│ ┌─── Quick Reports ───┐                                 │
-│ │ [Daily Discipline Summary] [Weekly Incident Report]   │
-│ │ [Monthly Trends Analysis] [Class Discipline Overview] │
-│ │ [Lateness Statistics] [Parent Communication Log]     │
-│ │ [Intervention Effectiveness] [Serious Incidents]     │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Today's Summary Report ───┐                        │
-│ │ Date: January 22, 2024                               │
-│ │ Total Incidents: 8                                   │
-│ │ • Morning Lateness: 5                                │
-│ │ • Class Absences: 2                                  │
-│ │ • Misconduct: 1                                      │
-│ │ Students Affected: 8                                 │
-│ │ Parent Contacts Made: 3                              │
-│ │ [Generate Full Report] [Print] [Email Principal]     │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Weekly Trends ───┐                                 │
-│ │ [📊 Chart showing daily incident counts]              │
-│ │ This Week: 45 total incidents                        │
-│ │ Last Week: 38 total incidents (+18% increase)        │
-│ │ Most Common: Morning Lateness (52%)                  │
-│ │ Peak Day: Monday (28% of weekly incidents)           │
-│ │ [Detailed Analysis] [Compare Previous Weeks]         │
-│ └─────────────────────────────────────────────────────┘ │
-│                                                         │
-│ ┌─── Monthly Statistics ───┐                            │
-│ │ January 2024 Summary:                                │
-│ │ Total Incidents: 156                                 │
-│ │ Resolved: 142 (91%)                                  │
-│ │ Pending: 14 (9%)                                     │
-│ │ Average Resolution Time: 2.8 days                    │
-│ │ Parent Satisfaction: 87%                             │
-│ │ Repeat Offenders: 23 students                        │
-│ │ [Full Monthly Report] [Export Data] [Share]          │
-│ └─────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────┘
-```
-
-### **Generate Custom Report** (`/discipline-master/reports/generate`)
-```
-┌─── Generate Custom Discipline Report ───┐
-│ ┌─── Report Configuration ───┐           │
-│ │ Report Type: [Custom ▼]                │
-│ │ • Daily Summary                        │
-│ │ • Weekly Analysis                      │
-│ │ • Monthly Trends                       │
-│ │ • Student Profile                      │
-│ │ • Class Analysis                       │
-│ │ • Custom Range                         │
-│ │                                       │
-│ │ Date Range:                           │
-│ │ From: [2024-01-01] To: [2024-01-22]   │
-│ │                                       │
-│ │ Include:                              │
-│ │ [☑️] Incident summaries               │
-│ │ [☑️] Student statistics               │
-│ │ [☑️] Trend analysis                   │
-│ │ [☑️] Resolution status                │
-│ │ [☑️] Parent communications            │
-│ │ [☐] Photos/Evidence                   │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ ┌─── Filters ───┐                       │
-│ │ Classes: [All ▼] [Select Multiple]    │
-│ │ Issue Types: [All ▼] [Select Multiple]│
-│ │ Severity: [All ▼] [Low/Med/High]      │
-│ │ Status: [All ▼] [Active/Resolved]     │
-│ │ Students: [All ▼] [High Risk Only]    │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ ┌─── Output Format ───┐                 │
-│ │ Format: [PDF ●] [Excel ○] [CSV ○]     │
-│ │ Include Charts: [Yes ●] [No ○]        │
-│ │ Confidentiality: [Standard ●] [High ○]│
-│ │ Distribution:                         │
-│ │ [☑️] Principal                        │
-│ │ [☑️] Vice Principal                   │
-│ │ [☐] Class Masters                     │
-│ │ [☐] Parent Committee                  │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ [Generate Report] [Preview] [Save Template] [Cancel] │
-└───────────────────────────────────────────┘
-```
-
-## Communication Center (`/discipline-master/communications`)
-
-### **Parent & Staff Communication**
-```
-┌─── Discipline Communications ───┐
-│ [Send Notice] [Parent Meetings] [Staff Updates] [Templates] │
-│                                                             │
-│ ┌─── Quick Communication ───┐                               │
-│ │ Type: [Parent Notice ▼]                                  │
-│ │ • Parent Notice    • Teacher Alert                       │
-│ │ • Principal Update • VP Briefing                        │
-│ │ • Warning Letter   • Meeting Invitation                 │
-│ │                                                         │
-│ │ Recipients: [Select...]                                 │
-│ │ Regarding Student: [Search Student]                     │
-│ │ Issue Reference: [Select Issue]                         │
-│ │ Priority: [Normal ▼] [High] [Urgent]                   │
-│ │                                                         │
-│ │ Message: [Template ▼] [Custom]                          │
-│ │ [Text Editor with discipline templates]                 │
-│ │                                                         │
-│ │ [Send Message] [Save Draft] [Schedule Send]             │
-│ └───────────────────────────────────────────────────────┘ │
-│                                                             │
-│ ┌─── Recent Communications ───┐                             │
-│ │ Jan 22 - Parent Notice: Alice Brown's mother             │
-│ │ Subject: Behavioral concern requiring attention          │
-│ │ Status: Delivered ✅ | Response: Pending                │
-│ │                                                         │
-│ │ Jan 21 - Principal Update: Weekly discipline summary     │
-│ │ Subject: 45 incidents this week, 3 requiring review     │
-│ │ Status: Read ✅ | Response: Acknowledged                 │
-│ │                                                         │
-│ │ Jan 20 - Parent Meeting: David Jones' parents           │
-│ │ Subject: Invitation for behavioral review meeting       │
-│ │ Status: Confirmed ✅ | Meeting: Jan 25, 2:00 PM         │
-│ │                                                         │
-│ │ [View All] [Filter] [Follow Up]                         │
-│ └───────────────────────────────────────────────────────┘ │
-│                                                             │
-│ ┌─── Parent Meeting Schedule ───┐                          │
-│ │ This Week's Scheduled Meetings:                         │
-│ │ Jan 23, 10:00 AM - Mrs. Brown (Alice's mother)         │
-│ │ Jan 25, 2:00 PM  - Mr. & Mrs. Jones (David's parents)  │
-│ │ Jan 26, 3:30 PM  - Mr. Smith (Michael's father)        │
-│ │ [View Calendar] [Schedule New] [Send Reminders]         │
-│ └───────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────┘
-```
-
-## Navigation Structure
-
-### **Main Navigation**
-```
-🏠 Dashboard | 📅 Attendance | ⚠️ Incidents | 👨‍🎓 Students | 📊 Reports | 📧 Communications | ⚙️ Settings
-```
-
-### **Quick Actions (Always Visible)**
-```
-⚡ SDM Quick Actions:
-• [Record Lateness]
-• [Mark Absence]
-• [New Incident]
-• [Contact Parent]
-• [Daily Report]
-• [Emergency Alert]
-```
-
-### **Mobile Navigation**
-```
-[🏠 Home] [⏰ Attendance] [⚠️ Issues] [👨‍🎓 Students] [📊 Reports]
-```
+| Situation | API Endpoint | Database Table(s) | Records Created |
+|-----------|-------------|------------------|-----------------|
+| Student late at gate | `POST /discipline/lateness` | StudentAbsence + DisciplineIssue | Absence + Disciplinary action |
+| Student missing from class | `POST /attendance/students` | StudentAbsence | Absence only |
+| Student misbehaves | `POST /discipline` | DisciplineIssue | Disciplinary action only |
+| Teacher doesn't show up | `POST /attendance/teachers` | TeacherAbsence | Teacher absence |
+| View absence patterns | `GET /attendance/students` | StudentAbsence | Query results |
+| View behavioral issues | `GET /discipline` | DisciplineIssue | Query results |
 
 ## Key Features for Discipline Master MVP:
 

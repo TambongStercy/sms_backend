@@ -201,4 +201,11 @@ router.get('/parent/:parentId',
     studentController.getStudentsByParent
 );
 
+// GET /api/v1/students/enrollments/:enrollmentId - Get student by enrollment ID
+router.get('/enrollments/:enrollmentId',
+    authenticate,
+    studentController.getStudentByEnrollmentId
+);
+
+
 export default router;
