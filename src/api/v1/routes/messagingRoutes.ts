@@ -7,31 +7,21 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticate);
 
-// Send a direct message
+// Original direct message sending (keep for backward compatibility)
 router.post('/send', messagingController.sendMessage);
 
-// Get all conversations for the authenticated user
-router.get('/conversations', messagingController.getUserConversations);
+// === SIMPLIFIED MESSAGING ROUTES ===
 
-// Get conversation history with another user
-router.get('/conversation/:otherUserId', messagingController.getConversationHistory);
+// Send a simple categorized message (easier for older users)
+router.post('/simple/send', messagingController.sendSimpleMessage);
 
-// Get messages by filters (inbox, sent, search, etc.)
-router.get('/filter', messagingController.getMessagesByFilters);
+// Get messages (inbox or sent) with simplified format
+router.get('/simple/messages', messagingController.getSimpleMessages);
 
-// Get message statistics
-router.get('/stats', messagingController.getMessageStats);
+// Get available contacts to message (filtered by role-based communication rules)
+router.get('/simple/contacts', messagingController.getAvailableContacts);
 
-// Get suggested contacts
-router.get('/suggested-contacts', messagingController.getSuggestedContacts);
-
-// Get message by ID
-router.get('/:messageId', messagingController.getMessageById);
-
-// Mark message as read
-router.patch('/:messageId/read', messagingController.markMessageAsRead);
-
-// Delete message
-router.delete('/:messageId', messagingController.deleteMessage);
+// Get conversation between two users
+router.get('/simple/conversation/:otherUserId', messagingController.getConversation);
 
 export default router; 

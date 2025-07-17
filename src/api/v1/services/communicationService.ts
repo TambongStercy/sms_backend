@@ -2,6 +2,7 @@
 import prisma, { Announcement, MobileNotification, Audience } from '../../../config/db';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination'; // Import pagination utilities
 import { getAcademicYearId } from '../../../utils/academicYear'; // Import academic year utility
+import { sendNotification as sendNotificationService, sendBulkNotifications } from './notificationService'; // Import notification service
 
 export async function getAnnouncements(
     paginationOptions?: PaginationOptions,
@@ -51,6 +52,58 @@ export async function getAnnouncements(
     );
 }
 
+/**
+ * Get users by audience type for notifications
+ */
+async function getUsersByAudience(audience: Audience, academicYearId?: number): Promise<number[]> {
+    let roleFilter: any = {};
+
+    switch (audience) {
+        case 'INTERNAL':
+            // All staff members (non-parent roles)
+            roleFilter = {
+                role: {
+                    in: ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'TEACHER', 'DISCIPLINE_MASTER', 'GUIDANCE_COUNSELOR', 'HOD']
+                }
+            };
+            break;
+        case 'EXTERNAL':
+            // Only parents
+            roleFilter = {
+                role: 'PARENT'
+            };
+            break;
+        case 'BOTH':
+            // All users
+            roleFilter = {};
+            break;
+        default:
+            return [];
+    }
+
+    const whereClause: any = {
+        user_roles: {
+            some: roleFilter
+        }
+    };
+
+    // If academic year is specified, include both global roles and year-specific roles
+    if (academicYearId && roleFilter.role) {
+        whereClause.user_roles.some.OR = [
+            { ...roleFilter, academic_year_id: academicYearId },
+            { ...roleFilter, academic_year_id: null }
+        ];
+        delete whereClause.user_roles.some.role;
+    }
+
+    const users = await prisma.user.findMany({
+        where: whereClause,
+        select: { id: true }
+    });
+
+    return users.map(user => user.id);
+}
+
 export async function createAnnouncement(data: {
     title: string;
     message: string;
@@ -58,9 +111,35 @@ export async function createAnnouncement(data: {
     academic_year_id?: number;
     created_by_id?: number;
 }): Promise<Announcement> {
-    return prisma.announcement.create({
+    // Create the announcement
+    const announcement = await prisma.announcement.create({
         data,
     });
+
+    try {
+        // Get target users for notifications
+        const targetUserIds = await getUsersByAudience(data.audience, data.academic_year_id);
+
+        if (targetUserIds.length > 0) {
+            // Send in-app notifications to all targeted users
+            await sendBulkNotifications({
+                title: `New Announcement: ${data.title}`,
+                message: data.message,
+                recipient_ids: targetUserIds,
+                sender_id: data.created_by_id
+            });
+
+            console.log(`✅ Announcement created and notifications sent to ${targetUserIds.length} users`);
+        } else {
+            console.log('⚠️ No target users found for announcement notifications');
+        }
+
+    } catch (notificationError) {
+        console.error('❌ Error sending announcement notifications:', notificationError);
+        // Don't fail the announcement creation if notifications fail
+    }
+
+    return announcement;
 }
 
 export async function updateAnnouncement(

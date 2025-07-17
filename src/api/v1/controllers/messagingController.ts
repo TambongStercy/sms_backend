@@ -40,37 +40,44 @@ export async function sendMessage(req: Request, res: Response) {
     }
 }
 
-// Get conversation history between two users
-export async function getConversationHistory(req: Request, res: Response) {
+// Send a simple categorized message (simplified for older users)
+export async function sendSimpleMessage(req: Request, res: Response) {
     try {
-        const userId = req.user?.id;
+        const senderId = req.user?.id;
 
-        if (!userId) {
+        if (!senderId) {
             return res.status(401).json({ success: false, error: 'User not authenticated' });
         }
 
-        const { otherUserId } = req.params;
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 50;
+        const { receiverId, subject, content, category } = req.body;
 
-        if (!otherUserId) {
+        if (!receiverId || !subject || !content) {
             return res.status(400).json({
                 success: false,
-                error: 'otherUserId is required'
+                error: 'receiverId, subject, and content are required'
             });
         }
 
-        const conversation = await messagingService.getConversationHistory(
-            userId,
-            parseInt(otherUserId),
-            page,
-            limit
-        );
+        // Validate category
+        const validCategories = ['ACADEMIC', 'FINANCIAL', 'DISCIPLINARY', 'GENERAL'];
+        const messageCategory = category || 'GENERAL';
+        
+        if (!validCategories.includes(messageCategory)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid category. Must be ACADEMIC, FINANCIAL, DISCIPLINARY, or GENERAL'
+            });
+        }
 
-        res.json({
-            success: true,
-            data: conversation
+        const result = await messagingService.sendSimpleMessage({
+            senderId,
+            receiverId: parseInt(receiverId),
+            subject,
+            content,
+            category: messageCategory as messagingService.MessageCategory
         });
+
+        res.status(201).json(result);
     } catch (error: any) {
         res.status(500).json({
             success: false,
@@ -79,8 +86,8 @@ export async function getConversationHistory(req: Request, res: Response) {
     }
 }
 
-// Get all conversations for a user
-export async function getUserConversations(req: Request, res: Response) {
+// Get messages with simplified format
+export async function getSimpleMessages(req: Request, res: Response) {
     try {
         const userId = req.user?.id;
 
@@ -88,47 +95,8 @@ export async function getUserConversations(req: Request, res: Response) {
             return res.status(401).json({ success: false, error: 'User not authenticated' });
         }
 
-        const conversations = await messagingService.getUserConversations(userId);
-
-        res.json({
-            success: true,
-            data: conversations
-        });
-    } catch (error: any) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-}
-
-// Get messages by filters
-export async function getMessagesByFilters(req: Request, res: Response) {
-    try {
-        const userId = req.user?.id;
-
-        if (!userId) {
-            return res.status(401).json({ success: false, error: 'User not authenticated' });
-        }
-
-        const { status, priority, dateFrom, dateTo, search } = req.query;
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 20;
-
-        const filters = {
-            status: status as any,
-            priority: priority as any,
-            dateFrom: dateFrom as string,
-            dateTo: dateTo as string,
-            search: search as string
-        };
-
-        const messages = await messagingService.getMessagesByFilters(
-            userId,
-            filters,
-            page,
-            limit
-        );
+        const type = req.query.type as 'inbox' | 'sent' || 'inbox';
+        const messages = await messagingService.getSimpleMessages(userId, type);
 
         res.json({
             success: true,
@@ -142,8 +110,8 @@ export async function getMessagesByFilters(req: Request, res: Response) {
     }
 }
 
-// Mark message as read
-export async function markMessageAsRead(req: Request, res: Response) {
+// Get available users to message (simplified)
+export async function getAvailableContacts(req: Request, res: Response) {
     try {
         const userId = req.user?.id;
 
@@ -151,139 +119,39 @@ export async function markMessageAsRead(req: Request, res: Response) {
             return res.status(401).json({ success: false, error: 'User not authenticated' });
         }
 
-        const { messageId } = req.params;
-
-        if (!messageId) {
-            return res.status(400).json({
-                success: false,
-                error: 'messageId is required'
-            });
-        }
-
-        const message = await messagingService.markMessageAsRead(
-            parseInt(messageId),
-            userId
-        );
-
-        res.json({
-            success: true,
-            data: message
-        });
-    } catch (error: any) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-}
-
-// Get message by ID
-export async function getMessageById(req: Request, res: Response) {
-    try {
-        const userId = req.user?.id;
-
-        if (!userId) {
-            return res.status(401).json({ success: false, error: 'User not authenticated' });
-        }
-
-        const { messageId } = req.params;
-
-        if (!messageId) {
-            return res.status(400).json({
-                success: false,
-                error: 'messageId is required'
-            });
-        }
-
-        const message = await messagingService.getMessageById(
-            parseInt(messageId),
-            userId
-        );
-
-        res.json({
-            success: true,
-            data: message
-        });
-    } catch (error: any) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-}
-
-// Delete message
-export async function deleteMessage(req: Request, res: Response) {
-    try {
-        const userId = req.user?.id;
-
-        if (!userId) {
-            return res.status(401).json({ success: false, error: 'User not authenticated' });
-        }
-
-        const { messageId } = req.params;
-
-        if (!messageId) {
-            return res.status(400).json({
-                success: false,
-                error: 'messageId is required'
-            });
-        }
-
-        await messagingService.deleteMessage(
-            parseInt(messageId),
-            userId
-        );
-
-        res.json({
-            success: true,
-            data: { message: 'Message deleted successfully' }
-        });
-    } catch (error: any) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-}
-
-// Get message statistics
-export async function getMessageStats(req: Request, res: Response) {
-    try {
-        const userId = req.user?.id;
-
-        if (!userId) {
-            return res.status(401).json({ success: false, error: 'User not authenticated' });
-        }
-
-        const stats = await messagingService.getMessageStats(userId);
-
-        res.json({
-            success: true,
-            data: stats
-        });
-    } catch (error: any) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-}
-
-// Get suggested contacts
-export async function getSuggestedContacts(req: Request, res: Response) {
-    try {
-        const userId = req.user?.id;
-
-        if (!userId) {
-            return res.status(401).json({ success: false, error: 'User not authenticated' });
-        }
-
-        const contacts = await messagingService.getSuggestedContacts(userId);
+        const targetRole = req.query.role as string;
+        const contacts = await messagingService.getUsersByRole(userId, targetRole);
 
         res.json({
             success: true,
             data: contacts
+        });
+    } catch (error: any) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+}
+
+// Get conversation history between two users
+export async function getConversation(req: Request, res: Response) {
+    try {
+        const userId = req.user?.id;
+        const { otherUserId } = req.params;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'User not authenticated' });
+        }
+
+        const conversation = await messagingService.getConversationHistory(
+            userId,
+            parseInt(otherUserId)
+        );
+
+        res.json({
+            success: true,
+            data: conversation
         });
     } catch (error: any) {
         res.status(500).json({

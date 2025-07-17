@@ -33,6 +33,28 @@ export interface ConversationParticipant {
     };
 }
 
+// Add simplified message categories
+export enum MessageCategory {
+    ACADEMIC = 'ACADEMIC',
+    FINANCIAL = 'FINANCIAL',
+    DISCIPLINARY = 'DISCIPLINARY',
+    GENERAL = 'GENERAL'
+}
+
+// Simplified message interface
+export interface SimpleMessage {
+    id: number;
+    from: string;
+    to: string;
+    subject: string;
+    content: string;
+    category: MessageCategory;
+    date: string;
+    isRead: boolean;
+    senderRole: string;
+    receiverRole: string;
+}
+
 // Send a direct message
 export async function sendDirectMessage(data: CreateMessageData) {
     try {
@@ -61,17 +83,83 @@ export async function sendDirectMessage(data: CreateMessageData) {
             }
         });
 
+        // Send in-app notification to recipient
+        const notificationMessage = `New message from ${sender.name}: ${data.subject}`;
+
+        await sendNotification({
+            user_id: data.receiverId,
+            message: notificationMessage
+        });
+
+        console.log(`✅ Message sent and notification delivered to ${receiver.name}`);
+
+        return message;
+    } catch (error: any) {
+        throw new Error(`Failed to send message: ${error.message}`);
+    }
+}
+
+// Send a simple categorized message
+export async function sendSimpleMessage(data: {
+    senderId: number;
+    receiverId: number;
+    subject: string;
+    content: string;
+    category: MessageCategory;
+}) {
+    try {
+        // Validate users exist
+        const [sender, receiver] = await Promise.all([
+            prisma.user.findUnique({
+                where: { id: data.senderId },
+                include: { user_roles: true }
+            }),
+            prisma.user.findUnique({
+                where: { id: data.receiverId },
+                include: { user_roles: true }
+            })
+        ]);
+
+        if (!sender || !receiver) {
+            throw new Error('Sender or receiver not found');
+        }
+
+        // Create message
+        const message = await prisma.message.create({
+            data: {
+                sender_id: data.senderId,
+                receiver_id: data.receiverId,
+                subject: data.subject,
+                content: data.content,
+                status: MessageStatus.SENT
+            },
+            include: {
+                sender: {
+                    select: { id: true, name: true, matricule: true },
+                    include: { user_roles: true }
+                },
+                receiver: {
+                    select: { id: true, name: true, matricule: true },
+                    include: { user_roles: true }
+                }
+            }
+        });
+
         // Send notification to receiver
         await sendNotification({
             recipient_id: data.receiverId,
             notification_type: 'IN_APP',
-            title: `New message from ${sender.name}`,
+            title: `New ${data.category} message from ${sender.name}`,
             message: `Subject: ${data.subject}`,
-            priority: data.priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
-            category: 'GENERAL'
+            priority: data.category === 'DISCIPLINARY' ? 'HIGH' : 'MEDIUM',
+            category: data.category as any
         });
 
-        return message;
+        return {
+            success: true,
+            message: 'Message sent successfully',
+            data: message
+        };
     } catch (error: any) {
         throw new Error(`Failed to send message: ${error.message}`);
     }
@@ -136,6 +224,65 @@ export async function getConversationHistory(
     } catch (error: any) {
         throw new Error(`Failed to get conversation history: ${error.message}`);
     }
+}
+
+// Get user's messages with simplified format
+export async function getSimpleMessages(userId: number, type: 'inbox' | 'sent' = 'inbox') {
+    try {
+        const whereClause = type === 'inbox'
+            ? { receiver_id: userId }
+            : { sender_id: userId };
+
+        const messages = await prisma.message.findMany({
+            where: whereClause,
+            include: {
+                sender: {
+                    select: { id: true, name: true, matricule: true },
+                    include: { user_roles: true }
+                },
+                receiver: {
+                    select: { id: true, name: true, matricule: true },
+                    include: { user_roles: true }
+                }
+            },
+            orderBy: { created_at: 'desc' },
+            take: 50
+        });
+
+        const formattedMessages: SimpleMessage[] = messages.map(msg => ({
+            id: msg.id,
+            from: msg.sender.name,
+            to: msg.receiver.name,
+            subject: msg.subject || 'No Subject',
+            content: msg.content,
+            category: determineCategory(msg.subject, msg.content),
+            date: msg.created_at.toISOString(),
+            isRead: msg.status === 'READ',
+            senderRole: msg.sender.user_roles?.[0]?.role || 'UNKNOWN',
+            receiverRole: msg.receiver.user_roles?.[0]?.role || 'UNKNOWN'
+        }));
+
+        return formattedMessages;
+    } catch (error: any) {
+        throw new Error(`Failed to get messages: ${error.message}`);
+    }
+}
+
+// Helper function to determine message category from content
+function determineCategory(subject: string, content: string): MessageCategory {
+    const text = `${subject} ${content}`.toLowerCase();
+
+    if (text.includes('fee') || text.includes('payment') || text.includes('money') || text.includes('fcfa')) {
+        return MessageCategory.FINANCIAL;
+    }
+    if (text.includes('discipline') || text.includes('behavior') || text.includes('late') || text.includes('absent')) {
+        return MessageCategory.DISCIPLINARY;
+    }
+    if (text.includes('grade') || text.includes('marks') || text.includes('exam') || text.includes('class') || text.includes('subject')) {
+        return MessageCategory.ACADEMIC;
+    }
+
+    return MessageCategory.GENERAL;
 }
 
 // Get all conversations for a user
@@ -493,5 +640,75 @@ export async function getSuggestedContacts(userId: number) {
         }));
     } catch (error: any) {
         throw new Error(`Failed to get suggested contacts: ${error.message}`);
+    }
+}
+
+// Get users by role for messaging (simplified)
+export async function getUsersByRole(currentUserId: number, targetRole?: string) {
+    try {
+        const currentUser = await prisma.user.findUnique({
+            where: { id: currentUserId },
+            include: { user_roles: true }
+        });
+
+        if (!currentUser) {
+            throw new Error('Current user not found');
+        }
+
+        const currentUserRole = currentUser.user_roles?.[0]?.role;
+
+        // Define communication rules (simplified)
+        let allowedRoles: string[] = [];
+
+        switch (currentUserRole) {
+            case 'PARENT':
+                allowedRoles = ['TEACHER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'DISCIPLINE_MASTER'];
+                break;
+            case 'TEACHER':
+                allowedRoles = ['PARENT', 'PRINCIPAL', 'VICE_PRINCIPAL', 'HOD', 'TEACHER'];
+                break;
+            case 'PRINCIPAL':
+            case 'VICE_PRINCIPAL':
+            case 'SUPER_MANAGER':
+                allowedRoles = ['TEACHER', 'PARENT', 'HOD', 'BURSAR', 'DISCIPLINE_MASTER'];
+                break;
+            default:
+                allowedRoles = ['TEACHER', 'PRINCIPAL', 'VICE_PRINCIPAL'];
+        }
+
+        const whereClause: any = {
+            user_roles: {
+                some: {
+                    role: { in: allowedRoles }
+                }
+            },
+            id: { not: currentUserId } // Exclude current user
+        };
+
+        if (targetRole && allowedRoles.includes(targetRole)) {
+            whereClause.user_roles.some.role = targetRole;
+        }
+
+        const users = await prisma.user.findMany({
+            where: whereClause,
+            select: {
+                id: true,
+                name: true,
+                matricule: true,
+                user_roles: {
+                    select: { role: true }
+                }
+            },
+            orderBy: { name: 'asc' }
+        });
+
+        return users.map(user => ({
+            id: user.id,
+            name: user.name,
+            matricule: user.matricule,
+            role: user.user_roles?.[0]?.role || 'UNKNOWN'
+        }));
+    } catch (error: any) {
+        throw new Error(`Failed to get users: ${error.message}`);
     }
 } 
