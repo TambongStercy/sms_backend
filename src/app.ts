@@ -1,5 +1,5 @@
 // src/app.ts
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -44,17 +44,26 @@ app.use(express.urlencoded({ extended: true }));
 // HTTP request logging
 app.use(morgan('dev'));
 
-// Serve static files from the uploads directory with subdirectories
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-app.use('/uploads/students', express.static(path.join(process.cwd(), 'uploads', 'students')));
-app.use('/uploads/users', express.static(path.join(process.cwd(), 'uploads', 'users')));
-app.use('/uploads/defaults', express.static(path.join(process.cwd(), 'uploads', 'defaults')));
+// --- FIX for Static File CORS ---
+// The 'cors' middleware package doesn't always apply to express.static.
+// This custom middleware ensures CORS headers are set for all static file requests.
 
-// Also serve uploads under /api/v1/uploads to match frontend requests
-app.use('/api/v1/uploads', express.static(path.join(process.cwd(), 'uploads')));
-app.use('/api/v1/uploads/students', express.static(path.join(process.cwd(), 'uploads', 'students')));
-app.use('/api/v1/uploads/users', express.static(path.join(process.cwd(), 'uploads', 'users')));
-app.use('/api/v1/uploads/defaults', express.static(path.join(process.cwd(), 'uploads', 'defaults')));
+const setStaticCorsHeaders = (req: Request, res: Response, next: NextFunction) => {
+    // This allows any origin. For better security in production, you might restrict this
+    // to your specific frontend domains, e.g., 'https://sms.sniperbuisnesscenter.com'
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    // This header is also important for allowing cross-origin image embedding
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+};
+
+// Serve static files from the 'uploads' directory, applying the CORS headers.
+// These two routes handle all subdirectories (students, users, defaults) and both URL structures.
+app.use('/uploads', setStaticCorsHeaders, express.static(path.join(process.cwd(), 'uploads')));
+app.use('/api/v1/uploads', setStaticCorsHeaders, express.static(path.join(process.cwd(), 'uploads')));
+
 
 // Log the number of routes and schemas in Swagger
 if (swaggerSpec && swaggerSpec.paths) {
