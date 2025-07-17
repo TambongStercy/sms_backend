@@ -28,7 +28,7 @@ import systemRoutes from './systemRoutes';
 import principalRoutes from './principalRoutes';
 import vicePrincipalRoutes from './vicePrincipalRoutes';
 import disciplineMasterRoutes from './disciplineMasterRoutes';
-import enhancedMessagingRoutes from './enhancedMessagingRoutes';
+import messagingRoutes from './messagingRoutes';
 import managerRoutes from './managerRoutes';
 import express from 'express';
 import path from 'path';
@@ -82,8 +82,8 @@ router.use('/vice-principal', vicePrincipalRoutes);
 // Mount discipline master routes at /discipline-master
 router.use('/discipline-master', disciplineMasterRoutes);
 
-// Mount enhanced messaging routes at /messaging
-router.use('/messaging', enhancedMessagingRoutes);
+// Mount messaging routes at /messaging
+router.use('/messaging', messagingRoutes);
 
 // Mount manager routes at /manager
 router.use('/manager', managerRoutes);

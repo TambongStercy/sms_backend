@@ -2,65 +2,31 @@
 import { Request, Response } from 'express';
 import * as notificationService from '../services/notificationService';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { extractPaginationAndFilters } from '../../../utils/pagination';
 
 /**
- * Send a single notification
+ * Send a single notification. This is deprecated in favor of bulk notifications or context-specific triggers.
+ * It remains for simple, direct notification needs.
  */
 export const sendNotification = async (req: Request, res: Response): Promise<void> => {
     try {
-        const authReq = req as AuthenticatedRequest;
-        const senderId = authReq.user?.id;
+        const { title, message, recipient_id } = req.body;
 
-        const {
-            title,
-            message,
-            recipient_id,
-            notification_type,
-            priority,
-            category,
-            academic_year_id,
-            metadata
-        } = req.body;
-
-        // Validate required fields
-        if (!title || !message || !recipient_id || !notification_type) {
+        // Basic validation
+        if (!message || !recipient_id) {
             res.status(400).json({
                 success: false,
-                error: 'Missing required fields: title, message, recipient_id, and notification_type are required'
+                error: 'Missing required fields: message and recipient_id are required'
             });
             return;
         }
 
-        // Validate notification type
-        const validTypes = ['SMS', 'EMAIL', 'IN_APP', 'WHATSAPP'];
-        if (!validTypes.includes(notification_type)) {
-            res.status(400).json({
-                success: false,
-                error: 'Invalid notification type. Must be SMS, EMAIL, IN_APP, or WHATSAPP'
-            });
-            return;
-        }
-
-        // Validate priority
-        const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
-        if (priority && !validPriorities.includes(priority)) {
-            res.status(400).json({
-                success: false,
-                error: 'Invalid priority. Must be LOW, MEDIUM, HIGH, or URGENT'
-            });
-            return;
-        }
+        // The service layer now only needs a user_id and a combined message.
+        const fullMessage = title ? `${title}: ${message}` : message;
 
         const notification = await notificationService.sendNotification({
-            title,
-            message,
-            recipient_id: parseInt(recipient_id),
-            sender_id: senderId,
-            notification_type,
-            priority: priority || 'MEDIUM',
-            category,
-            academic_year_id: academic_year_id ? parseInt(academic_year_id) : undefined,
-            metadata
+            user_id: parseInt(recipient_id),
+            message: fullMessage,
         });
 
         res.status(201).json({
@@ -81,121 +47,31 @@ export const sendNotification = async (req: Request, res: Response): Promise<voi
  */
 export const sendBulkNotifications = async (req: Request, res: Response): Promise<void> => {
     try {
-        const authReq = req as AuthenticatedRequest;
-        const senderId = authReq.user?.id;
-
-        const {
-            title,
-            message,
-            recipient_ids,
-            notification_type,
-            priority,
-            category,
-            academic_year_id,
-            metadata
-        } = req.body;
+        const { title, message, recipient_ids } = req.body;
 
         // Validate required fields
-        if (!title || !message || !recipient_ids || !Array.isArray(recipient_ids) || !notification_type) {
+        if (!title || !message || !recipient_ids || !Array.isArray(recipient_ids)) {
             res.status(400).json({
                 success: false,
-                error: 'Missing required fields: title, message, recipient_ids (array), and notification_type are required'
+                error: 'Missing required fields: title, message, and recipient_ids (array) are required'
             });
             return;
         }
 
-        // Validate recipient_ids array
-        if (recipient_ids.length === 0) {
-            res.status(400).json({
-                success: false,
-                error: 'recipient_ids array cannot be empty'
-            });
-            return;
-        }
-
-        // Validate notification type
-        const validTypes = ['SMS', 'EMAIL', 'IN_APP', 'WHATSAPP'];
-        if (!validTypes.includes(notification_type)) {
-            res.status(400).json({
-                success: false,
-                error: 'Invalid notification type. Must be SMS, EMAIL, IN_APP, or WHATSAPP'
-            });
-            return;
-        }
-
-        const notifications = await notificationService.sendBulkNotifications({
+        await notificationService.sendBulkNotifications({
             title,
             message,
             recipient_ids: recipient_ids.map((id: string) => parseInt(id)),
-            sender_id: senderId,
-            notification_type,
-            priority: priority || 'MEDIUM',
-            category,
-            academic_year_id: academic_year_id ? parseInt(academic_year_id) : undefined,
-            metadata
         });
 
         res.status(201).json({
             success: true,
             data: {
-                notifications_sent: notifications.length,
-                notifications: notifications
+                message: `Bulk notifications sent to ${recipient_ids.length} users.`
             }
         });
     } catch (error: any) {
         console.error('Error sending bulk notifications:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-};
-
-/**
- * Send templated notification
- */
-export const sendTemplatedNotification = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const authReq = req as AuthenticatedRequest;
-        const senderId = authReq.user?.id;
-
-        const {
-            template_id,
-            variables,
-            recipient_id,
-            options
-        } = req.body;
-
-        // Validate required fields
-        if (!template_id || !variables || !recipient_id) {
-            res.status(400).json({
-                success: false,
-                error: 'Missing required fields: template_id, variables, and recipient_id are required'
-            });
-            return;
-        }
-
-        const notification = await notificationService.sendTemplatedNotification(
-            template_id,
-            variables,
-            parseInt(recipient_id),
-            senderId,
-            options
-        );
-
-        res.status(201).json({
-            success: true,
-            data: notification
-        });
-    } catch (error: any) {
-        console.error('Error sending templated notification:', error);
-        if (error.message.includes('template') && error.message.includes('not found')) {
-            res.status(404).json({
-                success: false,
-                error: error.message
-            });
-            return;
-        }
         res.status(500).json({
             success: false,
             error: error.message
@@ -212,33 +88,25 @@ export const getUserNotifications = async (req: Request, res: Response): Promise
         const userId = authReq.user?.id;
 
         if (!userId) {
-            res.status(401).json({
-                success: false,
-                error: 'Unauthorized'
-            });
+            res.status(401).json({ success: false, error: 'Unauthorized' });
             return;
         }
 
-        const {
-            status,
-            category,
-            type,
-            limit,
-            offset
-        } = req.query;
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(
+            req.query,
+            ['status'] // Only allow filtering by status for now
+        );
 
-        const filters: any = {};
-        if (status) filters.status = status as string;
-        if (category) filters.category = category as string;
-        if (type) filters.type = type as string;
-        if (limit) filters.limit = parseInt(limit as string);
-        if (offset) filters.offset = parseInt(offset as string);
-
-        const notifications = await notificationService.getUserNotifications(userId, filters);
+        const result = await notificationService.getUserNotifications(
+            userId,
+            paginationOptions,
+            filterOptions
+        );
 
         res.json({
             success: true,
-            data: notifications
+            data: result.data,
+            meta: result.meta
         });
     } catch (error: any) {
         console.error('Error fetching user notifications:', error);
@@ -252,32 +120,28 @@ export const getUserNotifications = async (req: Request, res: Response): Promise
 /**
  * Mark notification as read
  */
-export const markNotificationRead = async (req: Request, res: Response): Promise<void> => {
+export const markNotificationAsRead = async (req: Request, res: Response): Promise<void> => {
     try {
         const authReq = req as AuthenticatedRequest;
         const userId = authReq.user?.id;
 
         if (!userId) {
-            res.status(401).json({
-                success: false,
-                error: 'Unauthorized'
-            });
+            res.status(401).json({ success: false, error: 'Unauthorized' });
             return;
         }
 
         const notificationId = parseInt(req.params.id);
         if (isNaN(notificationId)) {
-            res.status(400).json({
-                success: false,
-                error: 'Invalid notification ID'
-            });
+            res.status(400).json({ success: false, error: 'Invalid notification ID' });
             return;
         }
 
-        await notificationService.markNotificationRead(notificationId, userId);
+        // We can add a check here to ensure the user owns the notification before marking as read
+        const notification = await notificationService.markNotificationAsRead(notificationId);
 
         res.json({
             success: true,
+            data: notification,
             message: 'Notification marked as read'
         });
     } catch (error: any) {
@@ -321,108 +185,29 @@ export const getUnreadNotificationCount = async (req: Request, res: Response): P
 };
 
 /**
- * Get available notification templates
+ * Mark all of a user's notifications as read
  */
-export const getNotificationTemplates = async (req: Request, res: Response): Promise<void> => {
+export const markAllNotificationsAsRead = async (req: Request, res: Response): Promise<void> => {
     try {
-        const templates = Object.values(notificationService.NOTIFICATION_TEMPLATES);
+        const authReq = req as AuthenticatedRequest;
+        const userId = authReq.user?.id;
 
-        res.json({
-            success: true,
-            data: templates
-        });
-    } catch (error: any) {
-        console.error('Error fetching notification templates:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-};
-
-/**
- * Send payment confirmation (helper endpoint)
- */
-export const sendPaymentConfirmation = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const {
-            parent_id,
-            amount,
-            student_name,
-            payment_method,
-            payment_date,
-            receipt_number
-        } = req.body;
-
-        // Validate required fields
-        if (!parent_id || !amount || !student_name || !payment_method || !payment_date) {
-            res.status(400).json({
-                success: false,
-                error: 'Missing required fields: parent_id, amount, student_name, payment_method, and payment_date are required'
-            });
+        if (!userId) {
+            res.status(401).json({ success: false, error: 'User not authenticated' });
             return;
         }
 
-        const notification = await notificationService.sendPaymentConfirmation(
-            parseInt(parent_id),
-            {
-                amount: parseFloat(amount),
-                student_name,
-                payment_method,
-                payment_date,
-                receipt_number: receipt_number || 'N/A'
-            }
-        );
+        const result = await notificationService.markAllNotificationsAsRead(userId);
 
-        res.status(201).json({
+        res.status(200).json({
             success: true,
-            data: notification
+            data: {
+                markedCount: result.count,
+                message: "All notifications marked as read"
+            }
         });
     } catch (error: any) {
-        console.error('Error sending payment confirmation:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-};
-
-/**
- * Send absence notification (helper endpoint)
- */
-export const sendAbsenceNotification = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const {
-            parent_id,
-            student_name,
-            subject,
-            date
-        } = req.body;
-
-        // Validate required fields
-        if (!parent_id || !student_name || !subject || !date) {
-            res.status(400).json({
-                success: false,
-                error: 'Missing required fields: parent_id, student_name, subject, and date are required'
-            });
-            return;
-        }
-
-        const notification = await notificationService.sendAbsenceNotification(
-            parseInt(parent_id),
-            {
-                student_name,
-                subject,
-                date
-            }
-        );
-
-        res.status(201).json({
-            success: true,
-            data: notification
-        });
-    } catch (error: any) {
-        console.error('Error sending absence notification:', error);
+        console.error('Error marking all notifications as read:', error);
         res.status(500).json({
             success: false,
             error: error.message

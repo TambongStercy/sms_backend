@@ -1,5 +1,6 @@
 // src/api/v1/services/notificationService.ts
 import prisma, { MobileNotification, NotificationStatus } from '../../../config/db';
+import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 
 export interface NotificationData {
     user_id: number;
@@ -62,14 +63,23 @@ export async function sendBulkNotifications(data: BulkNotificationData): Promise
 }
 
 /**
- * Get user notifications
+ * Get user notifications with pagination and filtering
  */
-export async function getUserNotifications(userId: number, limit = 50): Promise<MobileNotification[]> {
-    return await prisma.mobileNotification.findMany({
-        where: { user_id: userId },
-        orderBy: { date_sent: 'desc' },
-        take: limit,
-    });
+export async function getUserNotifications(
+    userId: number,
+    paginationOptions: PaginationOptions,
+    filterOptions: FilterOptions
+): Promise<PaginatedResult<MobileNotification>> {
+    const query = {
+        where: {
+            user_id: userId,
+            ...filterOptions,
+        },
+        orderBy: {
+            date_sent: 'desc'
+        }
+    };
+    return await paginate<MobileNotification>(prisma.mobileNotification, paginationOptions, query.where);
 }
 
 /**
@@ -92,4 +102,22 @@ export async function getUnreadNotificationCount(userId: number): Promise<number
             status: { not: NotificationStatus.READ }
         },
     });
+}
+
+/**
+ * Mark all of a user's notifications as read
+ * @param userId - The ID of the user
+ * @returns The number of notifications updated
+ */
+export async function markAllNotificationsAsRead(userId: number): Promise<{ count: number }> {
+    const result = await prisma.mobileNotification.updateMany({
+        where: {
+            user_id: userId,
+            status: { not: NotificationStatus.READ }
+        },
+        data: {
+            status: NotificationStatus.READ,
+        },
+    });
+    return { count: result.count };
 } 

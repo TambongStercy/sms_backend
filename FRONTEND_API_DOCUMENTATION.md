@@ -343,13 +343,13 @@ GET /api/v1/messaging/simple/contacts?role=TEACHER&search=john
 
 ### **1. Get User Notifications**
 
-**Endpoint:** `GET /api/v1/notifications`
+**Endpoint:** `GET /api/v1/notifications/me`
 
 **Permission:** All authenticated users (own notifications only)
 
 **Query Parameters:**
 ```http
-GET /api/v1/notifications?page=1&limit=30&status=SENT
+GET /api/v1/notifications/me?page=1&limit=30&status=SENT
 ```
 
 - `page` *(optional)*: Page number (default: 1)
@@ -395,7 +395,7 @@ GET /api/v1/notifications?page=1&limit=30&status=SENT
 
 ### **2. Get Unread Notification Count**
 
-**Endpoint:** `GET /api/v1/notifications/unread-count`
+**Endpoint:** `GET /api/v1/notifications/me/unread-count`
 
 **Permission:** All authenticated users
 
@@ -415,7 +415,7 @@ GET /api/v1/notifications?page=1&limit=30&status=SENT
 
 ### **3. Mark Notification as Read**
 
-**Endpoint:** `PATCH /api/v1/notifications/:id/read`
+**Endpoint:** `PUT /api/v1/notifications/:id/read`
 
 **Permission:** Notification owner only
 
@@ -433,7 +433,7 @@ GET /api/v1/notifications?page=1&limit=30&status=SENT
 
 ### **4. Mark All Notifications as Read**
 
-**Endpoint:** `PATCH /api/v1/notifications/mark-all-read`
+**Endpoint:** `PUT /api/v1/notifications/mark-all-read`
 
 **Permission:** All authenticated users
 
@@ -480,7 +480,7 @@ const MESSAGE_CATEGORIES = [
 // Example: Polling for new notifications
 useEffect(() => {
   const interval = setInterval(async () => {
-    const response = await fetch('/api/v1/notifications/unread-count', {
+    const response = await fetch('/api/v1/notifications/me/unread-count', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const { data } = await response.json();

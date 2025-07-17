@@ -90,7 +90,7 @@ export async function paginate<T>(
     const data = await model.findMany({
         where,
         skip,
-        take: limit,
+        take: Number(limit),
         orderBy,
         include: includeOptions
     });
