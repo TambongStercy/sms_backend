@@ -120,4 +120,37 @@ export async function markAllNotificationsAsRead(userId: number): Promise<{ coun
         },
     });
     return { count: result.count };
+}
+
+/**
+ * Deletes a notification for a specific user.
+ * Ensures that a user can only delete their own notifications.
+ * @param notificationId - The ID of the notification to delete.
+ * @param userId - The ID of the user requesting the deletion.
+ * @returns An object indicating success or failure.
+ */
+export async function deleteNotificationForUser(notificationId: number, userId: number) {
+    try {
+        const notification = await prisma.mobileNotification.findUnique({
+            where: { id: notificationId },
+        });
+
+        if (!notification) {
+            return { success: false, error: "Notification not found", statusCode: 404 };
+        }
+
+        // Security check: ensure the user owns this notification
+        if (notification.user_id !== userId) {
+            return { success: false, error: "You are not authorized to delete this notification", statusCode: 403 };
+        }
+
+        await prisma.mobileNotification.delete({
+            where: { id: notificationId },
+        });
+
+        return { success: true, message: "Notification deleted successfully." };
+    } catch (error: any) {
+        console.error(`Failed to delete notification ${notificationId} for user ${userId}:`, error);
+        return { success: false, error: "An error occurred while deleting the notification.", statusCode: 500 };
+    }
 } 

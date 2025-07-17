@@ -213,4 +213,42 @@ export const markAllNotificationsAsRead = async (req: Request, res: Response): P
             error: error.message
         });
     }
+};
+
+/**
+ * Deletes a single notification for the logged-in user.
+ */
+export const deleteNotification = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const authReq = req as AuthenticatedRequest;
+        const userId = authReq.user?.id;
+        const notificationId = parseInt(req.params.id);
+
+        if (!userId) {
+            res.status(401).json({ success: false, error: 'User not authenticated' });
+            return;
+        }
+
+        if (isNaN(notificationId)) {
+            res.status(400).json({ success: false, error: 'Invalid notification ID' });
+            return;
+        }
+
+        const result = await notificationService.deleteNotificationForUser(notificationId, userId);
+
+        if (!result.success) {
+            // Use the status code from the service if available, otherwise default to 404
+            const statusCode = result.statusCode || 404;
+            res.status(statusCode).json(result);
+            return;
+        }
+
+        res.status(200).json(result);
+    } catch (error: any) {
+        console.error(`Error in deleteNotification controller: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            error: 'An internal error occurred while deleting the notification.'
+        });
+    }
 }; 

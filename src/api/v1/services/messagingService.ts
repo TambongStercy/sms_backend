@@ -220,12 +220,76 @@ export async function getConversationHistory(
     }
 }
 
+/**
+ * Deletes a message for a specific user.
+ * This is a "soft delete". If the user is the sender, it marks `deleted_by_sender`.
+ * If they are the receiver, it marks `deleted_by_receiver`.
+ * The message is only truly deleted from the DB if both have deleted it.
+ *
+ * @param messageId The ID of the message to delete.
+ * @param userId The ID of the user requesting the deletion.
+ * @returns An object indicating success or failure.
+ */
+export async function deleteMessageForUser(messageId: number, userId: number) {
+    try {
+        const message = await prisma.message.findUnique({
+            where: { id: messageId },
+        });
+
+        if (!message) {
+            return { success: false, error: "Message not found" };
+        }
+
+        // Check if the user is either the sender or the receiver
+        if (message.sender_id !== userId && message.receiver_id !== userId) {
+            return { success: false, error: "You are not authorized to delete this message" };
+        }
+
+        let updateData: { deleted_by_sender?: boolean; deleted_by_receiver?: boolean } = {};
+        let canPermanentlyDelete = false;
+
+        if (message.sender_id === userId) {
+            updateData.deleted_by_sender = true;
+            if (message.deleted_by_receiver) {
+                canPermanentlyDelete = true;
+            }
+        } else { // user is the receiver
+            updateData.deleted_by_receiver = true;
+            if (message.deleted_by_sender) {
+                canPermanentlyDelete = true;
+            }
+        }
+
+        if (canPermanentlyDelete) {
+            // Both parties have deleted the message, so we can remove it permanently
+            await prisma.message.delete({
+                where: { id: messageId },
+            });
+            return { success: true, message: "Message permanently deleted." };
+        } else {
+            // Only one party has deleted it, so we perform a soft delete
+            await prisma.message.update({
+                where: { id: messageId },
+                data: updateData,
+            });
+            return { success: true, message: "Message has been removed from your view." };
+        }
+
+    } catch (error: any) {
+        // Log the actual error for debugging
+        console.error(`Failed to delete message ${messageId} for user ${userId}:`, error);
+        // Return a generic error message to the user
+        return { success: false, error: "An error occurred while deleting the message." };
+    }
+}
+
+
 // Get user's messages with simplified format
 export async function getSimpleMessages(userId: number, type: 'inbox' | 'sent' = 'inbox') {
     try {
         const whereClause = type === 'inbox'
-            ? { receiver_id: userId }
-            : { sender_id: userId };
+            ? { receiver_id: userId, deleted_by_receiver: false }
+            : { sender_id: userId, deleted_by_sender: false };
 
         const messages = await prisma.message.findMany({
             where: whereClause,

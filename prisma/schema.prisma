@@ -562,16 +562,18 @@ model InterviewMark {
 
 // Communication system
 model Message {
-  id          Int           @id @default(autoincrement())
-  sender_id   Int
-  receiver_id Int
-  subject     String?
-  content     String
-  status      MessageStatus @default(SENT)
-  created_at  DateTime      @default(now())
-  updated_at  DateTime      @updatedAt
-  sender      User          @relation("SentMessages", fields: [sender_id], references: [id])
-  receiver    User          @relation("ReceivedMessages", fields: [receiver_id], references: [id])
+  id                  Int           @id @default(autoincrement())
+  sender_id           Int
+  receiver_id         Int
+  subject             String
+  content             String
+  status              MessageStatus @default(SENT)
+  deleted_by_sender   Boolean       @default(false)
+  deleted_by_receiver Boolean       @default(false)
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+  sender              User          @relation("SentMessages", fields: [sender_id], references: [id])
+  receiver            User          @relation("ReceivedMessages", fields: [receiver_id], references: [id])
 }
 
 // Form creation system for Super Manager

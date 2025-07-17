@@ -6,7 +6,8 @@ import {
     getUserNotifications,
     markNotificationAsRead,
     markAllNotificationsAsRead,
-    getUnreadNotificationCount
+    getUnreadNotificationCount,
+    deleteNotification
 } from '../controllers/notificationController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -34,6 +35,12 @@ router.put('/mark-all-read',
 router.put('/:id/read',
     authenticate,
     markNotificationAsRead
+);
+
+// Delete a single notification
+router.delete('/:id',
+    authenticate,
+    deleteNotification
 );
 
 // The following routes are for admin/system use and can be kept for future internal tools

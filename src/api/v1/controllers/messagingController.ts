@@ -10,7 +10,7 @@ export async function sendMessage(req: Request, res: Response) {
             return res.status(401).json({ success: false, error: 'User not authenticated' });
         }
 
-        const { receiver_id: receiverId , subject, content, priority, attachments } = req.body;
+        const { receiver_id: receiverId, subject, content, priority, attachments } = req.body;
 
         if (!receiverId || !subject || !content) {
             return res.status(400).json({
@@ -61,7 +61,7 @@ export async function sendSimpleMessage(req: Request, res: Response) {
         // Validate category
         const validCategories = ['ACADEMIC', 'FINANCIAL', 'DISCIPLINARY', 'GENERAL'];
         const messageCategory = category || 'GENERAL';
-        
+
         if (!validCategories.includes(messageCategory)) {
             return res.status(400).json({
                 success: false,
@@ -153,6 +153,35 @@ export async function getConversation(req: Request, res: Response) {
             success: true,
             data: conversation
         });
+    } catch (error: any) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+}
+
+// Delete a message for the logged-in user (soft delete)
+export async function deleteMessage(req: Request, res: Response) {
+    try {
+        const userId = req.user?.id;
+        const messageId = parseInt(req.params.id);
+
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'User not authenticated' });
+        }
+
+        if (isNaN(messageId)) {
+            return res.status(400).json({ success: false, error: 'Invalid message ID' });
+        }
+
+        const result = await messagingService.deleteMessageForUser(messageId, userId);
+
+        if (!result.success) {
+            return res.status(404).json(result);
+        }
+
+        res.status(200).json(result);
     } catch (error: any) {
         res.status(500).json({
             success: false,

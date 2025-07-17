@@ -337,6 +337,22 @@ GET /api/v1/messaging/simple/contacts?role=TEACHER&search=john
 }
 ```
 
+### **5. Delete Message**
+
+**Endpoint:** `DELETE /api/v1/messaging/simple/messages/:id`
+
+**Permission:** Message sender or recipient
+
+**Description:**
+This performs a "soft delete". The message is hidden from the user's view but not immediately deleted from the database. It is permanently removed only after both the sender and receiver have deleted it.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Message has been removed from your view."
+}
+```
 ---
 
 ## 🔔 NOTIFICATIONS API
@@ -445,6 +461,20 @@ GET /api/v1/notifications/me?page=1&limit=30&status=SENT
     "markedCount": 8,
     "message": "All notifications marked as read"
   }
+}
+```
+
+### **5. Delete Notification**
+
+**Endpoint:** `DELETE /api/v1/notifications/:id`
+
+**Permission:** Notification owner only
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Notification deleted successfully."
 }
 ```
 

@@ -24,4 +24,7 @@ router.get('/simple/contacts', messagingController.getAvailableContacts);
 // Get conversation between two users
 router.get('/simple/conversation/:otherUserId', messagingController.getConversation);
 
+// Delete a message (soft delete for the user)
+router.delete('/simple/messages/:id', messagingController.deleteMessage);
+
 export default router; 
