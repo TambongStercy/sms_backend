@@ -26,7 +26,7 @@ const router = Router();
 
 // Registration endpoint (public or specific roles)
 router.post('/register-with-roles', registerAndAssignRoles);
-router.post('/create-with-role', authenticate, authorize(['SUPER_MANAGER','PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), createUserWithRole);
+router.post('/create-with-role', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), createUserWithRole);
 
 // User CRUD operations (requires authentication, some require specific roles)
 router.get('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), getAllUsers);

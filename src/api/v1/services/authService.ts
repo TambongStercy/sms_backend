@@ -43,7 +43,7 @@ export const login = async (credentials: LoginCredentials): Promise<any> => {
         throw new Error('Email/Matricule and password are required');
     }
 
-    const findCondition = email ? { email: email?.toLowerCase() } : { matricule: matricule?.toLowerCase() };
+    const findCondition = email ? { email: email?.toLowerCase() } : { matricule: matricule?.toUpperCase() };
 
     const user = await prisma.user.findUnique({
         where: findCondition,
