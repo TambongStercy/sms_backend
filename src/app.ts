@@ -24,20 +24,11 @@ app.use(
     })
 );
 
-// Enable Cross-Origin Resource Sharing
-// app.use(cors()); // Default configuration can be too restrictive
+// Enable CORS for all routes
+app.use(cors());
 
-// More flexible CORS configuration
-app.use(cors({
-    origin: '*', // Or specify your frontend's domain, e.g., 'http://localhost:3000'
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-}));
-
-// Parse incoming JSON requests
+// Middleware
 app.use(express.json());
-
-// Parse URL-encoded bodies
 app.use(express.urlencoded({ extended: true }));
 
 // HTTP request logging
