@@ -37,14 +37,16 @@ export async function getAllUsers(
 
     // Define what relations to include
     const include: any = {
-        // Include user roles filtered by academic year if role filtering is requested
-        user_roles: filterOptions?.role ? {
-            where: roleAcademicYearId ? {
+        // Include user roles filtered by academic year
+        user_roles: roleAcademicYearId ? {
+            where: {
                 academic_year_id: roleAcademicYearId
-            } : {
-                academic_year_id: null // Global roles only
             }
-        } : true,
+        } : {
+            where: {
+                academic_year_id: null // Global roles only when no academic year specified
+            }
+        },
         // Include role assignments filtered by current year
         role_assignments: currentAcademicYearId ? {
             where: { academic_year_id: currentAcademicYearId },
@@ -61,7 +63,7 @@ export async function getAllUsers(
         }
     };
 
-    // Handle role filtering in the main query's where clause (simplified)
+    // Handle role filtering in the main query's where clause
     if (filterOptions?.role) {
         processedFilters.user_roles = {
             some: {
