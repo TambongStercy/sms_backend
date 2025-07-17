@@ -29,11 +29,22 @@ export async function getAllUsers(
     // Get the current academic year ID for role assignments (not for roles themselves)
     const currentAcademicYear = await getCurrentAcademicYear();
     const currentAcademicYearId = currentAcademicYear?.id;
+    
+    // Check if academic year filter is provided for role filtering
+    const roleAcademicYearId = filterOptions?.academic_year_id ? 
+        parseInt(filterOptions.academic_year_id as string) : 
+        currentAcademicYearId;
 
     // Define what relations to include
     const include: any = {
-        // Include all user roles (no academic year filtering needed)
-        user_roles: true,
+        // Include user roles filtered by academic year if role filtering is requested
+        user_roles: filterOptions?.role ? {
+            where: roleAcademicYearId ? {
+                academic_year_id: roleAcademicYearId
+            } : {
+                academic_year_id: null // Global roles only
+            }
+        } : true,
         // Include role assignments filtered by current year
         role_assignments: currentAcademicYearId ? {
             where: { academic_year_id: currentAcademicYearId },
@@ -54,12 +65,16 @@ export async function getAllUsers(
     if (filterOptions?.role) {
         processedFilters.user_roles = {
             some: {
-                role: filterOptions.role
+                role: filterOptions.role,
+                academic_year_id: roleAcademicYearId || null
             }
         };
         delete processedFilters.role;
     }
 
+    // Remove the academic_year_id filter from processedFilters as it's handled above
+    delete processedFilters.academic_year_id;
+    
     // Remove the includeRoles filter if present, as it's no longer needed
     delete processedFilters.includeRoles;
 

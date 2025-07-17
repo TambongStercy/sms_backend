@@ -25,7 +25,7 @@ export const transformUser = (user: any) => {
 export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
     try {
         // Define allowed filters for users in snake_case
-        const allowedFilters = ['name', 'email', 'gender', 'role', 'include_roles', 'phone'];
+        const allowedFilters = ['name', 'email', 'gender', 'role', 'include_roles', 'phone', 'academic_year_id'];
 
         // Extract pagination and filter parameters from the request
         const { paginationOptions, filterOptions } = extractPaginationAndFilters(req.finalQuery, allowedFilters);
