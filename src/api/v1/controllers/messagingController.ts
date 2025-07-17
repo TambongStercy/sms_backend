@@ -10,7 +10,7 @@ export async function sendMessage(req: Request, res: Response) {
             return res.status(401).json({ success: false, error: 'User not authenticated' });
         }
 
-        const { receiverId, subject, content, priority, attachments } = req.body;
+        const { receiver_id: receiverId , subject, content, priority, attachments } = req.body;
 
         if (!receiverId || !subject || !content) {
             return res.status(400).json({
@@ -49,7 +49,7 @@ export async function sendSimpleMessage(req: Request, res: Response) {
             return res.status(401).json({ success: false, error: 'User not authenticated' });
         }
 
-        const { receiverId, subject, content, category } = req.body;
+        const { receiver_id: receiverId, subject, content, category } = req.body;
 
         if (!receiverId || !subject || !content) {
             return res.status(400).json({

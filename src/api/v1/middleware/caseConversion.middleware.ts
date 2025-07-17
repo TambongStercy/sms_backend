@@ -83,7 +83,8 @@ const convertObjectKeysToClient = (obj: any): any => {
 export const convertCamelToSnakeCase = (req: Request, res: Response, next: NextFunction) => {
     // Convert request body if it exists
     if (req.body && Object.keys(req.body).length > 0) {
-        req.body = convertObjectKeys(req.body);
+        const converted = convertObjectKeys(req.body);
+        req.body = { ...req.body, ...converted };
     }
 
     // Initialize req.finalQuery as an empty object
