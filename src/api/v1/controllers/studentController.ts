@@ -42,10 +42,11 @@ export const getAllStudents = async (req: Request, res: Response) => {
         }
 
 
+        const currentAcademicYearId = await getAcademicYearId();
         // Always fetch students with their current enrollment info to handle filters like sub_class_id
         // Get academic year from finalQuery - middleware handles conversion
         const academic_year_id = req.finalQuery.academic_year_id ?
-            parseInt(req.finalQuery.academic_year_id as string) : undefined;
+            parseInt(req.finalQuery.academic_year_id as string) : currentAcademicYearId;
 
         // Call the service function that handles enrollment-based filtering
         const result = await studentService.getAllStudentsWithCurrentEnrollment(
