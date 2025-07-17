@@ -395,5 +395,6 @@ export async function bulkUpdateTimetable(
             });
         }
     }
+    // Return the summary of changes
     return result;
 } 

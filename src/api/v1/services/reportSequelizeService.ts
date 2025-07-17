@@ -61,7 +61,7 @@ interface SubjectDetailsRow {
     teacher_id: number;
 }
 
-export async function getAllSubjectsForSubclass(subClassId: number, academicYearId: number): Promise<SubjectDetailsRow[]> {
+export async function getAllSubjectsForSubclass(subClassId: number): Promise<SubjectDetailsRow[]> {
     const subjects = await sequelize.query<SubjectDetailsRow>(
         `SELECT
             scs.id AS sub_class_subject_id,
@@ -76,11 +76,10 @@ export async function getAllSubjectsForSubclass(subClassId: number, academicYear
          LEFT JOIN "SubjectTeacher" st ON st.subject_id = s.id
          LEFT JOIN "User" u ON st.teacher_id = u.id
          WHERE scs.sub_class_id = :subClassId
-           AND scs.academic_year_id = :academicYearId
          ORDER BY s.name ASC
         `,
         {
-            replacements: { subClassId, academicYearId },
+            replacements: { subClassId },
             type: QueryTypes.SELECT,
         }
     ) as SubjectDetailsRow[];

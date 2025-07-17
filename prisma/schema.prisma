@@ -155,8 +155,6 @@ model SubClass {
   sub_class_subjects SubClassSubject[]
   teacher_periods    TeacherPeriod[]
   role_assignments   RoleAssignment[]
-  // Timetables
-  timetables         TimeTable[]
 }
 
 model Student {
@@ -372,7 +370,7 @@ model Period {
   name            String
   teacher_periods TeacherPeriod[]
 
-  @@unique([id, day_of_week, start_time, end_time])
+  @@unique([day_of_week, start_time, end_time])
 }
 
 model TeacherPeriod {
@@ -380,7 +378,7 @@ model TeacherPeriod {
   teacher_id       Int
   subject_id       Int
   period_id        Int
-  academic_year_id Int 
+  academic_year_id Int
   assigned_by_id   Int
   created_at       DateTime         @default(now())
   updated_at       DateTime         @updatedAt
@@ -394,24 +392,31 @@ model TeacherPeriod {
   teacher          User             @relation("TeacherPeriods-Teacher", fields: [teacher_id], references: [id])
   subject          Subject          @relation(fields: [subject_id], references: [id])
 
-  @@unique([teacher_id, subject_id, period_id, sub_class_id, academic_year_id])
+  // Prevents a teacher from being booked in two different classes at the same time.
+  @@unique([teacher_id, period_id, academic_year_id], name: "teacher_period_unique")
+  // Prevents the same class from having two different subjects/teachers at the same time.
+  @@unique([sub_class_id, period_id, academic_year_id], name: "subclass_period_unique")
+  // This original constraint is still useful: prevents assigning the same teacher 
+  // to the same class/subject/period combination twice.
+  @@unique([teacher_id, subject_id, period_id, sub_class_id, academic_year_id], name: "teacher_subject_subclass_period_unique")
 }
 
-// Simplified timetable model
-model TimeTable {
-  id           Int       @id @default(autoincrement())
-  sub_class_id Int
-  day_of_week  DayOfWeek
-  period_time  String
-  subject_name String?
-  teacher_name String?
-  is_saved     Boolean   @default(false) // Auto-save functionality
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-  sub_class    SubClass  @relation(fields: [sub_class_id], references: [id])
-
-  @@unique([sub_class_id, day_of_week, period_time])
-}
+// Simplified timetable model is now removed.
+/**
+ * model TimeTable {
+ * id           Int       @id @default(autoincrement())
+ * sub_class_id Int
+ * day_of_week  DayOfWeek
+ * period_time  String
+ * subject_name String?
+ * teacher_name String?
+ * is_saved     Boolean   @default(false) // Auto-save functionality
+ * created_at   DateTime  @default(now())
+ * updated_at   DateTime  @updatedAt
+ * sub_class    SubClass  @relation(fields: [sub_class_id], references: [id])
+ * @@unique([sub_class_id, day_of_week, period_time])
+ * }
+ */
 
 model PaymentTransaction {
   id               Int           @id @default(autoincrement())

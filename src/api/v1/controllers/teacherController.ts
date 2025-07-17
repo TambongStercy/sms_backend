@@ -475,4 +475,18 @@ export const getMyCurrentAndNextSubjects = async (req: AuthenticatedRequest, res
             error: error.message
         });
     }
+};
+
+export const getMyTimetable = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const teacherId = req.user?.id;
+        if (!teacherId) {
+            res.status(401).json({ success: false, error: 'User not authenticated' });
+            return;
+        }
+        const timetable = await teacherService.getTeacherTimetable(teacherId);
+        res.json({ success: true, data: timetable });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 }; 

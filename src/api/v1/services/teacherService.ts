@@ -1,5 +1,5 @@
 import prisma from '../../../config/db';
-import { getCurrentAcademicYear } from '../../../utils/academicYear';
+import { getAcademicYearId, getCurrentAcademicYear } from '../../../utils/academicYear';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 
 export interface TeacherSubject {
@@ -1383,5 +1383,65 @@ export async function getTeacherCurrentAndNextSubjects(teacherId: number, academ
         next: nextPeriod,
         requestTime: now.toISOString(),
         currentDay
+    };
+}
+
+export async function getTeacherTimetable(teacherId: number, academicYearId?: number) {
+    const year = await getCurrentAcademicYear();
+    const yearId = year?.id;
+
+    const teacherPeriods = await prisma.teacherPeriod.findMany({
+        where: {
+            teacher_id: teacherId,
+            academic_year_id: yearId,
+        },
+        include: {
+            period: true,
+            subject: true,
+            sub_class: {
+                include: {
+                    class: true,
+                },
+            },
+        },
+        orderBy: [
+            { period: { day_of_week: 'asc' } },
+            { period: { start_time: 'asc' } },
+        ],
+    });
+
+    if (!teacherPeriods) {
+        return {
+            summary: {
+                totalClasses: 0,
+                totalSubjects: 0,
+                weeklyHours: 0,
+                todayClasses: 0,
+            },
+            schedule: [],
+        };
+    }
+
+    const totalClasses = new Set(teacherPeriods.map(tp => tp.sub_class_id)).size;
+    const totalSubjects = new Set(teacherPeriods.map(tp => tp.subject_id)).size;
+
+    const weeklyHours = teacherPeriods.reduce((acc, tp) => {
+        const start = new Date(`1970-01-01T${tp.period.start_time}Z`);
+        const end = new Date(`1970-01-01T${tp.period.end_time}Z`);
+        const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        return acc + duration;
+    }, 0);
+
+    const today = new Date().toLocaleString('en-US', { weekday: 'long' }).toUpperCase();
+    const todayClasses = teacherPeriods.filter(tp => tp.period.day_of_week === today).length;
+
+    return {
+        summary: {
+            totalClasses,
+            totalSubjects,
+            weeklyHours,
+            todayClasses,
+        },
+        schedule: teacherPeriods,
     };
 }

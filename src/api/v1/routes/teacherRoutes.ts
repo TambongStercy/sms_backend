@@ -1,7 +1,7 @@
 // src/api/v1/routes/teacherRoutes.ts
 
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, authorize } from '../middleware/auth.middleware';
 import { requireTeacherRole, validateTeacherStudentAccess } from '../middleware/teacherAuth.middleware';
 import {
     getMySubjects,
@@ -15,7 +15,8 @@ import {
     recordStudentAttendance,
     getAttendanceStatistics,
     getSubClassAttendance,
-    getMyCurrentAndNextSubjects
+    getMyCurrentAndNextSubjects,
+    getMyTimetable
 } from '../controllers/teacherController';
 
 const router = Router();
@@ -52,6 +53,9 @@ router.get('/me/subclass-ids', getMySubClassIds);
 
 // GET /teachers/me/timetable/current-next - Get current and next subjects from timetable
 router.get('/me/timetable/current-next', getMyCurrentAndNextSubjects);
+
+// Route for a teacher to get their own timetable
+router.get('/me/timetable', authenticate, authorize(['TEACHER']), getMyTimetable);
 
 // =============================
 // TEACHER ATTENDANCE MANAGEMENT ROUTES

@@ -549,277 +549,95 @@ async function generateSubclassReportCards(
     examSequenceId: number,
     examSequence: any
 ): Promise<string> {
-    console.time('Subclass data fetching and processing (Sequelize)');
+    console.log(`Generating report cards for subclass ${sub_classId}, year ${academicYearId}, sequence ${examSequenceId}`);
 
-    // 1. Fetch all marks and context using Sequelize
-    const { marks: existingMarks, context } = await reportSequelizeService.getSubclassReportCardData(sub_classId, academicYearId, examSequenceId);
+    // Fetch all subjects for the subclass
+    const subjects = await reportSequelizeService.getAllSubjectsForSubclass(sub_classId);
+    if (!subjects || subjects.length === 0) {
+        throw new Error(`No subjects found for subclass ${sub_classId}. Cannot generate reports.`);
+    }
+    const subjectMap = new Map(subjects.map(s => [s.sub_class_subject_id, s]));
 
-    if (!context) {
-        throw new Error(`Subclass context not found for subclass ${sub_classId} and year ${academicYearId}`);
+
+    const filePath = path.join(__dirname, `../../../../reports/subclass_${sub_classId}_sequence_${examSequenceId}_report_cards.pdf`);
+
+    // Fetch all students in the subclass for the academic year
+    const enrollments = await prisma.enrollment.findMany({
+        where: {
+            sub_class_id: sub_classId,
+            academic_year_id: academicYearId
+        },
+        select: {
+            student_id: true
+        }
+    });
+
+    if (enrollments.length === 0) {
+        console.log(`No students found for subclass ${sub_classId} in academic year ${academicYearId}.`);
+        return ""; // Or handle as an error
     }
 
-    // 2. Get all students enrolled in this subclass for the academic year
-    const enrolledStudentsInSubclass = await prisma.enrollment.findMany({
+    const studentIds = enrollments.map(e => e.student_id);
+
+    // Update status in GeneratedReport table
+    await prisma.generatedReport.updateMany({
         where: {
             sub_class_id: sub_classId,
             academic_year_id: academicYearId,
+            exam_sequence_id: examSequenceId,
+            report_type: ReportType.SUBCLASS
         },
-        include: {
-            student: true, // Include student details
-            sub_class: { // Include subclass and its class for full context
-                include: {
-                    class: true,
-                    class_master: { select: { name: true, id: true } }
-                }
-            },
-            academic_year: true, // Include academic year for start/end dates
-        },
+        data: {
+            status: ReportStatus.PROCESSING
+        }
     });
 
-    // If no students are enrolled at all, then no reports can be generated
-    if (enrolledStudentsInSubclass.length === 0) {
-        throw new Error(`No students enrolled in subclass ${sub_classId} for academic year ${academicYearId}`);
-    }
+    try {
+        const reportDataPromises = studentIds.map(studentId =>
+            generateStudentReportData(studentId, academicYearId, examSequenceId, examSequence)
+        );
+        const reportDataArray = await Promise.all(reportDataPromises);
 
-    // Fetch all subjects assigned to this subclass for the given academic year
-    const allSubjectsForSubclass = await reportSequelizeService.getAllSubjectsForSubclass(sub_classId, academicYearId);
+        const htmlPagesPromises = reportDataArray.map(reportData => renderReportCardHtml(reportData));
+        const htmlPages = await Promise.all(htmlPagesPromises);
 
-    // Create a map of existing marks by studentId and subClassSubjectId for quick lookup
-    const existingMarksMap = new Map<string, any>();
-    for (const mark of existingMarks) {
-        existingMarksMap.set(`${mark.student_id}-${mark.sub_class_subject_id}`, mark);
-    }
+        await generateMultiPagePdf(htmlPages, filePath);
 
-    // Populate marks for all students, adding zero-score marks for missing subjects
-    const allStudentsData: { student: any; marks: any[]; }[] = [];
-    for (const enrollment of enrolledStudentsInSubclass) {
-        const studentId = enrollment.student_id;
-        const studentMarks: any[] = [];
-
-        // Add actual marks for this student
-        studentMarks.push(...existingMarks.filter(m => m.student_id === studentId));
-
-        // Add zero-score marks for any subjects this student should have, but doesn't have marks for
-        for (const subject of allSubjectsForSubclass) {
-            const key = `${studentId}-${subject.sub_class_subject_id}`;
-            if (!existingMarksMap.has(key)) {
-                studentMarks.push({
-                    student_id: studentId,
-                    student_name: enrollment.student.name,
-                    matricule: enrollment.student.matricule,
-                    gender: enrollment.student.gender,
-                    date_of_birth: enrollment.student.date_of_birth.toISOString().split('T')[0],
-                    place_of_birth: enrollment.student.place_of_birth,
-                    enrollment_id: enrollment.id,
-                    sub_class_id: enrollment.sub_class_id!,
-                    academic_year_id: academicYearId,
-                    repeater: enrollment.repeater,
-                    photo: enrollment.photo || null,
-                    mark_id: -1, // Indicate a virtual mark
-                    score: 0,
-                    sub_class_subject_id: subject.sub_class_subject_id,
-                    exam_sequence_id: examSequenceId,
-                    subject_name: subject.subject_name,
-                    category: subject.category,
-                    coefficient: subject.coefficient,
-                    teacher_name: subject.teacher_name || 'Not Assigned', // Default if no teacher found
-                });
-            }
-        }
-        allStudentsData.push({
-            student: {
-                name: enrollment.student.name,
-                matricule: enrollment.student.matricule,
-                dateOfBirth: enrollment.student.date_of_birth.toISOString().split('T')[0],
-                placeOfBirth: enrollment.student.place_of_birth,
-                gender: enrollment.student.gender,
-                repeater: enrollment.repeater,
-                photo: enrollment.photo || 'default-photo.jpg',
+        // Update status to COMPLETED
+        await prisma.generatedReport.updateMany({
+            where: {
+                sub_class_id: sub_classId,
+                academic_year_id: academicYearId,
+                exam_sequence_id: examSequenceId,
+                report_type: ReportType.SUBCLASS
             },
-            marks: studentMarks,
+            data: {
+                status: ReportStatus.COMPLETED,
+                file_path: filePath
+            }
         });
-    }
 
-    // Now, allStudentsData contains all students, with actual marks or zero-score marks for all relevant subjects.
-    // Proceed with calculations using allStudentsData
-    const students = allStudentsData;
-    const enrolledStudentsCount = students.length;
+        console.log(`Successfully generated multi-page PDF for subclass ${sub_classId} at ${filePath}`);
+        return filePath;
 
-    const combinedSubclassMarks = students.flatMap(s => s.marks);
+    } catch (error: any) {
+        console.error('Error generating subclass report cards:', error);
 
-    // 3. Calculate class-wide stats (averages, ranks, subject stats)
-    // Calculate overall averages for all students
-    const studentsWithAverages = students.map(s => {
-        const totalWeighted = s.marks.reduce((sum: number, m: any) => sum + m.score * m.coefficient, 0);
-        const totalCoef = s.marks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
-        const overallAverage = totalCoef > 0 ? totalWeighted / totalCoef : 0;
-        return { studentId: s.student.matricule, overallAverage };
-    }).sort((a, b) => b.overallAverage - a.overallAverage);
-
-    // Subject stats
-    const subjectStats = new Map<number, { scores: number[], min: number, max: number, total: number, passed: number, avg?: number, successRate?: number }>();
-    for (const s of students) {
-        for (const m of s.marks) {
-            const subClassSubjectId = m.sub_class_subject_id;
-            if (!subjectStats.has(subClassSubjectId)) {
-                subjectStats.set(subClassSubjectId, { scores: [], min: Infinity, max: -Infinity, total: 0, passed: 0 });
+        // Update status to FAILED
+        await prisma.generatedReport.updateMany({
+            where: {
+                sub_class_id: sub_classId,
+                academic_year_id: academicYearId,
+                exam_sequence_id: examSequenceId,
+                report_type: ReportType.SUBCLASS
+            },
+            data: {
+                status: ReportStatus.FAILED,
+                error_message: error.message
             }
-            const stats = subjectStats.get(subClassSubjectId)!;
-            stats.scores.push(m.score);
-            stats.min = Math.min(stats.min, m.score);
-            stats.max = Math.max(stats.max, m.score);
-            stats.total += m.score;
-            if (m.score >= 10) stats.passed += 1;
-        }
-    }
-    subjectStats.forEach(stats => {
-        const count = stats.scores.length;
-        stats.avg = count > 0 ? stats.total / count : 0;
-        stats.successRate = count > 0 ? (stats.passed / count) * 100 : 0;
-    });
-
-    // Class stats
-    const classAverages = studentsWithAverages.map(s => s.overallAverage);
-    const classStats = {
-        lowestAverage: classAverages.length > 0 ? Math.min(...classAverages).toFixed(2) : '0.00',
-        highestAverage: classAverages.length > 0 ? Math.max(...classAverages).toFixed(2) : '0.00',
-        successRate: classAverages.length > 0 ? (classAverages.filter(avg => avg >= 10).length / classAverages.length) * 100 : 0,
-        standardDeviation: classAverages.length > 0 ? calculateStandardDeviation(classAverages).toFixed(2) : '0.00',
-        classAverage: classAverages.length > 0 ? (classAverages.reduce((sum, avg) => sum + avg, 0) / classAverages.length).toFixed(2) : '0.00',
-    };
-
-    // 4. Generate ReportData for each student
-    const reportDataArray: ReportData[] = [];
-    for (const s of students) {
-        // Find student's rank
-        const totalWeightedStudent = s.marks.reduce((sum: number, m: any) => sum + m.score * m.coefficient, 0);
-        const totalCoefStudent = s.marks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
-        const overallAverage = totalCoefStudent > 0 ? totalWeightedStudent / totalCoefStudent : 0;
-        const rankIndex = studentsWithAverages.findIndex(st => st.studentId === s.student.matricule);
-        const rank = rankIndex !== -1 ? `${rankIndex + 1}th` : 'N/A';
-
-        // Prepare subjects data
-        const subjects: SubjectData[] = s.marks.map((m: any) => {
-            const stats = subjectStats.get(m.sub_class_subject_id) || { min: 0, max: 0, avg: 0, successRate: 0 };
-            // Calculate subject rank for this student
-            const subjectScores = combinedSubclassMarks.filter(mm => mm.sub_class_subject_id === m.sub_class_subject_id).sort((a, b) => b.score - a.score);
-            const subjectRankIndex = subjectScores.findIndex(mm => mm.enrollment_id === m.enrollment_id);
-            const subjectRank = subjectRankIndex !== -1 ? `${subjectRankIndex + 1}th` : 'N/A';
-            return {
-                category: m.category,
-                name: m.subject_name,
-                coefficient: m.coefficient,
-                mark: m.score,
-                weightedMark: m.score * m.coefficient,
-                rank: subjectRank,
-                teacher: m.teacher_name,
-                min: stats.min === Infinity ? 0 : stats.min,
-                avg: parseFloat((stats.avg || 0).toFixed(2)),
-                max: stats.max === -Infinity ? 0 : stats.max,
-                successRate: parseFloat((stats.successRate || 0).toFixed(2)),
-                grade: getGrade(m.score),
-            };
         });
-        // Prepare category summaries
-        const categorySet = new Set<string>(subjects.map(s => s.category));
-        const categories = Array.from(categorySet);
-        const categorySummaries: CategorySummary[] = categories.map(category => {
-            const categorySubjects = subjects.filter(s => s.category === category);
-            if (categorySubjects.length === 0) {
-                return { category, totalMark: 0, totalCoef: 0, totalWeightedMark: 0, categoryAverage: 0, categoryGrade: 'N/A', categoryMin: 0, categoryMax: 0, categoryAvg: 0, categorySuccessRate: 0, categoryRank: 'N/A' };
-            }
-            const totalMarkCategory = categorySubjects.reduce((sum, s) => sum + s.mark, 0);
-            const totalCoefCategory = categorySubjects.reduce((sum, s) => sum + s.coefficient, 0);
-            const totalWeightedMarkCategory = categorySubjects.reduce((sum, s) => sum + s.weightedMark, 0);
-            const categoryAverage = totalCoefCategory > 0 ? totalWeightedMarkCategory / totalCoefCategory : 0;
-            // Category stats (min, max, avg, success) are class-wide for subjects in this category
-            const categorySubjectStats = Array.from(subjectStats.entries())
-                .filter(([subClassSubjectId, _]) => {
-                    // Find the subject category for this subClassSubjectId
-                    return combinedSubclassMarks.find(m => m.sub_class_subject_id === subClassSubjectId)?.category === category;
-                })
-                .map(([_, stats]) => stats);
-            const categoryMin = categorySubjectStats.length > 0 ? Math.min(...categorySubjectStats.map(s => s.min === Infinity ? 0 : s.min)) : 0;
-            const categoryMax = categorySubjectStats.length > 0 ? Math.max(...categorySubjectStats.map(s => s.max === -Infinity ? 0 : s.max)) : 0;
-            const categoryAvg = categorySubjectStats.length > 0 ? categorySubjectStats.reduce((sum, s) => sum + (s.avg || 0), 0) / categorySubjectStats.length : 0;
-            const categorySuccessRate = categorySubjectStats.length > 0 ? categorySubjectStats.reduce((sum, s) => sum + (s.successRate || 0), 0) / categorySubjectStats.length : 0;
-            // Calculate student's rank within this category
-            const studentCategoryAverages = students.map(stu => {
-                const studentCatMarks = stu.marks.filter((m: any) => m.category === category);
-                if (studentCatMarks.length === 0) return { studentId: stu.student.matricule, average: 0 };
-                const catTotalWeighted = studentCatMarks.reduce((sum: number, m: any) => sum + m.score * m.coefficient, 0);
-                const catTotalCoef = studentCatMarks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
-                return { studentId: stu.student.matricule, average: catTotalCoef > 0 ? catTotalWeighted / catTotalCoef : 0 };
-            }).sort((a, b) => b.average - a.average);
-            const studentCategoryRankIndex = studentCategoryAverages.findIndex(sca => sca.studentId === s.student.matricule);
-            const categoryRank = studentCategoryRankIndex >= 0 ? `${studentCategoryRankIndex + 1}th` : 'N/A';
-            return {
-                category,
-                totalMark: totalMarkCategory,
-                totalCoef: totalCoefCategory,
-                totalWeightedMark: totalWeightedMarkCategory,
-                categoryAverage,
-                categoryGrade: getGrade(categoryAverage),
-                categoryMin: parseFloat(categoryMin.toFixed(2)),
-                categoryMax: parseFloat(categoryMax.toFixed(2)),
-                categoryAvg: parseFloat(categoryAvg.toFixed(2)),
-                categorySuccessRate: parseFloat(categorySuccessRate.toFixed(2)),
-                categoryRank
-            };
-        });
-        // Calculate overall totals for the student
-        const totalMarkStudent = subjects.reduce((sum, s) => sum + s.mark, 0);
-        const totalCoefStudentTotals = subjects.reduce((sum, s) => sum + s.coefficient, 0);
-        const totalWeightedMarkStudent = subjects.reduce((sum, s) => sum + s.weightedMark, 0);
-        // Assemble the final ReportData object
-        const academicYearName = context ? `${new Date(context.start_date).getFullYear()}-${new Date(context.end_date).getFullYear()}` : '';
-        const studentReportData: ReportData = {
-            student: {
-                ...s.student,
-                dateOfBirth: moment(s.student.dateOfBirth).format('DD/MM/YY'), // Format date of birth here
-            },
-            classInfo: {
-                className: `${context.sub_class_name}`, // Only show subclass name
-                enrolledStudents: enrolledStudentsCount,
-                classMaster: context.class_master_name || 'Not Assigned',
-                academicYear: academicYearName,
-            },
-            subjects,
-            categories,
-            categorySummaries,
-            totals: {
-                totalMark: totalMarkStudent,
-                totalCoef: totalCoefStudentTotals,
-                totalWeightedMark: totalWeightedMarkStudent,
-                overallAverage,
-                overallGrade: getGrade(overallAverage)
-            },
-            statistics: {
-                overallAverage: overallAverage.toFixed(2),
-                rank,
-                subjectsPassed: s.marks.filter((m: any) => m.score >= 10).length,
-                classStats: classStats
-            },
-            examSequence: {
-                name: `Evaluation N° ${examSequence.sequence_number}`,
-                sequenceNumber: examSequence.sequence_number,
-                termName: examSequence.term.name
-            }
-        };
-        reportDataArray.push(studentReportData);
-        // Optionally: call StudentAverageService.calculateAndSaveStudentAverages here if needed
+        throw error; // Re-throw to be caught by the job processor
     }
-    console.timeEnd('Subclass data fetching and processing (Sequelize)');
-    // 5. Generate HTML and PDF
-    const htmlPages = await Promise.all(reportDataArray.map(data => renderReportCardHtml(data)));
-    const className = context.class_name || 'Unknown';
-    const sub_className = context.sub_class_name || 'Unknown';
-    const filePath = path.join(
-        process.cwd(),
-        `src/reports/${className}-${sub_className}-${academicYearId}-${examSequenceId}-reports.pdf`
-    );
-    await generateMultiPagePdf(htmlPages, filePath);
-    return filePath;
 }
 
 // Refactored generateStudentReportData to use Sequelize
