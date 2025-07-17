@@ -43,8 +43,11 @@ app.use(express.urlencoded({ extended: true }));
 // HTTP request logging
 app.use(morgan('dev'));
 
-// Serve static files from the uploads directory
+// Serve static files from the uploads directory with subdirectories
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads/students', express.static(path.join(process.cwd(), 'uploads', 'students')));
+app.use('/uploads/users', express.static(path.join(process.cwd(), 'uploads', 'users')));
+app.use('/uploads/defaults', express.static(path.join(process.cwd(), 'uploads', 'defaults')));
 
 // Log the number of routes and schemas in Swagger
 if (swaggerSpec && swaggerSpec.paths) {

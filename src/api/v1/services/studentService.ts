@@ -833,3 +833,90 @@ export async function getStudentByEnrollmentId(enrollmentId: number): Promise<an
         subClass: sub_class?.name || null,
     };
 }
+
+/**
+ * Update enrollment photo for a student
+ */
+export async function updateEnrollmentPhoto(
+    studentId: number,
+    academicYearId: number,
+    photoFilename: string
+): Promise<any> {
+    try {
+        // Find the enrollment record
+        const enrollment = await prisma.enrollment.findUnique({
+            where: {
+                student_id_academic_year_id: {
+                    student_id: studentId,
+                    academic_year_id: academicYearId
+                }
+            },
+            include: {
+                student: true,
+                sub_class: {
+                    include: {
+                        class: true
+                    }
+                }
+            }
+        });
+
+        if (!enrollment) {
+            throw new Error(`No enrollment found for student ${studentId} in academic year ${academicYearId}`);
+        }
+
+        // Update the enrollment with the new photo
+        const updatedEnrollment = await prisma.enrollment.update({
+            where: { id: enrollment.id },
+            data: { photo: photoFilename },
+            include: {
+                student: true,
+                sub_class: {
+                    include: {
+                        class: true
+                    }
+                }
+            }
+        });
+
+        return updatedEnrollment;
+    } catch (error: any) {
+        console.error('Error updating enrollment photo:', error);
+        throw new Error(`Failed to update enrollment photo: ${error.message}`);
+    }
+}
+
+/**
+ * Get student enrollment photo information
+ */
+export async function getStudentEnrollmentPhoto(
+    studentId: number,
+    academicYearId: number
+): Promise<{ photo: string | null; enrollmentId: number } | null> {
+    try {
+        const enrollment = await prisma.enrollment.findUnique({
+            where: {
+                student_id_academic_year_id: {
+                    student_id: studentId,
+                    academic_year_id: academicYearId
+                }
+            },
+            select: {
+                id: true,
+                photo: true
+            }
+        });
+
+        if (!enrollment) {
+            return null;
+        }
+
+        return {
+            photo: enrollment.photo,
+            enrollmentId: enrollment.id
+        };
+    } catch (error: any) {
+        console.error('Error getting student enrollment photo:', error);
+        throw new Error(`Failed to get enrollment photo: ${error.message}`);
+    }
+}

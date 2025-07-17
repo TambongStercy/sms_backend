@@ -413,4 +413,209 @@
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 
+/**
+ * @swagger
+ * /students/{id}/photo:
+ *   post:
+ *     summary: Upload student photo
+ *     description: |
+ *       Upload a photo file for a student. The photo will be stored in the students directory
+ *       with a filename that includes the student ID for easy identification.
+ *       This endpoint is used to upload photos that can later be assigned to enrollment records.
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Student ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - photo
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Student photo file (JPEG, PNG, etc.)
+ *     responses:
+ *       201:
+ *         description: Photo uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Student photo uploaded successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     filename:
+ *                       type: string
+ *                       example: student-123-1640995200000.jpg
+ *                     originalname:
+ *                       type: string
+ *                       example: john_doe_photo.jpg
+ *                     size:
+ *                       type: number
+ *                       example: 102400
+ *                     studentId:
+ *                       type: number
+ *                       example: 123
+ *                     url:
+ *                       type: string
+ *                       example: http://localhost:3000/uploads/students/student-123-1640995200000.jpg
+ *       400:
+ *         description: Bad request (invalid student ID or no photo uploaded)
+ *       404:
+ *         description: Student not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ *
+ * /students/{id}/enrollment-photo:
+ *   put:
+ *     summary: Update student enrollment photo
+ *     description: |
+ *       Update the photo for a student's enrollment record. This assigns a previously uploaded
+ *       photo to a specific enrollment (academic year). Students can have different photos
+ *       for different academic years.
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Student ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - photoFilename
+ *             properties:
+ *               photoFilename:
+ *                 type: string
+ *                 description: Filename of the previously uploaded photo
+ *                 example: student-123-1640995200000.jpg
+ *               academicYearId:
+ *                 type: integer
+ *                 description: Academic year ID (optional, defaults to current year)
+ *                 example: 4
+ *     responses:
+ *       200:
+ *         description: Enrollment photo updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Student enrollment photo updated successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     studentId:
+ *                       type: number
+ *                       example: 123
+ *                     academicYearId:
+ *                       type: number
+ *                       example: 4
+ *                     photo:
+ *                       type: string
+ *                       example: student-123-1640995200000.jpg
+ *                     enrollment:
+ *                       $ref: '#/components/schemas/Enrollment'
+ *       400:
+ *         description: Bad request (invalid photo filename or student ID)
+ *       404:
+ *         description: Student or enrollment not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ *   get:
+ *     summary: Get student enrollment photo info
+ *     description: |
+ *       Retrieve information about a student's enrollment photo including the filename
+ *       and public URL. This endpoint helps check if a photo is assigned to an enrollment.
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Student ID
+ *       - in: query
+ *         name: academicYearId
+ *         schema:
+ *           type: integer
+ *         description: Academic year ID (optional, defaults to current year)
+ *         example: 4
+ *     responses:
+ *       200:
+ *         description: Photo information retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     studentId:
+ *                       type: number
+ *                       example: 123
+ *                     academicYearId:
+ *                       type: number
+ *                       example: 4
+ *                     photo:
+ *                       type: string
+ *                       nullable: true
+ *                       example: student-123-1640995200000.jpg
+ *                     photoUrl:
+ *                       type: string
+ *                       nullable: true
+ *                       example: http://localhost:3000/uploads/students/student-123-1640995200000.jpg
+ *                     enrollmentId:
+ *                       type: number
+ *                       example: 456
+ *       404:
+ *         description: No enrollment photo found
+ *       400:
+ *         description: Invalid student ID format
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+
 export { }; 

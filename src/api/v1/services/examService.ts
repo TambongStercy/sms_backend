@@ -13,6 +13,7 @@ import * as PuppeteerManager from '../../../utils/puppeteerManager';
 import { reportGenerationQueue } from '../../../config/queue';
 import * as reportSequelizeService from './reportSequelizeService';
 import moment from 'moment';
+import * as photoUtils from '../../../utils/photoUtils';
 
 export async function createExamPaper(data: {
     name: string;
@@ -583,8 +584,8 @@ async function generateSubclassReportCards(
     await prisma.generatedReport.updateMany({
         where: {
             sub_class_id: sub_classId,
-                    academic_year_id: academicYearId,
-                    exam_sequence_id: examSequenceId,
+            academic_year_id: academicYearId,
+            exam_sequence_id: examSequenceId,
             report_type: ReportType.SUBCLASS
         },
         data: {
@@ -702,7 +703,7 @@ async function generateStudentReportData(
                 sub_class_id: studentEnrollment.sub_class_id!,
                 academic_year_id: academicYearId,
                 repeater: studentEnrollment.repeater,
-                photo: studentEnrollment.photo || null,
+                photo: studentEnrollment.photo || 'default-student.jpg',
                 mark_id: -1, // Unique identifier for a virtual mark
                 score: 0,
                 sub_class_subject_id: subject.sub_class_subject_id,
@@ -927,7 +928,7 @@ async function generateStudentReportData(
  */
 async function renderReportCardHtml(reportData: ReportData): Promise<string> {
     const template = fs.readFileSync(path.join(process.cwd(), 'src/view/report-template.ejs'), 'utf-8');
-    return ejs.render(template, reportData);
+    return ejs.render(template, { ...reportData, photoUtils });
 }
 
 /**

@@ -3,6 +3,7 @@ import * as puppeteer from 'puppeteer';
 import ejs from 'ejs';
 import fs from 'fs';
 import path from 'path';
+import * as photoUtils from '../../../utils/photoUtils';
 import getPuppeteerConfig from '../../../utils/puppeteer.config';
 import * as PuppeteerManager from '../../../utils/puppeteerManager';
 import { ExamSequence, Student, Enrollment, SubClass, AcademicYear } from '@prisma/client';
@@ -19,7 +20,7 @@ async function renderReportCardHtml(reportData: ReportData): Promise<string> {
     const templatePath = path.join(process.cwd(), 'src/view/report-template.ejs');
     // Consider caching the template read for performance
     const template = fs.readFileSync(templatePath, 'utf-8');
-    return ejs.render(template, reportData);
+    return ejs.render(template, { ...reportData, photoUtils });
 }
 
 /**
@@ -207,7 +208,7 @@ async function generateStudentReportDataForWorker(
             placeOfBirth: enrollment.student.place_of_birth,
             gender: enrollment.student.gender,
             repeater: enrollment.repeater,
-            photo: enrollment.photo || 'default-photo.jpg', // Needs embedding or public URL logic
+            photo: enrollment.photo || 'default-student.jpg', // Use local filename for faster access
         },
         classInfo: {
             className: `${enrollment.sub_class.class.name} ${enrollment.sub_class.name}`,

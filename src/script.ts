@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import * as dotenv from 'dotenv';
 import getPuppeteerConfig from './utils/puppeteer.config';
+import * as photoUtils from './utils/photoUtils';
 
 // Load environment variables from .env file
 dotenv.config({ path: './.env' });
@@ -447,7 +448,7 @@ async function generateStudentReportData(
             placeOfBirth: enrollment.student.place_of_birth,
             gender: enrollment.student.gender,
             repeater: enrollment.repeater,
-            photo: enrollment.photo || 'default-photo.jpg',
+            photo: enrollment.photo || 'default-student.jpg',
         },
         classInfo: {
             className: enrollment.sub_class.class.name,
@@ -501,7 +502,7 @@ async function generateStudentReportData(
 
 async function renderReportCardHtml(reportData: ReportData): Promise<string> {
     const template = fs.readFileSync(path.join(__dirname, 'view/report-template.ejs'), 'utf-8');
-    return ejs.render(template, reportData);
+    return ejs.render(template, { ...reportData, photoUtils });
 }
 
 async function generatePdf(html: string, filePath: string): Promise<void> {

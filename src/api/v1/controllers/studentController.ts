@@ -6,6 +6,8 @@ import { transformUser } from './userController'; // Assuming transformUser is e
 import { User, ParentStudent } from '@prisma/client'; // Import User and ParentStudent
 import { getStudentStatus, getStudentsWithStatus } from '../../../utils/studentStatus'; // Import student status utilities
 import { getAcademicYearId } from '../../../utils/academicYear'; // Import academic year utilities
+import upload, { PhotoType, getFileUrl, deletePhotoFile, isValidPhotoFilename } from '../../../utils/fileUpload';
+import { saveFileMetadata } from '../services/fileService';
 
 // Define an interface for ParentStudent with the parent relation included
 interface ParentStudentWithParent extends ParentStudent {
@@ -106,22 +108,6 @@ export const createStudent = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         console.error('Error creating student:', error);
-
-        // Handle specific error types
-        if (error.message.includes('Missing required fields')) {
-            return res.status(400).json({ success: false, error: error.message });
-        }
-
-        if (error.message.includes('Invalid gender') ||
-            error.message.includes('Invalid date of birth') ||
-            error.message.includes('already exists')) {
-            return res.status(400).json({ success: false, error: error.message });
-        }
-
-        if (error.message.includes('Date of birth cannot be in the future')) {
-            return res.status(400).json({ success: false, error: error.message });
-        }
-
         res.status(500).json({
             success: false,
             error: error.message
@@ -164,31 +150,192 @@ export const getStudentById = async (req: Request, res: Response): Promise<any> 
 export const updateStudent = async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
+        const updateData = req.body;
+
+        // Validate that the ID is a valid number
         if (isNaN(id)) {
-            return res.status(400).json({ success: false, error: 'Invalid student ID format' });
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid student ID format'
+            });
         }
 
-        const studentData = req.body; // Middleware handles case conversion
-
-
-        // Basic validation: Ensure at least one field is being updated
-        if (Object.keys(studentData).length === 0) {
-            return res.status(400).json({ success: false, error: 'No data provided for update' });
-        }
-
-        const updatedStudent = await studentService.updateStudent(id, studentData);
+        const updatedStudent = await studentService.updateStudent(id, updateData);
         res.json({
             success: true,
             data: updatedStudent
         });
     } catch (error: any) {
         console.error('Error updating student:', error);
-        if (error.code === 'P2025') { // Prisma error code for record to update not found
-            return res.status(404).json({ success: false, error: 'Student not found' });
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+interface MulterRequest extends Request {
+    file?: Express.Multer.File;
+}
+
+/**
+ * Upload student photo for enrollment
+ * @route POST /api/v1/students/:id/photo
+ */
+export const uploadStudentPhoto = async (req: MulterRequest, res: Response): Promise<void> => {
+    try {
+        const studentId = parseInt(req.params.id);
+        if (isNaN(studentId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid student ID format'
+            });
+            return;
         }
-        if (error.message.includes('Invalid gender')) {
-            return res.status(400).json({ success: false, error: error.message });
+
+        // Verify student exists
+        const student = await studentService.getStudentById(studentId);
+        if (!student) {
+            res.status(404).json({
+                success: false,
+                error: 'Student not found'
+            });
+            return;
         }
+
+        if (!req.file) {
+            res.status(400).json({
+                success: false,
+                error: 'No photo file uploaded'
+            });
+            return;
+        }
+
+        // Save file metadata and get file information
+        const fileData = await saveFileMetadata(req, req.file);
+
+        res.status(201).json({
+            success: true,
+            message: 'Student photo uploaded successfully',
+            data: {
+                ...fileData,
+                studentId: studentId,
+                url: getFileUrl(req, req.file.filename, PhotoType.STUDENT)
+            }
+        });
+    } catch (error: any) {
+        console.error('Error uploading student photo:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to upload student photo',
+            details: error.message
+        });
+    }
+};
+
+/**
+ * Update student enrollment photo
+ * @route PUT /api/v1/students/:id/enrollment-photo
+ */
+export const updateStudentEnrollmentPhoto = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const studentId = parseInt(req.params.id);
+        const { academic_year_id, photo_filename } = req.body;
+
+        if (isNaN(studentId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid student ID format'
+            });
+            return;
+        }
+
+        if (!photo_filename) {
+            res.status(400).json({
+                success: false,
+                error: 'Photo filename is required'
+            });
+            return;
+        }
+
+        // Validate photo filename exists
+        if (!isValidPhotoFilename(photo_filename)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid photo filename or file does not exist'
+            });
+            return;
+        }
+
+        const academicYearId = academic_year_id || await getAcademicYearId();
+
+        // Update the enrollment photo
+        const updatedEnrollment = await studentService.updateEnrollmentPhoto(
+            studentId,
+            academicYearId,
+            photo_filename
+        );
+
+        res.json({
+            success: true,
+            message: 'Student enrollment photo updated successfully',
+            data: {
+                studentId: studentId,
+                academicYearId: academicYearId,
+                photo: photo_filename,
+                enrollment: updatedEnrollment
+            }
+        });
+    } catch (error: any) {
+        console.error('Error updating student enrollment photo:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get student enrollment photo info
+ * @route GET /api/v1/students/:id/enrollment-photo
+ */
+export const getStudentEnrollmentPhoto = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const studentId = parseInt(req.params.id);
+        const academicYearId = req.query.academic_year_id ?
+            parseInt(req.query.academic_year_id as string) :
+            await getAcademicYearId();
+
+        if (isNaN(studentId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid student ID format'
+            });
+            return;
+        }
+
+        const photoInfo = await studentService.getStudentEnrollmentPhoto(studentId, academicYearId);
+
+        if (!photoInfo) {
+            res.status(404).json({
+                success: false,
+                error: 'No enrollment photo found for this student and academic year'
+            });
+            return;
+        }
+
+        res.json({
+            success: true,
+            data: {
+                studentId: studentId,
+                academicYearId: academicYearId,
+                photo: photoInfo.photo,
+                photoUrl: photoInfo.photo ? getFileUrl(req, photoInfo.photo, PhotoType.STUDENT) : null,
+                enrollmentId: photoInfo.enrollmentId
+            }
+        });
+    } catch (error: any) {
+        console.error('Error getting student enrollment photo:', error);
         res.status(500).json({
             success: false,
             error: error.message

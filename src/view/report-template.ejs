@@ -108,7 +108,8 @@
                 </div>
 
                 <div class="m-3">
-                    <img class="w-24 h-24 object-cover rounded-lg" src="<%= student.photo %>">
+                    <img class="w-24 h-24 object-cover rounded-lg"
+                        src="<%= photoUtils.getPhotoAsDataUri(student.photo) %>" alt="Student Photo">
                 </div>
             </div>
 

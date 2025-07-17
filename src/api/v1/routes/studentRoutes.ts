@@ -11,6 +11,7 @@ import { validateTeacherStudentAccess } from '../middleware/teacherAuth.middlewa
 //     getSubjectPerformanceAnalysis
 // } from '../controllers/performanceController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import upload, { PhotoType } from '../../../utils/fileUpload';
 
 const router = Router();
 
@@ -208,6 +209,35 @@ router.get('/parent/:parentId',
 router.get('/enrollments/:enrollmentId',
     authenticate,
     studentController.getStudentByEnrollmentId
+);
+
+// Photo management routes
+// POST /students/:id/photo - Upload student photo (requires authentication)
+router.post('/:id/photo',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'TEACHER']),
+    (req: any, res: any, next: any) => {
+        // Set photo type for multer
+        req.body.photoType = PhotoType.STUDENT;
+        req.params.entityId = req.params.id;
+        next();
+    },
+    upload.single('photo'),
+    studentController.uploadStudentPhoto
+);
+
+// PUT /students/:id/enrollment-photo - Update student enrollment photo
+router.put('/:id/enrollment-photo',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']),
+    studentController.updateStudentEnrollmentPhoto
+);
+
+// GET /students/:id/enrollment-photo - Get student enrollment photo info
+router.get('/:id/enrollment-photo',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'TEACHER', 'PARENT']),
+    studentController.getStudentEnrollmentPhoto
 );
 
 
