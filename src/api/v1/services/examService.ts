@@ -583,8 +583,8 @@ async function generateSubclassReportCards(
     await prisma.generatedReport.updateMany({
         where: {
             sub_class_id: sub_classId,
-            academic_year_id: academicYearId,
-            exam_sequence_id: examSequenceId,
+                    academic_year_id: academicYearId,
+                    exam_sequence_id: examSequenceId,
             report_type: ReportType.SUBCLASS
         },
         data: {
@@ -689,7 +689,7 @@ async function generateStudentReportData(
 
         // If no marks were fetched by the initial query, populate with zero-score marks for all subjects in their subclass
         if (studentMarks.length === 0) {
-            const allSubjectsForSubclass = await reportSequelizeService.getAllSubjectsForSubclass(studentEnrollment.sub_class_id!, academicYearId);
+            const allSubjectsForSubclass = await reportSequelizeService.getAllSubjectsForSubclass(studentEnrollment.sub_class_id!);
 
             studentMarks = allSubjectsForSubclass.map(subject => ({
                 student_id: studentId,
