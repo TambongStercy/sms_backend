@@ -24,8 +24,18 @@ app.use(
     })
 );
 
-// Enable CORS for all routes
-app.use(cors());
+// Enable CORS for all routes - flexible configuration for development and production
+app.use(cors({
+    origin: [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'https://sms.sniperbuisnesscenter.com',
+        // Add more origins as needed for production
+    ],
+    credentials: true, // Allow credentials (cookies, authorization headers)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+}));
 
 // Middleware
 app.use(express.json());
@@ -39,6 +49,12 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/uploads/students', express.static(path.join(process.cwd(), 'uploads', 'students')));
 app.use('/uploads/users', express.static(path.join(process.cwd(), 'uploads', 'users')));
 app.use('/uploads/defaults', express.static(path.join(process.cwd(), 'uploads', 'defaults')));
+
+// Also serve uploads under /api/v1/uploads to match frontend requests
+app.use('/api/v1/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/api/v1/uploads/students', express.static(path.join(process.cwd(), 'uploads', 'students')));
+app.use('/api/v1/uploads/users', express.static(path.join(process.cwd(), 'uploads', 'users')));
+app.use('/api/v1/uploads/defaults', express.static(path.join(process.cwd(), 'uploads', 'defaults')));
 
 // Log the number of routes and schemas in Swagger
 if (swaggerSpec && swaggerSpec.paths) {
