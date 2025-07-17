@@ -360,18 +360,8 @@ async function notifyAuditTrailChange(auditLog: any) {
         // Send notifications to administrators
         for (const admin of administrators) {
             await sendNotification({
-                recipient_id: admin.id,
-                notification_type: 'IN_APP',
-                title: `System Change Alert`,
-                message: `${auditLog.user.name} performed: ${auditLog.action} on ${auditLog.table_name} (ID: ${auditLog.record_id})`,
-                priority: 'MEDIUM',
-                category: 'SYSTEM',
-                metadata: {
-                    auditLogId: auditLog.id,
-                    userId: auditLog.user_id,
-                    entityType: auditLog.table_name,
-                    entityId: auditLog.record_id
-                }
+                user_id: admin.id,
+                message: `System Change Alert: ${auditLog.user.name} performed: ${auditLog.action} on ${auditLog.table_name} (ID: ${auditLog.record_id})`
             });
         }
     } catch (error: any) {

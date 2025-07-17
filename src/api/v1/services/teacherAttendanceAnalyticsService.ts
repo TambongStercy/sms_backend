@@ -535,12 +535,8 @@ export async function recordTeacherAttendance(
             // Send notification for unauthorized absences
             if (status === 'ABSENT' && recordedBy) {
                 await sendNotification({
-                    recipient_id: teacherId,
-                    notification_type: 'IN_APP',
-                    title: 'Attendance Alert',
-                    message: `Your absence has been recorded. Please contact administration if this is incorrect.`,
-                    priority: 'MEDIUM',
-                    category: 'GENERAL'
+                    user_id: teacherId,
+                    message: `Attendance Alert: Your absence has been recorded. Please contact administration if this is incorrect.`
                 });
             }
 

@@ -336,9 +336,9 @@ export async function processOverdueReports(): Promise<void> {
 
             // Send overdue notifications
             for (const userId of overdueUserIds) {
-                await notificationService.sendReportOverdueNotification(userId, {
-                    report_type: deadline.title,
-                    deadline: deadline.deadline_date.toISOString().split('T')[0]
+                await notificationService.sendNotification({
+                    user_id: userId,
+                    message: `Report Overdue: Your ${deadline.title} report was due on ${deadline.deadline_date.toISOString().split('T')[0]}. Please submit it as soon as possible.`
                 });
             }
 
@@ -354,17 +354,8 @@ export async function processOverdueReports(): Promise<void> {
 
             for (const manager of superManagers) {
                 await notificationService.sendNotification({
-                    title: 'Overdue Reports Alert',
-                    message: `${overdueUserIds.length} staff members have not submitted their ${deadline.title} reports. Deadline was ${deadline.deadline_date.toISOString().split('T')[0]}.`,
-                    recipient_id: manager.id,
-                    notification_type: 'IN_APP',
-                    priority: 'HIGH',
-                    category: 'SYSTEM',
-                    metadata: {
-                        deadline_id: deadline.id,
-                        overdue_count: overdueUserIds.length,
-                        overdue_user_ids: overdueUserIds
-                    }
+                    user_id: manager.id,
+                    message: `Overdue Reports Alert: ${overdueUserIds.length} staff members have not submitted their ${deadline.title} reports. Deadline was ${deadline.deadline_date.toISOString().split('T')[0]}.`
                 });
             }
         }
@@ -394,18 +385,8 @@ async function notifyTargetRolesOfNewDeadline(deadline: ReportDeadline, targetRo
         // Send notification to each user
         for (const user of targetUsers) {
             await notificationService.sendNotification({
-                title: 'New Report Deadline',
-                message: `A new report deadline has been set: ${deadline.title}. Due date: ${deadline.deadline_date.toISOString().split('T')[0]}. ${deadline.description}`,
-                recipient_id: user.id,
-                sender_id: deadline.created_by,
-                notification_type: 'IN_APP',
-                priority: 'MEDIUM',
-                category: 'SYSTEM',
-                academic_year_id: deadline.academic_year_id,
-                metadata: {
-                    deadline_id: deadline.id,
-                    report_type: deadline.report_type
-                }
+                user_id: user.id,
+                message: `New Report Deadline: A new report deadline has been set: ${deadline.title}. Due date: ${deadline.deadline_date.toISOString().split('T')[0]}. ${deadline.description}`
             });
         }
     } catch (error) {
@@ -436,17 +417,8 @@ async function notifyManagerOfSubmission(deadline: ReportDeadline, submission: R
 
         for (const manager of managers) {
             await notificationService.sendNotification({
-                title: 'Report Submitted',
-                message: `${submitter?.name} has submitted their report for "${deadline.title}".`,
-                recipient_id: manager.id,
-                notification_type: 'IN_APP',
-                priority: 'LOW',
-                category: 'SYSTEM',
-                metadata: {
-                    deadline_id: deadline.id,
-                    submission_id: submission.id,
-                    submitted_by: submission.submitted_by
-                }
+                user_id: manager.id,
+                message: `Report Submitted: ${submitter?.name} has submitted their report for "${deadline.title}".`
             });
         }
     } catch (error) {
@@ -466,17 +438,8 @@ async function notifySubmitterOfReview(submission: ReportSubmission, status: str
         };
 
         await notificationService.sendNotification({
-            title: 'Report Review Complete',
-            message: statusMessages[status as keyof typeof statusMessages] || 'Your report has been reviewed.',
-            recipient_id: submission.submitted_by,
-            notification_type: 'IN_APP',
-            priority: 'MEDIUM',
-            category: 'SYSTEM',
-            metadata: {
-                submission_id: submission.id,
-                review_status: status,
-                review_notes: submission.review_notes
-            }
+            user_id: submission.submitted_by,
+            message: `Report Review Complete: ${statusMessages[status as keyof typeof statusMessages] || 'Your report has been reviewed.'}`
         });
     } catch (error) {
         console.error('Error notifying submitter of review:', error);
