@@ -1402,7 +1402,7 @@ export async function updateExamSequenceStatus(
     });
 
     // If the status is set to FINALIZED, trigger background report generation
-    if (newStatus === ExamSequenceStatus.FINALIZED) {
+    if (newStatus === ExamSequenceStatus.FINALIZED || newStatus === ExamSequenceStatus.REPORTS_GENERATING) {
         console.log(`Exam sequence ${examSequenceId} finalized. Triggering report generation...`);
 
         // Update status to REPORTS_GENERATING immediately

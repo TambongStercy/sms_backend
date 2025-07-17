@@ -62,22 +62,48 @@ export async function getAllStudentsWithCurrentEnrollment(
         }
     }
 
-    // 3. Apply Enrollment Status Filtering
+    // 3. Build Combined Subclass Filter Logic
+    // Combine teacher restrictions with explicit subclass filter
+    let finalSubclassFilter: number | number[] | undefined = undefined;
+
+    if (teacherSubClassIds && teacherSubClassIds.length > 0) {
+        if (sub_classIdFilter !== undefined) {
+            // Teacher has restrictions AND explicit subclass filter provided
+            // Only allow the explicit filter if it's within teacher's allowed subclasses
+            if (teacherSubClassIds.includes(sub_classIdFilter)) {
+                finalSubclassFilter = sub_classIdFilter;
+                console.log(`Applying combined filter: teacher-restricted subclass ${sub_classIdFilter}`);
+            } else {
+                // Requested subclass is not in teacher's allowed list - return empty result
+                console.log(`Subclass ${sub_classIdFilter} not in teacher's allowed subclasses ${teacherSubClassIds.join(', ')}. No students will be returned.`);
+                finalSubclassFilter = -1; // Use invalid ID to return no results
+            }
+        } else {
+            // Teacher has restrictions but no explicit filter - show all their allowed subclasses
+            finalSubclassFilter = teacherSubClassIds;
+            console.log(`Applying teacher restriction: students must be in subclasses ${teacherSubClassIds.join(', ')}`);
+        }
+    } else if (sub_classIdFilter !== undefined) {
+        // No teacher restrictions but explicit subclass filter provided
+        finalSubclassFilter = sub_classIdFilter;
+        console.log(`Applying explicit subclass filter: ${sub_classIdFilter}`);
+    }
+
+    // 4. Apply Enrollment Status Filtering
     const enrollmentCriteria: Prisma.EnrollmentWhereInput = {
         academic_year_id: targetAcademicYearId
     };
 
-    // Apply teacher subclass restriction if provided
-    if (teacherSubClassIds && teacherSubClassIds.length > 0) {
-        enrollmentCriteria.sub_class_id = { in: teacherSubClassIds };
-        console.log("Applying teacher restriction: students must be in assigned subclasses", teacherSubClassIds);
+    // Apply the final subclass filter to enrollment criteria
+    if (finalSubclassFilter !== undefined) {
+        if (Array.isArray(finalSubclassFilter)) {
+            enrollmentCriteria.sub_class_id = { in: finalSubclassFilter };
+        } else {
+            enrollmentCriteria.sub_class_id = finalSubclassFilter;
+        }
     }
 
-    // Apply sub_class filter ONLY if filtering for 'enrolled' students and no teacher restriction
-    if (enrollmentStatus === 'enrolled') { // Check specifically for 'enrolled'
-        if (sub_classIdFilter !== undefined && (!teacherSubClassIds || teacherSubClassIds.length === 0)) {
-            enrollmentCriteria.sub_class_id = sub_classIdFilter;
-        }
+    if (enrollmentStatus === 'enrolled') {
         studentWhere.enrollments = { some: enrollmentCriteria };
         console.log("Applying filter: ENROLLED");
     } else if (enrollmentStatus === 'not_enrolled') {
@@ -98,24 +124,14 @@ export async function getAllStudentsWithCurrentEnrollment(
         }
         console.log("Applying filter: NOT ENROLLED");
     } else { // Default to 'all' if enrollmentStatus is undefined or 'all'
-        // Always ensure students have enrollments in their assigned subclasses for teachers
-        if (teacherSubClassIds && teacherSubClassIds.length > 0) {
+        if (finalSubclassFilter !== undefined) {
+            // Apply subclass filter for 'all' status - only show students who have enrollments in the filtered subclasses
             studentWhere.enrollments = { some: enrollmentCriteria };
-        } else if (sub_classIdFilter !== undefined) {
-            // Apply sub_class_id filter to the main student query for 'all' status
-            studentWhere.enrollments = {
-                some: {
-                    academic_year_id: targetAcademicYearId,
-                    sub_class_id: sub_classIdFilter
-                }
-            };
-            // Also ensure the included enrollments are filtered by sub_class_id for consistency
-            enrollmentCriteria.sub_class_id = sub_classIdFilter;
-            console.log("Applying filter: ALL (Default) with sub_class_id filter on Student enrollments");
+            console.log("Applying filter: ALL with subclass filter");
         } else {
-            // If no sub_class_id filter, no specific enrollment condition on studentWhere for 'all'
-            // but included enrollments are still filtered by academic year.
-            console.log("Applying filter: ALL (Default) - No sub_class_id filter on Student enrollments");
+            // No subclass filter - don't add enrollment conditions to studentWhere for 'all'
+            // but included enrollments are still filtered by academic year in the include
+            console.log("Applying filter: ALL (Default) - No subclass filter");
         }
     }
 
