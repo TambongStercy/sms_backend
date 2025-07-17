@@ -135,11 +135,9 @@ export async function sendSimpleMessage(data: {
             },
             include: {
                 sender: {
-                    select: { id: true, name: true, matricule: true },
                     include: { user_roles: true }
                 },
                 receiver: {
-                    select: { id: true, name: true, matricule: true },
                     include: { user_roles: true }
                 }
             }
@@ -147,12 +145,8 @@ export async function sendSimpleMessage(data: {
 
         // Send notification to receiver
         await sendNotification({
-            recipient_id: data.receiverId,
-            notification_type: 'IN_APP',
-            title: `New ${data.category} message from ${sender.name}`,
-            message: `Subject: ${data.subject}`,
-            priority: data.category === 'DISCIPLINARY' ? 'HIGH' : 'MEDIUM',
-            category: data.category as any
+            user_id: data.receiverId,
+            message: `New ${data.category} message from ${sender.name}: ${data.subject}`
         });
 
         return {
@@ -237,11 +231,9 @@ export async function getSimpleMessages(userId: number, type: 'inbox' | 'sent' =
             where: whereClause,
             include: {
                 sender: {
-                    select: { id: true, name: true, matricule: true },
                     include: { user_roles: true }
                 },
                 receiver: {
-                    select: { id: true, name: true, matricule: true },
                     include: { user_roles: true }
                 }
             },
