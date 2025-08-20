@@ -2,10 +2,10 @@
   "name": "school-management-sync",
   "version": "1.0.0",
   "description": "School Management System with Database Synchronization",
-  "main": "dist/app.js",
+  "main": "dist/server.js",
   "scripts": {
     "build": "tsc --noEmitOnError false",
-    "start": "node dist/app.js",
+    "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
