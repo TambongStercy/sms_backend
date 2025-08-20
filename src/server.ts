@@ -2,14 +2,18 @@
 import app from './app';
 import dotenv from 'dotenv';
 import { AddressInfo } from 'net';
-import { scheduleAverageCalculations } from './scripts/scheduledTasks';
+// import { scheduleAverageCalculations } from './scripts/scheduledTasks';
+import { SyncService } from './sync/sync-service';
 
 // Load environment variables (if not already loaded in app.ts)
 dotenv.config();
 
 // Get port from environment variable or use default port (with fallbacks)
-const DEFAULT_PORT = 3000;
+const DEFAULT_PORT = 4000;
 const PORT = parseInt(process.env.PORT || DEFAULT_PORT.toString(), 10);
+
+// Initialize sync service
+const syncService = new SyncService();
 
 // Function to start server with automatic port selection if default is in use
 function startServer(port: number) {
@@ -24,7 +28,10 @@ function startServer(port: number) {
         }
 
         // Start scheduled tasks
-        scheduleAverageCalculations();
+        // scheduleAverageCalculations();
+        
+        // Initialize sync service
+        syncService.initialize().catch(console.error);
     })
         .on('error', (error: NodeJS.ErrnoException) => {
             if (error.code === 'EACCES') {
@@ -41,3 +48,16 @@ function startServer(port: number) {
 console.log("Starting server on port", PORT);
 // Start the server
 startServer(PORT);
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  await syncService.shutdown();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully');
+  await syncService.shutdown();
+  process.exit(0);
+});
