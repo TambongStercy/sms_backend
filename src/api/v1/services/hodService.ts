@@ -205,7 +205,7 @@ export async function getDepartmentOverview(hodId: number, academicYearId?: numb
             });
 
             const averageMarks = marks.length > 0
-                ? marks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / marks.length
+                ? marks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / marks.length
                 : 0;
 
             teachersAssigned.push({
@@ -238,7 +238,7 @@ export async function getDepartmentOverview(hodId: number, academicYearId?: numb
         });
 
         const averagePerformance = subjectMarks.length > 0
-            ? subjectMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / subjectMarks.length
+            ? subjectMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / subjectMarks.length
             : 0;
 
         overviews.push({
@@ -366,7 +366,7 @@ export async function getTeachersInDepartment(
             });
 
             const averageMarks = marks.length > 0
-                ? marks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / marks.length
+                ? marks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / marks.length
                 : 0;
 
             subjectsTeaching.push({
@@ -422,7 +422,7 @@ export async function getTeachersInDepartment(
             });
 
             const averageMarks = classMarks.length > 0
-                ? classMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / classMarks.length
+                ? classMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / classMarks.length
                 : 0;
 
             classesTeaching.push({
@@ -449,13 +449,13 @@ export async function getTeachersInDepartment(
 
         const totalStudents = subjectsTeaching.reduce((total, subject) => total + subject.studentCount, 0);
         const overallAverage = allMarks.length > 0
-            ? allMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / allMarks.length
+            ? allMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / allMarks.length
             : 0;
         const passRate = allMarks.length > 0
-            ? (allMarks.filter(mark => (mark.score ?? 0 || 0) >= 10).length / allMarks.length) * 100
+            ? (allMarks.filter(mark => ((mark.score ?? 0) || 0) >= 10).length / allMarks.length) * 100
             : 0;
         const excellentRate = allMarks.length > 0
-            ? (allMarks.filter(mark => (mark.score ?? 0 || 0) >= 16).length / allMarks.length) * 100
+            ? (allMarks.filter(mark => ((mark.score ?? 0) || 0) >= 16).length / allMarks.length) * 100
             : 0;
 
         teachersInDepartment.push({
@@ -552,15 +552,15 @@ export async function getSubjectPerformance(
             total + scs.sub_class.enrollments.length, 0);
 
         const averageMarks = subjectMarks.length > 0
-            ? subjectMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / subjectMarks.length
+            ? subjectMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / subjectMarks.length
             : 0;
 
         const passRate = subjectMarks.length > 0
-            ? (subjectMarks.filter(mark => (mark.score ?? 0 || 0) >= 10).length / subjectMarks.length) * 100
+            ? (subjectMarks.filter(mark => ((mark.score ?? 0) || 0) >= 10).length / subjectMarks.length) * 100
             : 0;
 
         const excellentRate = subjectMarks.length > 0
-            ? (subjectMarks.filter(mark => (mark.score ?? 0 || 0) >= 16).length / subjectMarks.length) * 100
+            ? (subjectMarks.filter(mark => ((mark.score ?? 0) || 0) >= 16).length / subjectMarks.length) * 100
             : 0;
 
         // Class breakdown
@@ -571,7 +571,7 @@ export async function getSubjectPerformance(
             );
 
             const classAverage = classMarks.length > 0
-                ? classMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / classMarks.length
+                ? classMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / classMarks.length
                 : 0;
 
             // Get primary teacher for this class-subject combination
@@ -608,7 +608,7 @@ export async function getSubjectPerformance(
                     marks: []
                 });
             }
-            sequenceMap.get(key).marks.push(mark.score ?? 0 || 0);
+            sequenceMap.get(key).marks.push((mark.score ?? 0) || 0);
         });
 
         const performanceTrends = Array.from(sequenceMap.values()).map(trend => ({
@@ -779,11 +779,11 @@ export async function getDepartmentAnalytics(
         });
 
         const overallAverage = allMarks.length > 0
-            ? allMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / allMarks.length
+            ? allMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / allMarks.length
             : 0;
 
         const overallPassRate = allMarks.length > 0
-            ? (allMarks.filter(mark => (mark.score ?? 0 || 0) >= 10).length / allMarks.length) * 100
+            ? (allMarks.filter(mark => ((mark.score ?? 0) || 0) >= 10).length / allMarks.length) * 100
             : 0;
 
         // Find top and lowest performing classes
@@ -798,7 +798,7 @@ export async function getDepartmentAnalytics(
                     marks: []
                 });
             }
-            classPerformanceMap.get(classId).marks.push(mark.score ?? 0 || 0);
+            classPerformanceMap.get(classId).marks.push((mark.score ?? 0) || 0);
         });
 
         const classAverages = Array.from(classPerformanceMap.entries()).map(([classId, data]) => ({
@@ -831,7 +831,7 @@ export async function getDepartmentAnalytics(
                 });
             }
             const teacherData = teacherPerformanceMap.get(teacherId);
-            teacherData.marks.push(mark.score ?? 0 || 0);
+            teacherData.marks.push((mark.score ?? 0) || 0);
             teacherData.classes.add(mark.sub_class_subject.sub_class_id);
             teacherData.students.add(mark.enrollment_id);
         });
@@ -853,7 +853,7 @@ export async function getDepartmentAnalytics(
                 if (!map.has(month)) {
                     map.set(month, { marks: [], students: new Set() });
                 }
-                map.get(month).marks.push(mark.score ?? 0 || 0);
+                map.get(month).marks.push((mark.score ?? 0) || 0);
                 map.get(month).students.add(mark.enrollment_id);
                 return map;
             }, new Map()).entries()
@@ -960,15 +960,15 @@ export async function getTeacherPerformance(
     // Calculate performance metrics
     const totalMarks = marks.length;
     const averageScore = totalMarks > 0
-        ? marks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / totalMarks
+        ? marks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / totalMarks
         : 0;
 
     const passRate = totalMarks > 0
-        ? (marks.filter(mark => (mark.score ?? 0 || 0) >= 10).length / totalMarks) * 100
+        ? (marks.filter(mark => ((mark.score ?? 0) || 0) >= 10).length / totalMarks) * 100
         : 0;
 
     const excellentRate = totalMarks > 0
-        ? (marks.filter(mark => (mark.score ?? 0 || 0) >= 16).length / totalMarks) * 100
+        ? (marks.filter(mark => ((mark.score ?? 0) || 0) >= 16).length / totalMarks) * 100
         : 0;
 
     // Group by subject
@@ -982,7 +982,7 @@ export async function getTeacherPerformance(
                 marks: []
             };
         }
-        acc[subjectId].marks.push(mark.score ?? 0 || 0);
+        acc[subjectId].marks.push((mark.score ?? 0) || 0);
         return acc;
     }, {} as Record<number, { subjectName: string; marks: number[] }>);
 
@@ -1007,7 +1007,7 @@ export async function getTeacherPerformance(
                 marks: []
             };
         }
-        acc[subClassId].marks.push(mark.score ?? 0 || 0);
+        acc[subClassId].marks.push((mark.score ?? 0) || 0);
         return acc;
     }, {} as Record<number, { subClassName: string; className: string; marks: number[] }>);
 
@@ -1108,11 +1108,11 @@ export async function getHODDashboard(hodId: number, academicYearId?: number): P
     });
 
     const departmentAverage = allMarks.length > 0
-        ? allMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / allMarks.length
+        ? allMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / allMarks.length
         : 0;
 
     const overallPassRate = allMarks.length > 0
-        ? (allMarks.filter(mark => (mark.score ?? 0 || 0) >= 10).length / allMarks.length) * 100
+        ? (allMarks.filter(mark => ((mark.score ?? 0) || 0) >= 10).length / allMarks.length) * 100
         : 0;
 
     return {

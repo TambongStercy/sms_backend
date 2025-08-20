@@ -351,10 +351,10 @@ export async function getPerformanceMetrics(academicYearId?: number): Promise<Pe
             );
 
             const averageScore = allMarks.length > 0 ?
-                allMarks.reduce((sum, mark) => sum + mark.score ?? 0, 0) / allMarks.length : 0;
+                allMarks.reduce((sum, mark) => sum + mark.score || 0, 0) / allMarks.length : 0;
 
             const passRate = allMarks.length > 0 ?
-                (allMarks.filter(mark => mark.score ?? 0 >= 10).length / allMarks.length) * 100 : 0;
+                (allMarks.filter(mark => mark.score || 0 >= 10).length / allMarks.length) * 100 : 0;
 
             return {
                 subjectName: subject.name,
@@ -391,10 +391,10 @@ export async function getPerformanceMetrics(academicYearId?: number): Promise<Pe
         const processedClassPerformance = classPerformance.map(subClass => {
             const allMarks = subClass.enrollments.flatMap(enrollment => enrollment.marks);
             const averageScore = allMarks.length > 0 ?
-                allMarks.reduce((sum, mark) => sum + mark.score ?? 0, 0) / allMarks.length : 0;
+                allMarks.reduce((sum, mark) => sum + mark.score || 0, 0) / allMarks.length : 0;
 
             const passRate = allMarks.length > 0 ?
-                (allMarks.filter(mark => mark.score ?? 0 >= 10).length / allMarks.length) * 100 : 0;
+                (allMarks.filter(mark => mark.score || 0 >= 10).length / allMarks.length) * 100 : 0;
 
             const teacherName = subClass.teacher_periods[0]?.teacher?.name || 'No Teacher Assigned';
 
@@ -461,7 +461,7 @@ export async function getPerformanceMetrics(academicYearId?: number): Promise<Pe
             );
 
             const averageStudentPerformance = allMarks.length > 0 ?
-                allMarks.reduce((sum, mark) => sum + mark.score ?? 0, 0) / allMarks.length : 0;
+                allMarks.reduce((sum, mark) => sum + mark.score || 0, 0) / allMarks.length : 0;
 
             return {
                 teacherName: teacher.name,

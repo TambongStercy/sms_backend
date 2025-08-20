@@ -180,7 +180,7 @@ export async function getParentDashboard(parentId: number, academicYearId?: numb
             // Get latest marks
             const latestMarks: MarkSummary[] = currentEnrollment?.marks?.slice(0, 3).map(mark => ({
                 subject_name: mark.sub_class_subject.subject.name,
-                latest_mark: mark.score ?? 0 || 0,
+                latest_mark: (mark.score ?? 0) || 0,
                 sequence: 'Recent', // TODO: Get sequence from exam_sequence
                 date: mark.created_at
             })) || [];
@@ -384,7 +384,7 @@ export async function getChildDetails(parentId: number, studentId: number, acade
                 const performance = subjectPerformanceMap.get(subjectId)!;
                 performance.marks.push({
                     sequence: 'Sequence', // TODO: Get from exam_sequence
-                    mark: mark.score ?? 0 || 0,
+                    mark: (mark.score ?? 0) || 0,
                     total: 20, // TODO: Get from exam configuration
                     date: mark.created_at
                 });
@@ -855,18 +855,18 @@ async function calculatePerformanceAnalytics(marks: any[]): Promise<any> {
         if (!acc[subjectName]) {
             acc[subjectName] = [];
         }
-        acc[subjectName].push(mark.score ?? 0 || 0);
+        acc[subjectName].push((mark.score ?? 0) || 0);
         return acc;
     }, {} as Record<string, number[]>);
 
     // Calculate overall average
-    const totalMarks = marks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0);
+    const totalMarks = marks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0);
     const overallAverage = totalMarks / marks.length;
 
     // Calculate improvement trend (compare first half vs second half of marks)
     const midpoint = Math.floor(marks.length / 2);
-    const firstHalfAvg = marks.slice(0, midpoint).reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / midpoint;
-    const secondHalfAvg = marks.slice(midpoint).reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / (marks.length - midpoint);
+    const firstHalfAvg = marks.slice(0, midpoint).reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / midpoint;
+    const secondHalfAvg = marks.slice(midpoint).reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / (marks.length - midpoint);
 
     let improvementTrend = 'Stable';
     if (secondHalfAvg > firstHalfAvg + 2) {
@@ -1040,7 +1040,7 @@ async function calculateSubjectTrends(marks: any[]): Promise<any[]> {
             acc[subjectName] = [];
         }
         acc[subjectName].push({
-            mark: mark.score ?? 0 || 0,
+            mark: (mark.score ?? 0) || 0,
             date: mark.created_at,
             sequence: mark.exam_sequence?.name || 'Unknown'
         });
@@ -1118,13 +1118,13 @@ async function calculateComparativeAnalytics(studentId: number, subClassId: numb
 
     const studentMarks = classmates.find(c => c.student_id === studentId)?.marks || [];
     const studentAverage = studentMarks.length > 0
-        ? studentMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / studentMarks.length
+        ? studentMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / studentMarks.length
         : 0;
 
     // Calculate class average
     const allMarks = classmates.flatMap(c => c.marks);
     const classAverage = allMarks.length > 0
-        ? allMarks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / allMarks.length
+        ? allMarks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / allMarks.length
         : 0;
 
     // Calculate ranking
@@ -1132,7 +1132,7 @@ async function calculateComparativeAnalytics(studentId: number, subClassId: numb
         const marks = c.marks;
         return {
             student_id: c.student_id,
-            average: marks.length > 0 ? marks.reduce((sum, mark) => sum + (mark.score ?? 0 || 0), 0) / marks.length : 0
+            average: marks.length > 0 ? marks.reduce((sum, mark) => sum + ((mark.score ?? 0) || 0), 0) / marks.length : 0
         };
     }).sort((a, b) => b.average - a.average);
 

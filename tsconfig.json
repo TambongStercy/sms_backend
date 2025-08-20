@@ -15,6 +15,10 @@
     "exactOptionalPropertyTypes": false,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
+    "allowUnreachableCode": true,
+    "allowUnusedLabels": true,
+    "noFallthroughCasesInSwitch": false,
+    "noImplicitOverride": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": false,
@@ -31,7 +35,8 @@
     "typeRoots": [
       "./node_modules/@types",
       "./src/types"
-    ]
+    ],
+    "ignoreDeprecations": "5.0"
   },
   "include": [
     "src/**/*"

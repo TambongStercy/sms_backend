@@ -771,7 +771,7 @@ async function generateStudentReportData(
     const students = Array.from(studentsMap.values());
     // Calculate stats as in subclass method
     const studentsWithAverages = students.map(stuEntry => {
-        const totalWeighted = stuEntry.marks.reduce((sum: number, m: any) => sum + m.score ?? 0 * m.coefficient, 0);
+        const totalWeighted = stuEntry.marks.reduce((sum: number, m: any) => sum + (m.score ?? 0) * m.coefficient, 0);
         const totalCoef = stuEntry.marks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
         const overallAverage = totalCoef > 0 ? totalWeighted / totalCoef : 0;
         return { studentId: stuEntry.student.matricule, overallAverage };
@@ -790,7 +790,7 @@ async function generateStudentReportData(
         throw new Error('Internal error: Could not find student in processed student list.');
     }
 
-    const totalWeightedStudentSingle = updatedStudentEntry.marks.reduce((sum: number, m: any) => sum + m.score ?? 0 * m.coefficient, 0);
+    const totalWeightedStudentSingle = updatedStudentEntry.marks.reduce((sum: number, m: any) => sum + (m.score ?? 0) * m.coefficient, 0);
     const totalCoefStudentSingle = updatedStudentEntry.marks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
     const overallAverage = totalCoefStudentSingle > 0 ? totalWeightedStudentSingle / totalCoefStudentSingle : 0;
     const rankIndex = studentsWithAverages.findIndex(st => st.studentId === updatedStudentEntry.student.matricule);
@@ -865,7 +865,7 @@ async function generateStudentReportData(
         const studentCategoryAverages = students.map(stuEntry => {
             const studentCatMarks = stuEntry.marks.filter((m: any) => m.category === category);
             if (studentCatMarks.length === 0) return { studentId: stuEntry.student.matricule, average: 0 };
-            const catTotalWeighted = studentCatMarks.reduce((sum: number, m: any) => sum + m.score ?? 0 * m.coefficient, 0);
+            const catTotalWeighted = studentCatMarks.reduce((sum: number, m: any) => sum + (m.score ?? 0) * m.coefficient, 0);
             const catTotalCoef = studentCatMarks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
             return { studentId: stuEntry.student.matricule, average: catTotalCoef > 0 ? catTotalWeighted / catTotalCoef : 0 };
         }).sort((a, b) => b.average - a.average);

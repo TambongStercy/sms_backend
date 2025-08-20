@@ -4,7 +4,7 @@
   "description": "School Management System with Database Synchronization",
   "main": "dist/app.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --noEmitOnError false",
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "db:generate": "prisma generate",

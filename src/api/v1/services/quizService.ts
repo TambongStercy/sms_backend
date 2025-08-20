@@ -337,10 +337,9 @@ export async function submitQuiz(submissionId: number, responses: QuizResponseDa
                 data: {
                     submission_id: submissionId,
                     question_id: response.question_id,
-                    selected_answer: response.selected_answer,
+                    answer: response.selected_answer,
                     is_correct: isCorrect,
-                    marks_earned: marksEarned,
-                    time_spent: response.time_spent
+                    marks_awarded: marksEarned
                 }
             });
 
@@ -478,9 +477,9 @@ export async function getDetailedQuizResults(submissionId: number, parentId: num
                 question: question.question_text,
                 options: question.options ? JSON.parse(question.options as string) : null,
                 correct_answer: question.correct_answer,
-                student_answer: response?.selected_answer || 'Not answered',
+                student_answer: response?.answer || 'Not answered',
                 is_correct: response?.is_correct || false,
-                marks_earned: response?.marks_earned || 0,
+                marks_earned: response?.marks_awarded || 0,
                 total_marks: question.marks,
                 explanation: question.explanation
             };
