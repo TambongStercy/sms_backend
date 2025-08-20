@@ -60,7 +60,7 @@ router.get('/',
         const userRoles = req.user?.roles || [];
         const isTeacher = userRoles.includes('TEACHER');
         const hasHigherRole = userRoles.some((role: string) =>
-            ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER'].includes(role)
+            ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR'].includes(role)
         );
 
         if (isTeacher && !hasHigherRole) {
@@ -93,7 +93,7 @@ router.get('/:id',
         const userRoles = req.user?.roles || [];
         const isTeacher = userRoles.includes('TEACHER');
         const hasHigherRole = userRoles.some((role: string) =>
-            ['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL'].includes(role)
+            ['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR'].includes(role)
         );
 
         if (isTeacher && !hasHigherRole) {
@@ -144,7 +144,7 @@ router.get('/:id/status',
         const userRoles = req.user?.roles || [];
         const isTeacher = userRoles.includes('TEACHER');
         const hasHigherRole = userRoles.some((role: string) =>
-            ['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR'].includes(role)
+            ['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR'].includes(role)
         );
 
         if (isTeacher && !hasHigherRole) {
@@ -184,7 +184,7 @@ router.get('/class/:classId',
         const userRoles = req.user?.roles || [];
         const isTeacher = userRoles.includes('TEACHER');
         const hasHigherRole = userRoles.some((role: string) =>
-            ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL'].includes(role)
+            ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR'].includes(role)
         );
 
         if (isTeacher && !hasHigherRole) {
