@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { saveFileMetadata, deleteFile } from '../services/fileService';
 
 interface CustomRequest extends Request {
-    file: Express.Multer.File;
+    file?: Express.Multer.File;
 }
 
 /**

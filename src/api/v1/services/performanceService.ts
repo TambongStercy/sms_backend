@@ -110,7 +110,7 @@ async function buildStudentPerformanceData(enrollment: any): Promise<StudentPerf
     const subjectAverages: { [subject: string]: number } = {};
 
     marks.forEach(mark => {
-        totalMarksObtained += mark.score;
+        totalMarksObtained += mark.score ?? 0;
         // For now, assume each subject has a maximum of 20 points per exam
         totalPossibleMarks += 20;
     });

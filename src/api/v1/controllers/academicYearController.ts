@@ -394,7 +394,7 @@ export const getAvailableAcademicYearsForRole = async (req: Request, res: Respon
             academicYears: academicYears.map(year => ({
                 ...year,
                 studentCount: year._count?.enrollments || 0,
-                classCount: year.terms?.length || 0,
+                termCount: year.terms?.length || 0,
                 status: year.is_current ? 'ACTIVE' :
                     new Date(year.end_date) < new Date() ? 'COMPLETED' : 'UPCOMING'
             })),

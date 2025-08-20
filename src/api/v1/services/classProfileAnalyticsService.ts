@@ -167,15 +167,15 @@ async function calculateAcademicPerformance(enrollments: any[]): Promise<any> {
     // Calculate average grade
     const validMarks = allMarks.filter(m => m.score !== null);
     const averageGrade = validMarks.length > 0
-      ? validMarks.reduce((sum, mark) => sum + mark.score, 0) / validMarks.length
+      ? validMarks.reduce((sum: number, mark: any) => sum + mark.score, 0) / validMarks.length
       : 0;
 
     // Get student averages
     const studentAverages = enrollments.map(enrollment => {
       const studentMarks = enrollment.marks || [];
-      const validStudentMarks = studentMarks.filter(m => m.score !== null);
+      const validStudentMarks = studentMarks.filter((m: any): m is typeof m & {score: number} => m.score !== null);
       const studentAverage = validStudentMarks.length > 0
-        ? validStudentMarks.reduce((sum, mark) => sum + mark.score, 0) / validStudentMarks.length
+        ? validStudentMarks.reduce((sum: number, mark: any) => sum + mark.score, 0) / validStudentMarks.length
         : 0;
 
       return {

@@ -180,7 +180,7 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
                 },
                 parent: {
                     id: parentUser.id,
-                    matricule: parentUser.matricule,
+                    matricule: parentUser.matricule || '',
                     name: parentUser.name,
                     email: parentUser.email,
                     phone: parentUser.phone,
@@ -312,7 +312,7 @@ export async function getAvailableParents(searchTerm?: string, limit: number = 2
             name: parent.name,
             email: parent.email,
             phone: parent.phone,
-            matricule: parent.matricule,
+            matricule: parent.matricule || '',
             children_count: parent.parent_students.length,
             children: parent.parent_students.map(link => ({
                 id: link.student.id,

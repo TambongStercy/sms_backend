@@ -771,7 +771,7 @@ async function generateStudentReportData(
     const students = Array.from(studentsMap.values());
     // Calculate stats as in subclass method
     const studentsWithAverages = students.map(stuEntry => {
-        const totalWeighted = stuEntry.marks.reduce((sum: number, m: any) => sum + m.score * m.coefficient, 0);
+        const totalWeighted = stuEntry.marks.reduce((sum: number, m: any) => sum + m.score ?? 0 * m.coefficient, 0);
         const totalCoef = stuEntry.marks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
         const overallAverage = totalCoef > 0 ? totalWeighted / totalCoef : 0;
         return { studentId: stuEntry.student.matricule, overallAverage };
@@ -790,7 +790,7 @@ async function generateStudentReportData(
         throw new Error('Internal error: Could not find student in processed student list.');
     }
 
-    const totalWeightedStudentSingle = updatedStudentEntry.marks.reduce((sum: number, m: any) => sum + m.score * m.coefficient, 0);
+    const totalWeightedStudentSingle = updatedStudentEntry.marks.reduce((sum: number, m: any) => sum + m.score ?? 0 * m.coefficient, 0);
     const totalCoefStudentSingle = updatedStudentEntry.marks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
     const overallAverage = totalCoefStudentSingle > 0 ? totalWeightedStudentSingle / totalCoefStudentSingle : 0;
     const rankIndex = studentsWithAverages.findIndex(st => st.studentId === updatedStudentEntry.student.matricule);
@@ -804,11 +804,11 @@ async function generateStudentReportData(
                 subjectStats.set(subClassSubjectId, { scores: [], min: Infinity, max: -Infinity, total: 0, passed: 0 });
             }
             const stats = subjectStats.get(subClassSubjectId)!;
-            stats.scores.push(m.score);
-            stats.min = Math.min(stats.min, m.score);
-            stats.max = Math.max(stats.max, m.score);
-            stats.total += m.score;
-            if (m.score >= 10) stats.passed += 1;
+            stats.scores.push(m.score ?? 0);
+            stats.min = Math.min(stats.min, m.score ?? 0);
+            stats.max = Math.max(stats.max, m.score ?? 0);
+            stats.total += m.score ?? 0;
+            if (m.score ?? 0 >= 10) stats.passed += 1;
         }
     }
     subjectStats.forEach(stats => {
@@ -827,15 +827,15 @@ async function generateStudentReportData(
             category: m.category,
             name: m.subject_name,
             coefficient: m.coefficient,
-            mark: m.score,
-            weightedMark: m.score * m.coefficient,
+            mark: m.score ?? 0,
+            weightedMark: m.score ?? 0 * m.coefficient,
             rank: subjectRank,
             teacher: m.teacher_name,
             min: stats.min === Infinity ? 0 : stats.min,
             avg: parseFloat((stats.avg || 0).toFixed(2)),
             max: stats.max === -Infinity ? 0 : stats.max,
             successRate: parseFloat((stats.successRate || 0).toFixed(2)),
-            grade: getGrade(m.score),
+            grade: getGrade(m.score ?? 0),
         };
     });
     // Prepare category summaries
@@ -865,7 +865,7 @@ async function generateStudentReportData(
         const studentCategoryAverages = students.map(stuEntry => {
             const studentCatMarks = stuEntry.marks.filter((m: any) => m.category === category);
             if (studentCatMarks.length === 0) return { studentId: stuEntry.student.matricule, average: 0 };
-            const catTotalWeighted = studentCatMarks.reduce((sum: number, m: any) => sum + m.score * m.coefficient, 0);
+            const catTotalWeighted = studentCatMarks.reduce((sum: number, m: any) => sum + m.score ?? 0 * m.coefficient, 0);
             const catTotalCoef = studentCatMarks.reduce((sum: number, m: any) => sum + m.coefficient, 0);
             return { studentId: stuEntry.student.matricule, average: catTotalCoef > 0 ? catTotalWeighted / catTotalCoef : 0 };
         }).sort((a, b) => b.average - a.average);
@@ -911,7 +911,7 @@ async function generateStudentReportData(
         statistics: {
             overallAverage: overallAverage.toFixed(2),
             rank,
-            subjectsPassed: updatedStudentEntry.marks.filter((m: any) => m.score >= 10).length,
+            subjectsPassed: updatedStudentEntry.marks.filter((m: any) => m.score ?? 0 >= 10).length,
             classStats: classStats
         },
         examSequence: {

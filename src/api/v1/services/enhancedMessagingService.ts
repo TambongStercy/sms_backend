@@ -478,7 +478,7 @@ export async function sendMessage(data: {
             data: {
                 sender_id: data.senderId,
                 receiver_id: data.receiverId,
-                subject: data.subject,
+                subject: data.subject || 'No Subject',
                 content: data.content,
                 status: 'SENT'
             },

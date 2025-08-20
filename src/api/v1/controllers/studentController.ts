@@ -50,6 +50,14 @@ export const getAllStudents = async (req: Request, res: Response) => {
         const academic_year_id = req.finalQuery.academic_year_id ?
             parseInt(req.finalQuery.academic_year_id as string) : currentAcademicYearId;
 
+        if (!academic_year_id) {
+            res.status(400).json({
+                success: false,
+                error: 'Academic year ID is required'
+            });
+            return;
+        }
+
         // Call the service function that handles enrollment-based filtering
         const result = await studentService.getAllStudentsWithCurrentEnrollment(
             academic_year_id,
@@ -306,10 +314,10 @@ export const getStudentEnrollmentPhoto = async (req: Request, res: Response): Pr
             parseInt(req.query.academic_year_id as string) :
             await getAcademicYearId();
 
-        if (isNaN(studentId)) {
+        if (isNaN(studentId) || !academicYearId) {
             res.status(400).json({
                 success: false,
-                error: 'Invalid student ID format'
+                error: 'Invalid student ID format or missing academic year'
             });
             return;
         }

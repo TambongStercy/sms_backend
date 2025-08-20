@@ -7,6 +7,11 @@ export async function getAllAcademicYears(): Promise<AcademicYear[]> {
         include: {
             terms: true,
             exam_sequences: true,
+            _count: {
+                select: {
+                    enrollments: true
+                }
+            }
         }
     });
 }
@@ -247,6 +252,7 @@ export async function getAcademicYearsForUserRole(userId: number, role: string):
         },
         include: {
             terms: true,
+            exam_sequences: true,
             _count: {
                 select: {
                     enrollments: true

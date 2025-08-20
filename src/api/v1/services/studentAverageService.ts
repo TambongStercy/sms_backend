@@ -66,7 +66,7 @@ export const calculateAndSaveStudentAverages = async (
             let totalCoefficient = 0;
 
             marks.forEach((mark) => {
-                totalWeightedScore += mark.score * mark.sub_class_subject.coefficient;
+                totalWeightedScore += mark.score ?? 0 * mark.sub_class_subject.coefficient;
                 totalCoefficient += mark.sub_class_subject.coefficient;
             });
 

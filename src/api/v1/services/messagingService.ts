@@ -393,7 +393,7 @@ export async function getUserConversations(userId: number): Promise<Conversation
                     id: partnerId,
                     name: partner.name,
                     role: userRole?.role || 'PARENT',
-                    matricule: partner.matricule,
+                    matricule: partner.matricule || '',
                     unreadCount,
                     lastMessage: {
                         content: message.content.substring(0, 100) + (message.content.length > 100 ? '...' : ''),

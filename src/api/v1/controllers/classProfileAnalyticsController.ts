@@ -189,8 +189,8 @@ export async function getClassDashboardSummary(req: Request, res: Response) {
                 feeCollectionRate: analytics.finances.collectionRate,
                 disciplineIncidents: analytics.discipline.totalIncidents
             },
-            alerts: [],
-            recommendations: []
+            alerts: [] as Array<{type: string, level: string, message: string}>,
+            recommendations: [] as string[]
         };
 
         // Add alerts based on performance
@@ -271,10 +271,10 @@ export async function getClassInsights(req: Request, res: Response) {
 
         // Generate insights based on analytics
         const insights = {
-            strengths: [],
-            weaknesses: [],
-            opportunities: [],
-            threats: []
+            strengths: [] as string[],
+            weaknesses: [] as string[],
+            opportunities: [] as string[],
+            threats: [] as string[]
         };
 
         // Analyze strengths
