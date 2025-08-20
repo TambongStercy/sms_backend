@@ -116,19 +116,10 @@ async function seedAcademicYears() {
     const academicYears = await Promise.all([
         prisma.academicYear.create({
             data: {
-                name: '2024-2025',
-                start_date: new Date('2024-09-01'),
-                end_date: new Date('2025-06-30'),
-                is_current: true,
-                report_deadline: new Date('2025-07-15'),
-            }
-        }),
-        prisma.academicYear.create({
-            data: {
                 name: '2025-2026',
                 start_date: new Date('2025-09-01'),
                 end_date: new Date('2026-06-30'),
-                is_current: false,
+                is_current: true,
                 report_deadline: new Date('2026-07-15'),
             }
         })
@@ -321,23 +312,19 @@ async function seedUserRoles(users: any[], academicYears: any[]) {
     console.log('🎭 Seeding User Roles...');
 
     const currentYearId = academicYears.find(y => y.is_current)?.id;
-    const nextYearId = academicYears.find(y => y.name === '2025-2026')?.id;
 
     const userRoles = [
         // Super Manager - Global role
         { user_id: users[0].id, role: Role.SUPER_MANAGER, academic_year_id: null },
 
-        // Principal - Current and next year
+        // Principal - Current year only
         { user_id: users[1].id, role: Role.PRINCIPAL, academic_year_id: currentYearId },
-        { user_id: users[1].id, role: Role.PRINCIPAL, academic_year_id: nextYearId },
 
-        // Vice Principal - Current and next year
+        // Vice Principal - Current year only
         { user_id: users[2].id, role: Role.VICE_PRINCIPAL, academic_year_id: currentYearId },
-        { user_id: users[2].id, role: Role.VICE_PRINCIPAL, academic_year_id: nextYearId },
 
-        // Bursar - Current and next year
+        // Bursar - Current year only
         { user_id: users[3].id, role: Role.BURSAR, academic_year_id: currentYearId },
-        { user_id: users[3].id, role: Role.BURSAR, academic_year_id: nextYearId },
 
         // Discipline Master - Current year
         { user_id: users[4].id, role: Role.DISCIPLINE_MASTER, academic_year_id: currentYearId },
@@ -929,28 +916,28 @@ async function seedTermsAndExamSequences(academicYearId: number) {
         prisma.term.create({
             data: {
                 name: 'First Term',
-                start_date: new Date('2024-09-01'),
-                end_date: new Date('2024-12-15'),
+                start_date: new Date('2025-09-01'),
+                end_date: new Date('2025-12-15'),
                 academic_year_id: academicYearId,
-                fee_deadline: new Date('2024-10-15'),
+                fee_deadline: new Date('2025-10-15'),
             }
         }),
         prisma.term.create({
             data: {
                 name: 'Second Term',
-                start_date: new Date('2025-01-15'),
-                end_date: new Date('2025-04-15'),
+                start_date: new Date('2026-01-15'),
+                end_date: new Date('2026-04-15'),
                 academic_year_id: academicYearId,
-                fee_deadline: new Date('2025-02-15'),
+                fee_deadline: new Date('2026-02-15'),
             }
         }),
         prisma.term.create({
             data: {
                 name: 'Third Term',
-                start_date: new Date('2025-04-20'),
-                end_date: new Date('2025-06-30'),
+                start_date: new Date('2026-04-20'),
+                end_date: new Date('2026-06-30'),
                 academic_year_id: academicYearId,
-                fee_deadline: new Date('2025-05-15'),
+                fee_deadline: new Date('2026-05-15'),
             }
         })
     ]);
