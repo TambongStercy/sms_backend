@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -22,7 +22,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+app.use((express.json as any)({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Initialize sync service
@@ -32,7 +32,7 @@ const syncService = new SyncService();
 app.use('/api', syncRoutes);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -42,7 +42,7 @@ app.get('/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', error);
   
   res.status(error.status || 500).json({
@@ -54,7 +54,7 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 });
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use('*', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: 'Route not found'
