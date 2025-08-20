@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger/swagger';
 import path from 'path';
-import rateLimit from 'express-rate-limit';
 import { convertCamelToSnakeCase, convertSnakeToCamelCase } from './api/v1/middleware/caseConversion.middleware';
 import syncRoutes from './sync/sync-routes';
 import apiV1Routes from './api/v1/routes/index';
@@ -36,12 +35,6 @@ app.use(cors({
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
 
 // Middleware
 app.use(express.json());
