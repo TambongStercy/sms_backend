@@ -2,24 +2,35 @@ import prisma from '../config/db';
 import { Role } from '@prisma/client';
 
 const STAFF_MATRICULE_PREFIX = 'SS';
-const STUDENT_MATRICULE_PREFIX = 'SS'; // As per your format SS{YY}STU{NNN}
-const STUDENT_TYPE_CODE = 'STU';
+const STUDENT_MATRICULE_PREFIX = 'SS'; // As per your format SS{YY}STD{NNN}
+const STUDENT_TYPE_CODE = 'STD';
 
 const POSITION_CODES = {
     SUPER_MANAGER: 'CEO',
     MANAGER: 'SA',
+    PRINCIPAL: 'SA',
+    VICE_PRINCIPAL: 'SA', 
+    BURSAR: 'SA',
     TEACHER: 'ST',
-    OTHERS: 'SO' // For other staff roles like Principal, Bursar etc.
+    HOD: 'ST',
+    DISCIPLINE_MASTER: 'SO',
+    GUIDANCE_COUNSELOR: 'SO',
+    PARENT: 'SO'
 };
 
 // Defines the hierarchy for determining the matricule position code.
 // Highest role in this list that the user has will determine the code.
 const MATRICULE_ROLE_PRIORITY: Role[] = [
-    Role.SUPER_MANAGER,    // CEO prefix
-    Role.MANAGER,          // SA prefix  
-    Role.TEACHER,          // ST prefix
-    Role.HOD,              // ST prefix (Head of Department is teacher role)
-    // All other roles (PRINCIPAL, VICE_PRINCIPAL, BURSAR, DISCIPLINE_MASTER, GUIDANCE_COUNSELOR, PARENT) get SO prefix
+    Role.SUPER_MANAGER,       // CEO prefix
+    Role.MANAGER,             // SA prefix  
+    Role.PRINCIPAL,           // SA prefix
+    Role.VICE_PRINCIPAL,      // SA prefix
+    Role.BURSAR,              // SA prefix
+    Role.TEACHER,             // ST prefix
+    Role.HOD,                 // ST prefix (Head of Department is teacher role)
+    Role.DISCIPLINE_MASTER,   // SO prefix
+    Role.GUIDANCE_COUNSELOR,  // SO prefix
+    Role.PARENT               // SO prefix
 ];
 
 /**
@@ -29,7 +40,7 @@ const MATRICULE_ROLE_PRIORITY: Role[] = [
  */
 export function getPositionCodeForRoles(roles: Role[] | undefined | null): string {
     if (!roles || roles.length === 0) {
-        return POSITION_CODES.OTHERS; // Or handle as an error/specific default
+        return 'SO'; // Default fallback for users without roles
     }
 
     for (const priorityRole of MATRICULE_ROLE_PRIORITY) {
@@ -39,15 +50,27 @@ export function getPositionCodeForRoles(roles: Role[] | undefined | null): strin
                     return POSITION_CODES.SUPER_MANAGER;
                 case Role.MANAGER:
                     return POSITION_CODES.MANAGER;
+                case Role.PRINCIPAL:
+                    return POSITION_CODES.PRINCIPAL;
+                case Role.VICE_PRINCIPAL:
+                    return POSITION_CODES.VICE_PRINCIPAL;
+                case Role.BURSAR:
+                    return POSITION_CODES.BURSAR;
                 case Role.TEACHER:
-                case Role.HOD:  // HOD gets same prefix as TEACHER (ST)
                     return POSITION_CODES.TEACHER;
+                case Role.HOD:
+                    return POSITION_CODES.HOD;
+                case Role.DISCIPLINE_MASTER:
+                    return POSITION_CODES.DISCIPLINE_MASTER;
+                case Role.GUIDANCE_COUNSELOR:
+                    return POSITION_CODES.GUIDANCE_COUNSELOR;
+                case Role.PARENT:
+                    return POSITION_CODES.PARENT;
             }
         }
     }
-    // If none of the priority roles for CEO, SA, ST are found, but the user has roles,
-    // they are considered 'OTHERS'. This covers Principal, VP, Bursar, etc.
-    return POSITION_CODES.OTHERS;
+    // Default fallback if no roles match
+    return 'SO';
 }
 
 /**
@@ -143,7 +166,7 @@ async function getNextStudentSequenceNumber(yearLastTwoDigits: string): Promise<
 
 /**
  * Generates a new student matricule.
- * SS{YY}STU{NNN}
+ * SS{YY}STD{NNN}
  * @param customYear Optional: Full year (e.g., 2023). Defaults to current year.
  * @returns Generated student matricule string.
  */

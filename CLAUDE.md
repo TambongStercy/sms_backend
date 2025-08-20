@@ -5,27 +5,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Core Development
-- **Start development server**: `npm run dev` (uses nodemon with TypeScript)
-- **Build for production**: `npm run build` (compiles TypeScript, generates Prisma client, copies assets)
+- **Start development server**: `npm run dev` (uses ts-node-dev with TypeScript)
+- **Build for production**: `npm run build` (compiles TypeScript only)
 - **Start production server**: `npm start` (runs from dist/)
-- **Build for Vercel**: `npm run vercel-build` (TypeScript compilation only)
 
 ### Database Operations
-- **Deploy migrations**: `npm run prisma:deploy`
-- **Generate Prisma client**: `npx prisma generate` (auto-runs after npm install)
-- **Create migration**: `npx prisma migrate dev --name <migration_name>`
-- **Seed periods**: `npm run seed-periods`
-- **Seed test data**: `npm run seed:test`
+- **Generate Prisma client**: `npm run db:generate` (or `npx prisma generate`)
+- **Push schema to database**: `npm run db:push` (or `npx prisma db push`)
+- **Create and apply migration**: `npm run db:migrate` (or `npx prisma migrate dev`)
+- **Open Prisma Studio**: `npm run db:studio` (or `npx prisma studio`)
 
-### Utility Scripts
-- **Generate Swagger docs**: `npm run swagger-docs`
-- **Create super manager**: `npm run create-super-manager`
-- **Import students**: `npm run import-students`
-- **Start report worker**: `npm run start:worker`
+### Sync Operations (Database Synchronization System)
+- **Trigger manual sync**: `npm run sync:trigger` (POST request to sync endpoint)
+- **Check sync status**: `npm run sync:status` (GET sync status)
+
+### Production Seeding
+- **Comprehensive production seed**: `npm run seed:production` (Seeds complete production data: academic years, users, classes, subjects, periods, terms)
 
 ### Testing Commands
 - **Check enrollments**: `node check-enrollments.js`
 - **HTTP API tests**: Use files in `tests/` directory and `.http` files
+- **Shell script tests**: `./test-all-endpoints.sh`, `./test-corrected-endpoints.sh`
 
 ## Architecture Overview
 
@@ -33,11 +33,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Runtime**: Node.js with TypeScript
 - **Framework**: Express.js with comprehensive middleware stack
 - **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: JWT tokens with role-based authorization
+- **Authentication**: JWT tokens with role-based authorization and token blacklisting
 - **Documentation**: Swagger/OpenAPI with comprehensive schemas
-- **Report Generation**: Puppeteer for PDF generation with EJS templates
-- **File Handling**: Multer for uploads, static file serving
-- **Background Jobs**: BullMQ with Redis for report generation workers
+- **Rate Limiting**: Express rate limiting middleware
+- **Security**: Helmet.js for security headers, CORS for cross-origin requests
+- **Database Synchronization**: Custom sync system for offline/online server synchronization
 
 ### Project Structure
 ```
@@ -51,15 +51,18 @@ src/api/v1/
 src/config/
 ├── db.ts          # Prisma client configuration
 ├── auth.ts        # JWT configuration
-├── queue.ts       # BullMQ configuration
 └── swagger/       # Complete API documentation system
+
+src/sync/          # Database synchronization system
+                   # Handles bidirectional sync between VPS and local servers
+                   # Includes conflict resolution and network monitoring
 
 prisma/
 └── schema.prisma  # Single source of truth for database schema
 
 workflows/          # Detailed business logic and role-specific workflows
-                    # These documents explain user journeys, system interactions,
-                    # and often include API endpoint references for context.
+                   # These documents explain user journeys, system interactions,
+                   # and often include API endpoint references for context.
 ```
 
 ### Critical Data Conversion Pattern
@@ -157,3 +160,9 @@ To ensure smooth development and avoid common issues, keep the following in mind
 -   **Foreign Key Constraints**: Before deleting any entity (e.g., `Class`, `SubClass`, `Subject`, `AcademicYear`), **always perform a check for dependent records** (e.g., `enrollments`, `sub_classes`, `marks`). If dependent records exist, prevent deletion and return a `409 Conflict` error with a clear message.
 -   **Error Handling Consistency**: Adhere to the standard `{ success: false, error: "message" }` format for all error responses and use appropriate HTTP status codes (400, 401, 403, 404, 409, 500).
 -   **Prisma Schema as Source of Truth**: Any changes to database models must first be made in `prisma/schema.prisma`, followed by a migration (`npx prisma migrate dev`).
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

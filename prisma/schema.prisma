@@ -402,21 +402,7 @@ model TeacherPeriod {
 }
 
 // Simplified timetable model is now removed.
-/**
- * model TimeTable {
- * id           Int       @id @default(autoincrement())
- * sub_class_id Int
- * day_of_week  DayOfWeek
- * period_time  String
- * subject_name String?
- * teacher_name String?
- * is_saved     Boolean   @default(false) // Auto-save functionality
- * created_at   DateTime  @default(now())
- * updated_at   DateTime  @updatedAt
- * sub_class    SubClass  @relation(fields: [sub_class_id], references: [id])
- * @@unique([sub_class_id, day_of_week, period_time])
- * }
- */
+// The TimeTable functionality is handled by TeacherPeriod model
 
 model PaymentTransaction {
   id               Int           @id @default(autoincrement())
@@ -653,7 +639,7 @@ enum Role {
   VICE_PRINCIPAL // SA prefix
   BURSAR // SA prefix
   TEACHER // ST prefix
-  DISCIPLINE_MASTER // SDM instead of DM, SO prefix
+  DISCIPLINE_MASTER // SDM instead of DM
   GUIDANCE_COUNSELOR // SO prefix
   PARENT // SO prefix
   HOD // Head of Department, ST prefix
@@ -836,16 +822,15 @@ model QuizResponse {
   id              Int      @id @default(autoincrement())
   submission_id   Int
   question_id     Int
-  selected_answer String
-  is_correct      Boolean  @default(false)
-  marks_earned    Int      @default(0)
-  time_spent      Int? // Seconds spent on this question
+  answer          String
+  is_correct      Boolean?
+  marks_awarded   Int      @default(0)
   created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   submission QuizSubmission @relation(fields: [submission_id], references: [id], onDelete: Cascade)
   question   QuizQuestion   @relation(fields: [question_id], references: [id])
 
-  @@unique([submission_id, question_id])
   @@index([submission_id])
   @@index([question_id])
 }
@@ -855,5 +840,33 @@ enum QuizStatus {
   IN_PROGRESS
   SUBMITTED
   COMPLETED
+  GRADED
   EXPIRED
 }
+
+// Sync-related models
+model SyncMetadata {
+  id          Int      @id @default(autoincrement())
+  timestamp   DateTime @default(now())
+  server_type String   // 'local' or 'remote'
+  server_id   String?
+  created_at  DateTime @default(now())
+}
+
+model SyncLog {
+  id                Int      @id @default(autoincrement())
+  sync_id           String
+  start_time        DateTime
+  end_time          DateTime?
+  status            String   // PENDING, IN_PROGRESS, COMPLETED, FAILED
+  direction         String   // PUSH, PULL, BIDIRECTIONAL
+  records_processed Int      @default(0)
+  conflicts         String?  // JSON string
+  errors            String?  // JSON string
+  created_at        DateTime @default(now())
+
+  @@index([sync_id])
+  @@index([start_time])
+}
+
+

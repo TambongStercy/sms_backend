@@ -1,134 +1,88 @@
-// src/app.ts
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-import swaggerUi from 'swagger-ui-express';
-import swaggerSpec from './config/swagger/swagger';
-import path from 'path';
-import { convertCamelToSnakeCase, convertSnakeToCamelCase } from './api/v1/middleware/caseConversion.middleware';
-
-// Load environment variables from .env file
-dotenv.config();
-
-// Import your API routes (you can create an index.ts inside src/api/v1/routes)
-import routes from './api/v1/routes';
+import rateLimit from 'express-rate-limit';
+import { SyncService } from './sync/sync-service';
+import syncRoutes from './sync/sync-routes';
 
 const app = express();
 
-// Security middleware - but allow Swagger UI to work correctly
-app.use(
-    helmet({
-        contentSecurityPolicy: false, // This helps with Swagger UI rendering
-    })
-);
-
-// Enable CORS for all routes - flexible configuration for development and production
+// Security middleware
+app.use(helmet());
 app.use(cors({
-    origin: [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'https://sms.sniperbuisnesscenter.com',
-        // Add more origins as needed for production
-    ],
-    credentials: true, // Allow credentials (cookies, authorization headers)
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  credentials: true
 }));
 
-// Middleware
-app.use(express.json());
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// HTTP request logging
-app.use(morgan('dev'));
+// Initialize sync service
+const syncService = new SyncService();
 
-// --- FIX for Static File CORS ---
-// The 'cors' middleware package doesn't always apply to express.static.
-// This custom middleware ensures CORS headers are set for all static file requests.
+// Routes
+app.use('/api', syncRoutes);
 
-const setStaticCorsHeaders = (req: Request, res: Response, next: NextFunction) => {
-    // This allows any origin. For better security in production, you might restrict this
-    // to your specific frontend domains, e.g., 'https://sms.sniperbuisnesscenter.com'
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    // This header is also important for allowing cross-origin image embedding
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    next();
-};
-
-// Serve static files from the 'uploads' directory, applying the CORS headers.
-// These two routes handle all subdirectories (students, users, defaults) and both URL structures.
-app.use('/uploads', setStaticCorsHeaders, express.static(path.join(process.cwd(), 'uploads')));
-app.use('/api/v1/uploads', setStaticCorsHeaders, express.static(path.join(process.cwd(), 'uploads')));
-
-
-// Log the number of routes and schemas in Swagger
-if (swaggerSpec && swaggerSpec.paths) {
-    console.log(`Swagger loaded with ${Object.keys(swaggerSpec.paths).length} endpoints`);
-    if (swaggerSpec.components && swaggerSpec.components.schemas) {
-        console.log(`Swagger loaded with ${Object.keys(swaggerSpec.components.schemas).length} schemas`);
-    }
-}
-
-// Setup Swagger documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    explorer: true, // Enable the search functionality
-    swaggerOptions: {
-        persistAuthorization: true, // Persist authorization data
-    },
-}));
-
-// Get Swagger JSON
-app.get('/api-docs.json', (req: Request, res: Response) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.send(swaggerSpec);
+// Health check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    server_id: process.env.SERVER_ID,
+    server_type: process.env.SERVER_TYPE
+  });
 });
 
-// Apply case conversion middlewares GLOBALLY before API routes
-app.use(convertCamelToSnakeCase); // Converts incoming camelCase query/body to snake_case
-app.use(convertSnakeToCamelCase); // Converts outgoing snake_case responses to camelCase
-
-// Mount API routes under /api/v1
-app.use('/api/v1', routes);
-
-// Health-check or root endpoint
-app.get('/', (req: Request, res: Response) => {
-    res.send('School Management System API is up and running!');
+// Error handling middleware
+app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Error:', error);
+  
+  res.status(error.status || 500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' 
+      ? 'Internal server error' 
+      : error.message
+  });
 });
 
-// Health check endpoint for monitoring - multiple paths to ensure compatibility
-app.get('/api/health', (req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', message: 'Service is running', version: process.env.npm_package_version || '1.0.0' });
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found'
+  });
 });
 
-// Additional health check at the path shown in the screenshot
-app.get('/api/v1/health', (req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', message: 'Service is running', version: process.env.npm_package_version || '1.0.0' });
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  await syncService.shutdown();
+  process.exit(0);
 });
 
-// Endpoint to download the 1-1-1 report PDF from the root directory
-app.get('/download/report/1-1-1', (req: Request, res: Response) => {
-    const filePath = path.join(process.cwd(), '1-1-1report.pdf');
-    // Use res.download to send the file as an attachment
-    (res as any).download(filePath, '1-1-1report.pdf', (err: any) => {
-        if (err) {
-            // Handle errors, e.g., file not found
-            console.error("Error sending file:", err);
-            if (!res.headersSent) {
-                // Check if headers were already sent (e.g., by internal Express error handling)
-                // Type assertion needed as Express types might not fully cover this scenario
-                const nodeError = err as NodeJS.ErrnoException;
-                if (nodeError.code === 'ENOENT') {
-                    res.status(404).send({ success: false, error: 'Report file not found.' });
-                } else {
-                    res.status(500).send({ success: false, error: 'Could not download the file.' });
-                }
-            }
-        }
-    });
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully');
+  await syncService.shutdown();
+  process.exit(0);
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`Server Type: ${process.env.SERVER_TYPE}`);
+  
+  // Initialize sync service
+  await syncService.initialize();
 });
 
 export default app;

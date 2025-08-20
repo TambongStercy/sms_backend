@@ -1,460 +1,256 @@
-# School Management System
+# School Management System with Database Synchronization
 
-## Overview
-
-This is a comprehensive School Management System backend API built with TypeScript, Node.js, Express, and PostgreSQL. The system helps educational institutions manage their academic operations, including student information, classes, exams, marks, report cards, attendance, and more.
-
-## Table of Contents
-
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Technology Stack](#technology-stack)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Environment Variables](#environment-variables)
-  - [Database Setup](#database-setup)
-  - [Running the Application](#running-the-application)
-- [Deployment](#deployment)
-  - [Deploying to Render](#deploying-to-render)
-- [API Documentation](#api-documentation)
-  - [API Endpoints](#api-endpoints)
-- [Authentication & Authorization](#authentication--authorization)
-- [Core Modules](#core-modules)
-- [Database Schema](#database-schema)
-- [Contributing](#contributing)
-- [Testing](#testing)
-- [Development Guidelines](#development-guidelines)
+A robust school management system with bidirectional database synchronization between online (VPS) and offline (local school) servers.
 
 ## Features
 
-- **User Management**
-  - Different user roles (Admin, Principal, Vice Principal, Teacher, Student, Parent)
-  - Authentication and authorization
-  - User profiles and settings
+- **Bidirectional Sync**: Automatic synchronization between VPS and local servers
+- **Offline-First**: Full functionality when internet is unavailable
+- **Conflict Resolution**: Smart conflict resolution with business logic
+- **Real-time Updates**: Immediate sync when network is restored
+- **Comprehensive Logging**: Detailed sync logs and error tracking
 
-- **Academic Management**
-  - Classes and subclasses
-  - Academic years and terms
-  - Subject management
-  - Teacher assignments
-
-- **Student Management**
-  - Student enrollment
-  - Student profiles
-  - Parent-student associations
-
-- **Exam Management**
-  - Exam creation and scheduling
-  - Question management
-  - Marking system
-  - Report card generation
-  - Statistical analysis of performance
-
-- **Attendance Management**
-  - Student attendance tracking
-  - Teacher attendance tracking
-  - Discipline issue recording
-
-- **Finance Management**
-  - School fees management
-  - Payment tracking
-  - Financial reporting
-
-- **Communication**
-  - Announcements
-  - Mobile notifications
-  - Targeted audience messaging
-
-- **File Management**
-  - Document uploads
-  - Media storage and retrieval
-
-## Project Structure
-
-The project follows a modular architecture organized by feature:
+## Architecture
 
 ```
-src/
-├── api/                    # API modules
-│   └── v1/                 # API version 1
-│       ├── controllers/    # Request handlers
-│       ├── middleware/     # Custom middleware
-│       ├── models/         # Data models
-│       ├── routes/         # API routes
-│       ├── services/       # Business logic
-│       ├── swagger/        # API documentation
-│       ├── docs/           # Additional documentation
-│       └── utils/          # API-specific utilities
-├── config/                 # Configuration files
-├── reports/                # Report templates and generation
-├── types/                  # TypeScript type definitions
-├── utils/                  # Utility functions
-├── view/                   # View templates
-├── app.ts                  # Express application setup
-├── script.ts               # Utility scripts
-├── seed.ts                 # Database seed data
-└── server.ts               # Server entry point
+┌─────────────────┐    ┌─────────────────┐
+│   VPS Server    │◄──►│  Local Server   │
+│   (Online)      │    │  (School)       │
+│                 │    │                 │
+│ - Admin Data    │    │ - Classroom     │
+│ - Reports       │    │   Data          │
+│ - Payments      │    │ - Attendance    │
+│ - Announcements │    │ - Real-time     │
+└─────────────────┘    │   Operations    │
+                       └─────────────────┘
 ```
 
-### Key API Modules
+## Setup Instructions
 
-The system is divided into the following main API modules:
+### 1. Environment Configuration
 
-- **Authentication** (`/auth`) - User registration, login, password reset
-- **Academic Years** (`/academic-years`) - Manage school academic calendar
-- **Users** (`/users`) - User management for all roles
-- **Classes** (`/classes`) - Class and subclass management
-- **Students** (`/students`) - Student records and operations
-- **Fees** (`/fees`) - School fees and payment management
-- **Subjects** (`/subjects`) - Academic subjects and teacher assignments
-- **Discipline** (`/discipline`) - Student discipline management
-- **Attendance** (`/attendance`) - Student and teacher attendance
-- **Exams** (`/exams`) - Exam creation and management
-- **Marks** (`/marks`) - Student grading and marks
-- **Report Cards** (`/report-cards`) - Academic performance reports
-- **Communication** - Announcements and notifications
-- **Mobile** (`/mobile`) - Mobile app specific endpoints
-- **Files** (`/uploads`) - File upload and management
+Copy `.env.example` to `.env` and configure:
 
-## Technology Stack
-
-- **Backend Framework**: Node.js with Express
-- **Language**: TypeScript
-- **Database**: PostgreSQL
-- **ORM**: Prisma
-- **Authentication**: JSON Web Tokens (JWT)
-- **Documentation**: Swagger/OpenAPI
-- **Report Generation**: HTML/PDF generation for report cards
-- **File Storage**: Local file system with configurable paths
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v14 or higher)
-- npm or yarn
-- PostgreSQL database
-
-### Installation
-
-1. Clone the repository
-   ```bash
-   git clone <repository-url>
-   cd School_Management_System
-   ```
-
-2. Install dependencies
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-### Environment Variables
-
-Create a `.env` file in the root directory with the following variables:
-
+```bash
+cp .env.example .env
 ```
-# Database
-DATABASE_URI=postgresql://username:password@localhost:5432/school_management_db
 
-# Server
-PORT=3000
+**For VPS Server:**
+```env
+NODE_ENV=production
+SERVER_TYPE=remote
+SERVER_ID=vps_main_001
+DATABASE_URL_PRODUCTION="postgresql://user:pass@localhost:5432/school_db"
+REMOTE_SYNC_URL=http://school-local-ip:3000/api/sync
+```
+
+**For Local School Server:**
+```env
 NODE_ENV=development
-
-# JWT
-JWT_SECRET=your-secret-key
-JWT_EXPIRES_IN=7d
-
-# Other configuration
-UPLOAD_DIR=./uploads
+SERVER_TYPE=local
+SERVER_ID=local_school_001
+DATABASE_URL_DEVELOPMENT="postgresql://user:pass@localhost:5432/school_db_local"
+REMOTE_SYNC_URL=https://your-vps.com/api/sync
 ```
 
-### Database Setup
+### 2. Database Setup
 
-1. Create a PostgreSQL database
-   ```sql
-   CREATE DATABASE school_management_db;
-   ```
-
-2. Run Prisma migrations
-   ```bash
-   npx prisma migrate dev
-   ```
-
-3. Seed the database (optional)
-   ```bash
-   npm run seed
-   # or
-   yarn seed
-   ```
-
-### Running the Application
-
-Development mode:
 ```bash
+# Install dependencies
+npm install
+
+# Generate Prisma client
+npm run db:generate
+
+# Push schema to database
+npm run db:push
+
+# Or run migrations
+npm run db:migrate
+```
+
+### 3. Start the Application
+
+```bash
+# Development
 npm run dev
-# or
-yarn dev
-```
 
-Production mode:
-```bash
+# Production
 npm run build
 npm start
-# or
-yarn build
-yarn start
 ```
 
-## Deployment
+## Sync Configuration
 
-### Deploying to Render
+### Automatic Sync
+- Runs every 5 minutes by default
+- Configurable via `AUTO_SYNC_INTERVAL` environment variable
+- Automatically triggers when network is restored
 
-This application can be deployed to Render as a Web Service. Follow these steps to deploy:
-
-1. Create a new Web Service in Render and connect your GitHub repository.
-
-2. Configure the following settings:
-   - **Environment**: Node
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
-   - **Node Version**: 16 or higher (recommended)
-
-3. Add the necessary environment variables in the Render dashboard:
-   - `DATABASE_URL`: Your PostgreSQL connection string
-   - `JWT_SECRET`: Secret key for JWT authentication
-   - `NODE_ENV`: Set to `production`
-   - Other environment variables as needed
-
-4. For database, you can either:
-   - Use Render's PostgreSQL managed database service
-   - Connect to an external PostgreSQL database
-
-5. Once deployed, Render will automatically build and start your application whenever you push changes to your repository.
-
-**Note**: The repository is configured with a special `postbuild` script that creates necessary directories and copies templates for report generation, ensuring proper functionality in the Render environment.
-
-## API Documentation
-
-The API documentation is available via Swagger UI at `/api-docs` when the server is running. It provides detailed information about all available endpoints, request/response formats, and authentication requirements.
-
-The complete OpenAPI specification is also available in JSON format at `/api-docs.json`. This can be useful for:
-- Importing the API collection into tools like Postman or Insomnia
-- Generating client libraries for various programming languages
-- Offline documentation reference
-- Integration with third-party API management tools
-
-To download the specification file, you can use:
+### Manual Sync
 ```bash
-curl http://localhost:3000/api-docs.json -o api-docs.json
+# Trigger manual sync
+npm run sync:trigger
+
+# Check sync status
+npm run sync:status
 ```
 
 ### API Endpoints
 
-The API is organized into logical modules with the following base paths:
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/sync/trigger` | POST | Trigger manual sync |
+| `/api/sync/status` | GET | Get sync status |
+| `/api/sync/logs` | GET | Get sync history |
+| `/api/sync/auto/start` | POST | Start auto sync |
+| `/api/sync/auto/stop` | POST | Stop auto sync |
 
-| Base Path | Description |
-|-----------|-------------|
-| `/api/v1/auth` | Authentication endpoints |
-| `/api/v1/academic-years` | Academic year management |
-| `/api/v1/users` | User management |
-| `/api/v1/classes` | Class and subclass management |
-| `/api/v1/students` | Student management |
-| `/api/v1/fees` | School fees management |
-| `/api/v1/subjects` | Subject management |
-| `/api/v1/exams` | Exam management |
-| `/api/v1/marks` | Student marks management |
-| `/api/v1/report-cards` | Report card generation |
-| `/api/v1/discipline` | Student discipline issues |
-| `/api/v1/attendance` | Attendance tracking |
-| `/api/v1/mobile` | Mobile-specific endpoints |
-| `/api/v1/uploads` | File upload and management |
+## Conflict Resolution Strategy
 
-## Authentication & Authorization
+### Business Logic Rules
 
-The system uses JWT (JSON Web Tokens) for authentication. The `authenticate` middleware verifies tokens, and the `authorize` middleware controls access based on user roles.
+1. **Student Attendance**: Local server wins (real-time data)
+2. **Payment Transactions**: VPS server wins (authoritative)
+3. **User Passwords**: Latest change wins
+4. **Marks/Grades**: Latest entry wins (teacher corrections)
+5. **Administrative Data**: VPS server wins
 
-Different endpoints have different authorization requirements:
-- Some endpoints are accessible by all authenticated users
-- Some endpoints require specific roles (e.g., ADMIN, PRINCIPAL, TEACHER)
-- Some endpoints have data-level permissions (e.g., teachers can only view their assigned students)
+### Conflict Types
 
-Example of protected route implementation:
-```typescript
-router.get('/students', authenticate, authorize(['ADMIN', 'PRINCIPAL', 'TEACHER']), studentController.getAllStudents);
+- **LOCAL_WINS**: Local data takes precedence
+- **REMOTE_WINS**: Remote data takes precedence  
+- **TIMESTAMP_WINS**: Most recent change wins
+- **MERGE**: Combine both values
+- **MANUAL**: Requires manual intervention
+
+## Data Sync Priority
+
+### High Priority (Synced First)
+- Users and authentication
+- Academic years and terms
+- Classes and subjects
+- Student enrollments
+
+### Medium Priority
+- Marks and grades
+- Attendance records
+- Teacher assignments
+
+### Low Priority
+- Reports and analytics
+- Announcements
+- Audit logs
+
+## Network Handling
+
+### Online Mode
+- Real-time bidirectional sync
+- Immediate conflict resolution
+- Full feature availability
+
+### Offline Mode
+- Local operations continue
+- Changes queued for sync
+- Automatic sync when online
+
+### Network Recovery
+- Automatic detection
+- Immediate sync trigger
+- Conflict resolution
+
+## Monitoring and Logging
+
+### Sync Logs
+```javascript
+{
+  "sync_id": "1703123456789",
+  "start_time": "2023-12-21T10:30:00Z",
+  "status": "COMPLETED",
+  "records_processed": 150,
+  "conflicts": 2,
+  "errors": []
+}
 ```
 
-## Core Modules
+### Health Checks
+- `/health` - Server health
+- `/api/sync/health` - Sync service health
+- Network connectivity monitoring
 
-### User Management
+## Security Considerations
 
-The system supports multiple user roles with different permissions:
-- **Admin**: Full system access
-- **Principal**: School-wide management
-- **Vice Principal**: Assists principal in management
-- **Discipline Master**: Handles discipline issues
-- **Bursar**: Manages school finances
-- **Teacher**: Manages classes, subjects, and marks
-- **Parent**: Views their children's information
-- **Student**: Views own information
+- API key authentication for sync endpoints
+- Rate limiting on sync operations
+- Encrypted data transmission
+- Server ID validation
+- Audit trail for all changes
 
-### Exam Management
+## Deployment
 
-The exam system allows for:
-- Creating and scheduling exams
-- Managing exam papers and questions
-- Recording student marks
-- Generating report cards with academic performance
-- Analyzing results with statistics and rankings
+### VPS Deployment
+```bash
+# Clone repository
+git clone <repo-url>
+cd school-management-sync
 
-Key features include:
-- Individual student report cards
-- Class-wide report cards
-- Performance statistics (min, max, average scores)
-- Grade calculations
-- Student ranking
+# Install dependencies
+npm install
 
-### Class & Subject Management
+# Set production environment
+export NODE_ENV=production
+export SERVER_TYPE=remote
 
-- Classes can have multiple subclasses
-- Subjects can be assigned to specific subclasses
-- Teachers can be assigned to teach specific subjects
-- The system tracks periods and teaching schedules
+# Build and start
+npm run build
+npm start
+```
 
-### Mobile App Integration
+### Local School Deployment
+```bash
+# Same steps but with local configuration
+export NODE_ENV=development
+export SERVER_TYPE=local
+```
 
-The system includes API endpoints specifically designed for mobile app integration, available under the `/api/v1/mobile` path. These endpoints provide:
+## Troubleshooting
 
-- **Mobile Dashboard**: Personalized dashboard data for different user roles
-- **Push Notifications**: Registration and delivery of notifications to mobile devices
-- **Optimized Responses**: Data formatted specifically for mobile consumption
-- **Authentication**: Specialized authentication flows for mobile clients
+### Common Issues
 
-Mobile app developers can reference the API documentation at `/api-docs` for detailed information about the mobile endpoints.
+1. **Sync Failures**
+   - Check network connectivity
+   - Verify API keys
+   - Review sync logs
 
-## Database Schema
+2. **Database Conflicts**
+   - Check conflict resolution logs
+   - Manual resolution may be required
+   - Verify server IDs
 
-The database uses a relational model with the following key entities:
+3. **Performance Issues**
+   - Adjust sync intervals
+   - Monitor database performance
+   - Check network latency
 
-- **AcademicYear**: School academic calendar years
-- **User**: System users with various roles
-- **UserRole**: Role assignments for users
-- **Student**: Student information and profiles
-- **Enrollment**: Student enrollment in classes
-- **Class/Subclass**: School class structure
-- **Subject/SubclassSubject**: Academic subjects and their assignment to classes
-- **SubjectTeacher**: Teacher assignments to subjects
-- **ExamSequence/ExamPaper**: Exam information and scheduling
-- **Question/ExamPaperQuestion**: Exam questions and their structure
-- **Mark**: Student exam performance records
-- **StudentAbsence/TeacherAbsence**: Attendance tracking
-- **DisciplineIssue**: Student discipline records
-- **SchoolFees/PaymentTransaction**: Financial records
-- **Announcement/MobileNotification**: Communication records
+### Debug Commands
+```bash
+# Check sync status
+curl http://localhost:3000/api/sync/status
+
+# View recent logs
+curl http://localhost:3000/api/sync/logs
+
+# Test network connectivity
+curl http://localhost:3000/api/sync/health
+```
 
 ## Contributing
 
-1. Create a new branch for features or fixes
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-2. Follow the coding style and patterns used in the project
-   - Use TypeScript interfaces for data structures
-   - Follow the controller-service-repository pattern
-   - Add proper error handling
-   - Document your code with JSDoc comments
-
-3. Write appropriate tests for your changes
-
-4. Submit a pull request with a description of your changes
-
-## Testing
-
-Run the test suite with:
-```bash
-npm test
-# or
-yarn test
-```
-
-For specific test files:
-```bash
-npm test -- path/to/test
-# or
-yarn test path/to/test
-```
-
-## Development Guidelines
-
-### Adding New API Endpoints
-
-1. Create or modify the appropriate controller in `src/api/v1/controllers/`
-2. Implement the business logic in a service in `src/api/v1/services/`
-3. Add the route to the appropriate router in `src/api/v1/routes/`
-4. Document the endpoint with Swagger annotations
-5. Update tests to cover the new functionality
-
-### Database Changes
-
-1. Modify the Prisma schema in `prisma/schema.prisma`
-2. Generate a migration:
-   ```bash
-   npx prisma migrate dev --name descriptive-name
-   ```
-3. Update related services and controllers
-4. Update TypeScript types if necessary
-
-### Best Practices
-
-- Always validate user input
-- Use proper error handling and consistent error responses
-- Implement role-based access control for all endpoints
-- Keep controller methods focused on request/response handling
-- Put business logic in service files
-- Use transactions for operations that modify multiple database records
-
-### Using Swagger for Development
-
-Swagger UI provides a powerful interactive tool for testing and exploring the API during development:
-
-1. **Testing Endpoints**: Use the Swagger UI to send requests directly from your browser
-2. **Exploring Parameters**: View all required and optional parameters for each endpoint
-3. **Authentication**: Test endpoints with authentication by clicking the "Authorize" button
-4. **Schema Inspection**: View the data models and response schemas
-
-To properly document new endpoints, add Swagger JSDoc comments to your route files:
-
-```typescript
-/**
- * @swagger
- * /api/v1/your-path:
- *   get:
- *     summary: Brief description of your endpoint
- *     description: Detailed description of what this endpoint does
- *     tags: [YourTagName]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: paramName
- *         in: query
- *         description: Description of the parameter
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Success response description
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/YourResponseType'
- */
-```
-
-This approach ensures that all API changes are automatically reflected in the documentation. 
+1. Fork the repository
+2. Create feature branch
+3. Add tests for new functionality
+4. Submit pull request
 
 ## License
 
-[MIT](LICENSE) 
+MIT License - see LICENSE file for details

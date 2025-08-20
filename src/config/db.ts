@@ -5,7 +5,8 @@ import {
     DisciplineIssue, RoleAssignment, AssignmentRole,
     Period, TeacherPeriod, ExamPaper, ExamPaperQuestion, Question, QuestionType, NotificationStatus,
     DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole, ExamSequenceStatus, ReportStatus, UserStatus,
-    ReportType, Prisma, QuizTemplate, QuizQuestion, QuizSubmission, QuizResponse, QuizStatus
+    ReportType, Prisma, QuizTemplate, QuizQuestion, QuizSubmission, QuizResponse, QuizStatus,
+    SyncMetadata, SyncLog
 } from '@prisma/client';
 import * as dotenv from 'dotenv';
 
@@ -30,7 +31,8 @@ export {
     DisciplineIssue, RoleAssignment, AssignmentRole,
     Period, TeacherPeriod, ExamPaper, ExamPaperQuestion, Question, QuestionType, NotificationStatus,
     DayOfWeek, Enrollment, StudentSequenceAverage, AverageStatus, UserRole, ExamSequenceStatus, ReportStatus, UserStatus,
-    ReportType, Prisma, QuizTemplate, QuizQuestion, QuizSubmission, QuizResponse, QuizStatus
+    ReportType, Prisma, QuizTemplate, QuizQuestion, QuizSubmission, QuizResponse, QuizStatus,
+    SyncMetadata, SyncLog
 };
 
 export default prisma; 

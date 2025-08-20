@@ -1,5 +1,5 @@
 import { PrismaClient, Gender, StudentStatus, Role, DisciplineType, AbsenceType, MessageStatus, AverageStatus, Student, Enrollment, User, Class, SubClass, Subject, Period, SchoolFees, Mark, StudentSequenceAverage, Message, DisciplineIssue, StudentAbsence, TeacherAbsence, InterviewMark, TeacherPeriod, QuizTemplate, QuizQuestion, QuizSubmission, QuizResponse, QuizStatus, PaymentMethod, DayOfWeek, SubjectCategory, ExamSequence, Term, Announcement } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -120,7 +120,6 @@ async function clearDatabase() {
     await prisma.mobileNotification.deleteMany();
     await prisma.announcement.deleteMany();
     await prisma.paymentTransaction.deleteMany();
-    await prisma.timeTable.deleteMany();
     await prisma.teacherAbsence.deleteMany();
     await prisma.studentAbsence.deleteMany();
     await prisma.disciplineIssue.deleteMany();
@@ -199,7 +198,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1980-01-15'),
                 phone: '+237670123001',
                 address: 'Yaounde, Cameroon',
-                matricule: 'CEO001',
+                matricule: 'SS24CEO0001',
                 status: 'ACTIVE',
             }
         }),
@@ -214,7 +213,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1975-03-20'),
                 phone: '+237670123002',
                 address: 'Yaounde, Cameroon',
-                matricule: 'SA001',
+                matricule: 'SS24SA0001',
                 status: 'ACTIVE',
             }
         }),
@@ -229,7 +228,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1978-07-10'),
                 phone: '+237670123003',
                 address: 'Yaounde, Cameroon',
-                matricule: 'SA002',
+                matricule: 'SS24SA0002',
                 status: 'ACTIVE',
             }
         }),
@@ -244,7 +243,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1982-11-05'),
                 phone: '+237670123004',
                 address: 'Yaounde, Cameroon',
-                matricule: 'SA003',
+                matricule: 'SS24SA0003',
                 status: 'ACTIVE',
             }
         }),
@@ -259,7 +258,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1979-04-18'),
                 phone: '+237670123005',
                 address: 'Yaounde, Cameroon',
-                matricule: 'SO001',
+                matricule: 'SS24SO0004',
                 status: 'ACTIVE',
             }
         }),
@@ -274,7 +273,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1985-06-12'),
                 phone: '+237670123006',
                 address: 'Yaounde, Cameroon',
-                matricule: 'ST001',
+                matricule: 'SS24ST0001',
                 status: 'ACTIVE',
                 total_hours_per_week: 20,
             }
@@ -289,7 +288,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1983-09-25'),
                 phone: '+237670123007',
                 address: 'Yaounde, Cameroon',
-                matricule: 'ST002',
+                matricule: 'SS24ST0002',
                 status: 'ACTIVE',
                 total_hours_per_week: 18,
             }
@@ -304,7 +303,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1987-02-14'),
                 phone: '+237670123008',
                 address: 'Yaounde, Cameroon',
-                matricule: 'ST003',
+                matricule: 'SS24ST0003',
                 status: 'ACTIVE',
                 total_hours_per_week: 16,
             }
@@ -319,7 +318,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1984-12-08'),
                 phone: '+237670123009',
                 address: 'Yaounde, Cameroon',
-                matricule: 'ST004',
+                matricule: 'SS24ST0004',
                 status: 'ACTIVE',
                 total_hours_per_week: 15,
             }
@@ -336,7 +335,7 @@ async function seedUsers() {
                 phone: '+237670123010',
                 whatsapp_number: '+237670123010',
                 address: 'Douala, Cameroon',
-                matricule: 'SO002',
+                matricule: 'SS24SO0001',
                 status: 'ACTIVE',
             }
         }),
@@ -351,7 +350,7 @@ async function seedUsers() {
                 phone: '+237670123011',
                 whatsapp_number: '+237670123011',
                 address: 'Bafoussam, Cameroon',
-                matricule: 'SO003',
+                matricule: 'SS24SO0002',
                 status: 'ACTIVE',
             }
         }),
@@ -366,7 +365,7 @@ async function seedUsers() {
                 phone: '+237670123012',
                 whatsapp_number: '+237670123012',
                 address: 'Yaounde, Cameroon',
-                matricule: 'SO004',
+                matricule: 'SS24SO0003',
                 status: 'ACTIVE',
             }
         }),
@@ -381,7 +380,7 @@ async function seedUsers() {
                 date_of_birth: new Date('1976-10-22'),
                 phone: '+237670123013',
                 address: 'Yaounde, Cameroon',
-                matricule: 'ST005',
+                matricule: 'SS24ST0005',
                 status: 'ACTIVE',
                 total_hours_per_week: 12,
             }
@@ -652,7 +651,7 @@ async function seedClassesAndSubclasses() {
 async function seedSubjects(users: any[]) {
     console.log('📚 Seeding Subjects...');
 
-    const hodUser = users.find(u => u.matricule === 'ST005'); // Dr. Science HOD
+    const hodUser = users.find(u => u.matricule === 'SS24ST0005'); // Dr. Science HOD
 
     const subjects = await Promise.all([
         // Science & Technology
@@ -784,7 +783,7 @@ async function seedStudents() {
         const data = studentData[i];
         const student = await prisma.student.create({
             data: {
-                matricule: `STD${String(i + 1).padStart(3, '0')}`,
+                matricule: `SS24STD${String(i + 1).padStart(3, '0')}`,
                 name: data.name,
                 date_of_birth: new Date(2008 + Math.floor(Math.random() * 5), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1),
                 place_of_birth: 'Cameroon',
@@ -849,7 +848,7 @@ async function seedEnrollments(students: Student[], classes: Class[], subclasses
 async function seedParentStudentRelationships(users: any[], students: any[]) {
     console.log('👨‍👩‍👧‍👦 Seeding Parent-Student Relationships...');
 
-    const parents = users.filter(u => u.matricule?.startsWith('SO') && ['SO002', 'SO003', 'SO004'].includes(u.matricule));
+    const parents = users.filter(u => u.matricule?.startsWith('SS24SO') && ['SS24SO0001', 'SS24SO0002', 'SS24SO0003'].includes(u.matricule));
 
     const relationships = [
         // Parent 1 has 2 children
@@ -886,7 +885,7 @@ async function seedParentStudentRelationships(users: any[], students: any[]) {
 async function seedTeacherAssignments(users: User[], subjects: Subject[], subclasses: SubClass[]) {
     console.log('👨‍🏫 Seeding Teacher Assignments...');
 
-    const teachers = users.filter(u => u.matricule?.startsWith('ST'));
+    const teachers = users.filter(u => u.matricule?.startsWith('SS24ST'));
 
     // Subject-Teacher assignments
     const subjectTeachers = [
@@ -1009,7 +1008,7 @@ async function seedSchoolFees(enrollments: Enrollment[], users: User[], academic
     console.log('💰 Seeding School Fees...');
 
     const fees: SchoolFees[] = [];
-    const bursar = users.find(u => u.matricule === 'SA003'); // Bursar user
+    const bursar = users.find(u => u.matricule === 'SS24SA0003'); // Bursar user
 
     for (const enrollment of enrollments) {
         // Get student info to determine if new student
@@ -1099,9 +1098,9 @@ async function seedPeriods() {
 async function seedTeacherPeriods(users: any[], subjects: any[], periods: any[], subclasses: any[], academicYearId: number) {
     console.log('📚 Seeding Teacher Periods (Timetable)...');
 
-    const teachers = users.filter(u => u.matricule?.startsWith('ST'));
+    const teachers = users.filter(u => u.matricule?.startsWith('SS24ST'));
     const nonBreakPeriods = periods.filter(p => !p.is_break);
-    const assignedBy = users.find(u => u.matricule === 'SA001'); // Principal
+    const assignedBy = users.find(u => u.matricule === 'SS24SA0001'); // Principal
 
     const teacherPeriods: TeacherPeriod[] = [];
 
@@ -1136,7 +1135,7 @@ async function seedTeacherPeriods(users: any[], subjects: any[], periods: any[],
 async function seedMarks(enrollments: any[], users: any[], examSequences: any[], subjects: any[], subclasses: any[]) {
     console.log('📊 Seeding Marks...');
 
-    const teachers = users.filter(u => u.matricule?.startsWith('ST'));
+    const teachers = users.filter(u => u.matricule?.startsWith('SS24ST'));
     const marks: Mark[] = [];
 
     for (const enrollment of enrollments.slice(0, 10)) { // Only for enrolled students
@@ -1207,8 +1206,8 @@ async function seedStudentSequenceAverages(enrollments: any[], examSequences: an
 async function seedQuizSystem(users: any[], subjects: any[], classes: any[], students: any[], academicYearId: number) {
     console.log('🧩 Seeding Quiz System...');
 
-    const teachers = users.filter(u => u.matricule?.startsWith('ST'));
-    const parents = users.filter(u => u.matricule?.startsWith('SO') && ['SO002', 'SO003', 'SO004'].includes(u.matricule));
+    const teachers = users.filter(u => u.matricule?.startsWith('SS24ST'));
+    const parents = users.filter(u => u.matricule?.startsWith('SS24SO') && ['SS24SO0001', 'SS24SO0002', 'SS24SO0003'].includes(u.matricule));
 
     // Create quiz templates
     const quizTemplates: QuizTemplate[] = [];
@@ -1291,8 +1290,8 @@ async function seedQuizSystem(users: any[], subjects: any[], classes: any[], stu
 async function seedDisciplineIssues(enrollments: any[], users: any[]) {
     console.log('⚠️ Seeding Discipline Issues...');
 
-    const sdm = users.find(u => u.matricule === 'SO001'); // Discipline Master
-    const principal = users.find(u => u.matricule === 'SA001'); // Principal
+    const sdm = users.find(u => u.matricule === 'SS24SO0004'); // Discipline Master
+    const principal = users.find(u => u.matricule === 'SS24SA0001'); // Principal
 
     const disciplineTypes = ['MORNING_LATENESS', 'CLASS_ABSENCE', 'MISCONDUCT', 'OTHER'];
     const issues: DisciplineIssue[] = [];
@@ -1323,8 +1322,8 @@ async function seedDisciplineIssues(enrollments: any[], users: any[]) {
 async function seedAttendanceRecords(enrollments: any[], users: any[]) {
     console.log('📅 Seeding Attendance Records...');
 
-    const sdm = users.find(u => u.matricule === 'SO001'); // Discipline Master
-    const teachers = users.filter(u => u.matricule?.startsWith('ST'));
+    const sdm = users.find(u => u.matricule === 'SS24SO0004'); // Discipline Master
+    const teachers = users.filter(u => u.matricule?.startsWith('SS24ST'));
 
     const absences: any[] = []; // Mixed types array
 
@@ -1366,8 +1365,8 @@ async function seedAttendanceRecords(enrollments: any[], users: any[]) {
 async function seedMessages(users: any[]) {
     console.log('💬 Seeding Messages...');
 
-    const parents = users.filter(u => u.matricule?.startsWith('SO') && ['SO002', 'SO003', 'SO004'].includes(u.matricule));
-    const staff = users.filter(u => u.matricule?.startsWith('SA') || u.matricule?.startsWith('ST'));
+    const parents = users.filter(u => u.matricule?.startsWith('SS24SO') && ['SS24SO0001', 'SS24SO0002', 'SS24SO0003'].includes(u.matricule));
+    const staff = users.filter(u => u.matricule?.startsWith('SS24SA') || u.matricule?.startsWith('SS24ST'));
 
     const messages: Message[] = [];
 
@@ -1393,7 +1392,7 @@ async function seedMessages(users: any[]) {
 async function seedAnnouncements(users: any[], academicYearId: number) {
     console.log('📢 Seeding Announcements...');
 
-    const principal = users.find(u => u.matricule === 'SA001');
+    const principal = users.find(u => u.matricule === 'SS24SA0001');
 
     const announcements = await Promise.all([
         prisma.announcement.create({
@@ -1431,7 +1430,7 @@ async function seedAnnouncements(users: any[], academicYearId: number) {
 async function seedInterviewMarks(students: any[], users: any[]) {
     console.log('🎤 Seeding Interview Marks...');
 
-    const vp = users.find(u => u.matricule === 'SA002'); // Vice Principal
+    const vp = users.find(u => u.matricule === 'SS24SA0002'); // Vice Principal
     const newStudents = students.filter(s => s.is_new_student);
 
     const interviews: InterviewMark[] = [];
