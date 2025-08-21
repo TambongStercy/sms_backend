@@ -13,6 +13,7 @@
     "db:studio": "prisma studio",
     "sync:trigger": "curl -X POST http://localhost:3000/api/sync/trigger",
     "sync:status": "curl http://localhost:3000/api/sync/status",
+    "start:worker": "ts-node src/workers/reportGenerator.ts",
     "seed:production": "ts-node scripts/production-classes-seed.ts"
   },
   "dependencies": {
