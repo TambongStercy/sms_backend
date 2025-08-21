@@ -700,8 +700,16 @@ export async function recordPayment(data: {
 
     const normalizedPaymentMethod = normalizePaymentMethod(data.payment_method);
 
+    // Get academic year ID if not provided
+    const academicYearId = data.academic_year_id || await getAcademicYearId();
+    if (!academicYearId) {
+        throw new Error("Academic year ID is required to record a payment, but none was provided or found.");
+    }
+
     const createData: any = {
         fee_id: data.fee_id,
+        enrollment_id: data.enrollment_id,
+        academic_year_id: academicYearId,
         amount: data.amount,
         payment_date: new Date(data.payment_date),
         receipt_number: data.receipt_number,
