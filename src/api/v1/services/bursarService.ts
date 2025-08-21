@@ -100,7 +100,7 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
         // Hash password for parent
         const hashedPassword = await bcrypt.hash('defaultPassword123', 10);
 
-        return await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             // 1. Create student
             const student = await tx.student.create({
                 data: {
