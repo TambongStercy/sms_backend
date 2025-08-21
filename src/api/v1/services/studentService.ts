@@ -299,9 +299,18 @@ export async function updateStudent(id: number, data: Partial<Omit<Student, 'id'
 
     const updateData: Prisma.StudentUpdateInput = {};
 
-    // Copy all fields except the ones we need to process specially
+    // Fields to skip - either because they need special processing or are camelCase duplicates
+    const fieldsToSkip = [
+        'date_of_birth', 
+        'gender',
+        'dateOfBirth',     // camelCase version that gets converted to date_of_birth
+        'placeOfBirth',    // camelCase version that gets converted to place_of_birth
+        'formerSchool'     // camelCase version that gets converted to former_school
+    ];
+
+    // Copy all fields except the ones we need to process specially or skip
     for (const [key, value] of Object.entries(data)) {
-        if (key !== 'date_of_birth' && key !== 'gender') {
+        if (!fieldsToSkip.includes(key)) {
             updateData[key as keyof Prisma.StudentUpdateInput] = value as any;
         }
     }
