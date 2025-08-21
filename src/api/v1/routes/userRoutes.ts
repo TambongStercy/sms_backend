@@ -29,8 +29,8 @@ router.post('/register-with-roles', registerAndAssignRoles);
 router.post('/create-with-role', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), createUserWithRole);
 
 // User CRUD operations (requires authentication, some require specific roles)
-router.get('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), getAllUsers);
-router.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL']), createUser);
+router.get('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR']), getAllUsers);
+router.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR']), createUser);
 
 // Get all teachers (optionally filtered by subject)
 // Important: This route must be defined BEFORE the /:id route to avoid conflicts
