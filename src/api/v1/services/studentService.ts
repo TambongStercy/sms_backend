@@ -4,7 +4,7 @@ import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 import * as feeService from './feeService'; // Import feeService
 import { generateStudentMatricule } from '../../../utils/matriculeGenerator'; // Import student matricule generator
-import { setFirstEnrollmentYear } from '../../../utils/studentStatus'; // Import student status utilities
+import { setFirstEnrollmentYear, updateNewStudentStatus } from '../../../utils/studentStatus'; // Import student status utilities
 import { StudentStatus } from '@prisma/client'; // Import StudentStatus enum
 
 // Get all students with pagination and filtering
@@ -284,6 +284,19 @@ export async function createStudent(data: {
 }
 
 export async function updateStudent(id: number, data: Partial<Omit<Student, 'id' | 'created_at' | 'updated_at'>>): Promise<Student> {
+    // Check if is_new_student field is being updated for fee recalculation
+    const isNewStudentChanged = data.is_new_student !== undefined;
+    let previousIsNewStudent: boolean | undefined;
+
+    if (isNewStudentChanged) {
+        // Get current is_new_student value before update
+        const currentStudent = await prisma.student.findUnique({
+            where: { id },
+            select: { is_new_student: true }
+        });
+        previousIsNewStudent = currentStudent?.is_new_student;
+    }
+
     const updateData: Prisma.StudentUpdateInput = { ...data };
 
     if (data.date_of_birth && typeof data.date_of_birth === 'string') {
@@ -301,10 +314,52 @@ export async function updateStudent(id: number, data: Partial<Omit<Student, 'id'
         }
     }
 
-    return prisma.student.update({
+    const updatedStudent = await prisma.student.update({
         where: { id },
         data: updateData,
     });
+
+    // Recalculate fees if is_new_student field changed and student is enrolled
+    if (isNewStudentChanged && previousIsNewStudent !== data.is_new_student) {
+        await recalculateStudentFees(id);
+    }
+
+    return updatedStudent;
+}
+
+/**
+ * Recalculates fees for all enrollments of a student when is_new_student field changes
+ * @param studentId - The ID of the student
+ */
+async function recalculateStudentFees(studentId: number): Promise<void> {
+    try {
+        // Get all enrollments for the student
+        const enrollments = await prisma.enrollment.findMany({
+            where: { student_id: studentId },
+            include: {
+                sub_class: {
+                    include: { class: true }
+                },
+                school_fees: true
+            }
+        });
+
+        console.log(`Recalculating fees for student ${studentId} - found ${enrollments.length} enrollments`);
+
+        // For each enrollment, recalculate and update the fees
+        for (const enrollment of enrollments) {
+            if (enrollment.sub_class?.class) {
+                // Use the existing fee service to recalculate and update fees
+                await feeService.createOrUpdateFeeForEnrollment(enrollment.id, enrollment.sub_class.class.id);
+                console.log(`Updated fees for enrollment ${enrollment.id} in class ${enrollment.sub_class.class.name}`);
+            }
+        }
+
+        console.log(`Successfully recalculated fees for student ${studentId}`);
+    } catch (error: any) {
+        console.error(`Error recalculating fees for student ${studentId}:`, error);
+        throw new Error(`Failed to recalculate fees: ${error.message}`);
+    }
 }
 
 export async function getStudentById(id: number, academicYearId?: number): Promise<any> {
@@ -466,6 +521,9 @@ export async function assignStudentToClass(
         fee_id = fee.id;
     }
 
+    // Update is_new_student field based on enrollment history
+    await updateNewStudentStatus(student_id);
+
     // Update student status to ASSIGNED_TO_CLASS
     await prisma.student.update({
         where: { id: student_id },
@@ -557,6 +615,9 @@ export async function enrollStudentInSubclass(
         const fee = await feeService.createOrUpdateFeeForEnrollment(enrollment.id, sub_class.class_id);
         fee_id = fee.id;
     }
+
+    // Update is_new_student field based on enrollment history
+    await updateNewStudentStatus(student_id);
 
     // Update student status to ENROLLED when assigned to subclass
     await prisma.student.update({

@@ -3,6 +3,7 @@ import { getCurrentAcademicYear } from '../../../utils/academicYear';
 import { generateStaffMatricule } from '../../../utils/matriculeGenerator';
 import { StudentStatus, Gender, Role } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { updateNewStudentStatus } from '../../../utils/studentStatus';
 
 // Types for bursar operations
 export interface StudentWithParentData {
@@ -197,6 +198,11 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
                 } : undefined
             };
         });
+
+        // Update is_new_student field based on enrollment history (after transaction)
+        await updateNewStudentStatus(result.student.id);
+
+        return result;
     } catch (error) {
         console.error('Error creating student with parent:', error);
         throw error;

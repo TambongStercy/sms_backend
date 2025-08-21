@@ -103,6 +103,23 @@ export async function shouldPayNewStudentFees(
     studentId: number, 
     currentAcademicYearId: number
 ): Promise<boolean> {
+    // First, get the student's is_new_student field from the database
+    const student = await prisma.student.findUnique({
+        where: { id: studentId },
+        select: { is_new_student: true }
+    });
+
+    if (!student) {
+        throw new Error(`Student with ID ${studentId} not found`);
+    }
+
+    // If user explicitly marked the student as not new, respect that choice
+    // This handles cases where existing students are being added to the system
+    if (student.is_new_student === false) {
+        return false; // Pay old student fees
+    }
+
+    // If user marked as new student (or default true), check enrollment history
     const statusInfo = await getStudentStatus(studentId, currentAcademicYearId);
     
     // New students pay new student fees
@@ -136,6 +153,29 @@ export async function setFirstEnrollmentYear(
             data: { first_enrollment_year_id: academicYearId }
         });
     }
+}
+
+/**
+ * Updates the is_new_student field based on enrollment history across different academic years
+ * If student has enrollments in 2+ different academic years, sets is_new_student to false
+ * @param studentId - The ID of the student
+ */
+export async function updateNewStudentStatus(studentId: number): Promise<void> {
+    // Get all enrollments for the student with their academic years
+    const enrollments = await prisma.enrollment.findMany({
+        where: { student_id: studentId },
+        select: { academic_year_id: true },
+        distinct: ['academic_year_id'] // Get unique academic years
+    });
+
+    // If student has enrollments in 2 or more different academic years, they're not new
+    if (enrollments.length >= 2) {
+        await prisma.student.update({
+            where: { id: studentId },
+            data: { is_new_student: false }
+        });
+    }
+    // If only 1 academic year (or 0), leave is_new_student as is
 }
 
 /**

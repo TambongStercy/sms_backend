@@ -1,6 +1,7 @@
 import prisma from '../../../config/db';
 import { getAcademicYearId } from '../../../utils/academicYear';
 import { StudentStatus, Gender } from '@prisma/client';
+import { updateNewStudentStatus } from '../../../utils/studentStatus';
 
 // Types for the enrollment workflow
 export interface BursarRegistrationData {
@@ -80,6 +81,9 @@ export async function registerStudentToClass(data: BursarRegistrationData) {
                 enrollment_date: new Date()
             }
         });
+
+        // Update is_new_student field based on enrollment history
+        await updateNewStudentStatus(student.id);
 
         return { student, enrollment };
     });
