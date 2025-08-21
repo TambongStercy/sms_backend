@@ -1047,9 +1047,7 @@ export async function createOrUpdateFeeForEnrollment(enrollmentId: number, class
         include: {
             student: true,
             academic_year: true,
-            school_fees: {
-                where: { academic_year_id: { not: null } }
-            }
+            school_fees: true
         }
     });
 
