@@ -297,12 +297,23 @@ export async function updateStudent(id: number, data: Partial<Omit<Student, 'id'
         previousIsNewStudent = currentStudent?.is_new_student;
     }
 
-    const updateData: Prisma.StudentUpdateInput = { ...data };
+    const updateData: Prisma.StudentUpdateInput = {};
 
-    if (data.date_of_birth && typeof data.date_of_birth === 'string') {
-        updateData.date_of_birth = new Date(data.date_of_birth);
+    // Copy all fields except the ones we need to process specially
+    for (const [key, value] of Object.entries(data)) {
+        if (key !== 'date_of_birth' && key !== 'gender') {
+            updateData[key as keyof Prisma.StudentUpdateInput] = value as any;
+        }
     }
 
+    // Handle date_of_birth conversion
+    if (data.date_of_birth && typeof data.date_of_birth === 'string') {
+        updateData.date_of_birth = new Date(data.date_of_birth);
+    } else if (data.date_of_birth instanceof Date) {
+        updateData.date_of_birth = data.date_of_birth;
+    }
+
+    // Handle gender conversion
     if (data.gender) {
         const genderLower = data.gender.toLowerCase();
         if (genderLower === 'male') {
