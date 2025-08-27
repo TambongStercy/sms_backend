@@ -365,13 +365,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'FORM 1',
                 max_students: 150, // 6 subclasses × 25 students
-                base_fee: 45000,
-                miscellaneous_fee: 5000,
-                new_student_fee: 70000,
-                old_student_fee: 60000,
-                first_term_fee: 23000,
-                second_term_fee: 22000,
-                third_term_fee: 22000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         }),
         
@@ -380,13 +380,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'FORM 2',
                 max_students: 125, // 5 subclasses × 25 students
-                base_fee: 50000,
-                miscellaneous_fee: 5000,
-                new_student_fee: 75000,
-                old_student_fee: 65000,
-                first_term_fee: 25000,
-                second_term_fee: 25000,
-                third_term_fee: 25000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         }),
         
@@ -395,13 +395,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'FORM 3',
                 max_students: 100, // 4 subclasses × 25 students
-                base_fee: 55000,
-                miscellaneous_fee: 5000,
-                new_student_fee: 80000,
-                old_student_fee: 70000,
-                first_term_fee: 27000,
-                second_term_fee: 27000,
-                third_term_fee: 26000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         }),
         
@@ -410,13 +410,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'FORM 4',
                 max_students: 100, // 4 subclasses × 25 students
-                base_fee: 60000,
-                miscellaneous_fee: 5000,
-                new_student_fee: 85000,
-                old_student_fee: 75000,
-                first_term_fee: 30000,
-                second_term_fee: 30000,
-                third_term_fee: 25000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         }),
         
@@ -425,13 +425,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'FORM 5',
                 max_students: 100, // 4 subclasses × 25 students
-                base_fee: 65000,
-                miscellaneous_fee: 5000,
-                new_student_fee: 90000,
-                old_student_fee: 80000,
-                first_term_fee: 32000,
-                second_term_fee: 32000,
-                third_term_fee: 26000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         }),
         
@@ -440,13 +440,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'LOWER SIXTH ARTS',
                 max_students: 50, // 2 subclasses × 25 students
-                base_fee: 70000,
-                miscellaneous_fee: 7000,
-                new_student_fee: 95000,
-                old_student_fee: 85000,
-                first_term_fee: 35000,
-                second_term_fee: 35000,
-                third_term_fee: 27000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         }),
         
@@ -455,13 +455,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'LOWER SIXTH SCIENCE',
                 max_students: 50, // 2 subclasses × 25 students
-                base_fee: 75000,
-                miscellaneous_fee: 7000,
-                new_student_fee: 100000,
-                old_student_fee: 90000,
-                first_term_fee: 37000,
-                second_term_fee: 37000,
-                third_term_fee: 26000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         }),
         
@@ -470,13 +470,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'UPPER SIXTH ARTS',
                 max_students: 50, // 2 subclasses × 25 students
-                base_fee: 75000,
-                miscellaneous_fee: 7000,
-                new_student_fee: 100000,
-                old_student_fee: 90000,
-                first_term_fee: 37000,
-                second_term_fee: 37000,
-                third_term_fee: 26000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         }),
         
@@ -485,13 +485,13 @@ async function seedProductionClassesAndSubclasses() {
             data: {
                 name: 'UPPER SIXTH SCIENCE',
                 max_students: 50, // 2 subclasses × 25 students
-                base_fee: 80000,
-                miscellaneous_fee: 7000,
-                new_student_fee: 105000,
-                old_student_fee: 95000,
-                first_term_fee: 40000,
-                second_term_fee: 40000,
-                third_term_fee: 25000,
+                base_fee: 175000,
+                miscellaneous_fee: 0,
+                new_student_fee: 175000,
+                old_student_fee: 175000,
+                first_term_fee: 58333,
+                second_term_fee: 58333,
+                third_term_fee: 58334,
             }
         })
     ]);
