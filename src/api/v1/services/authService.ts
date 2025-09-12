@@ -109,6 +109,18 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
     if (!email) {
         throw new Error('Email is required');
     }
+    if (!phone) {
+        throw new Error('Phone is required');
+    }
+    if (!gender) {
+        throw new Error('Gender is required');
+    }
+    if (!dateOfBirth) {
+        throw new Error('Date of birth is required');
+    }
+    if (!address) {
+        throw new Error('Address is required');
+    }
 
     console.log('Password received:', password ? 'YES' : 'NO');
 
@@ -129,8 +141,8 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
             date_of_birth: new Date(dateOfBirth),
             phone,
             address,
-            id_card_num: idCardNum,
-            photo,
+            ...(idCardNum && { id_card_num: idCardNum }),
+            ...(photo && { photo }),
             status: status || 'ACTIVE',
             user_roles: {
                 create: [{ role: Role.PARENT }], // Default role for new users is PARENT

@@ -256,12 +256,15 @@ export const exportFeeReports = async (req: Request, res: Response) => {
         const format = (req.query.format as string || 'csv').toLowerCase();
 
         // Validate format
-        if (!['csv', 'pdf', 'docx'].includes(format)) {
+        if (!['csv', 'pdf', 'docx', 'xlsx', 'excel'].includes(format)) {
             return res.status(400).json({
                 success: false,
-                error: 'Invalid format requested. Supported formats are: csv, pdf, docx.'
+                error: 'Invalid format requested. Supported formats are: csv, pdf, docx, xlsx, excel.'
             });
         }
+
+        // Map 'excel' to 'xlsx' for proper file generation
+        const normalizedFormat = format === 'excel' ? 'xlsx' : format;
 
         const { buffer, contentType, filename } = await feeService.exportFeeReports(
             academic_year_id,
@@ -269,7 +272,7 @@ export const exportFeeReports = async (req: Request, res: Response) => {
             class_id,
             student_identifier,
             payment_status,
-            format as 'csv' | 'pdf' | 'docx'
+            normalizedFormat as 'csv' | 'pdf' | 'docx' | 'xlsx'
         );
 
         res.setHeader('Content-Type', contentType);

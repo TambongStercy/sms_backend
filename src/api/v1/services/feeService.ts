@@ -6,6 +6,7 @@ import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../
 import { Parser } from 'json2csv'; // For CSV export
 import { PDFDocument, rgb, StandardFonts, PageSizes } from 'pdf-lib'; // For PDF export
 import { Document, Paragraph, Packer, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } from 'docx'; // For DOCX export
+import * as XLSX from 'xlsx'; // For Excel export
 import fs from 'fs';
 import path from 'path';
 
@@ -27,6 +28,63 @@ async function generateCSV(data: any[]): Promise<Buffer> {
     const json2csvParser = new Parser({ fields });
     const csv = json2csvParser.parse(data);
     return Buffer.from(csv);
+}
+
+// Helper for generating Excel (XLSX)
+async function generateExcel(data: any[]): Promise<Buffer> {
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
+    
+    // Convert data to worksheet format
+    const worksheet = XLSX.utils.json_to_sheet(data, {
+        header: ['feeId', 'studentName', 'studentMatricule', 'className', 'subClassName', 
+                'expectedAmount', 'paidAmount', 'outstanding', 'paymentPercentage', 'dueDate', 'paymentsCount']
+    });
+    
+    // Set column headers
+    const headers = [
+        'Fee ID', 'Student Name', 'Matricule', 'Class', 'Subclass',
+        'Expected Amount (FCFA)', 'Paid Amount (FCFA)', 'Outstanding (FCFA)', 
+        'Payment %', 'Due Date', 'Payments Count'
+    ];
+    
+    // Update the first row with proper headers
+    headers.forEach((header, index) => {
+        const cellAddress = XLSX.utils.encode_cell({ c: index, r: 0 });
+        if (!worksheet[cellAddress]) worksheet[cellAddress] = {};
+        worksheet[cellAddress].v = header;
+    });
+    
+    // Set column widths
+    const colWidths = [
+        { wch: 8 },   // Fee ID
+        { wch: 30 },  // Student Name
+        { wch: 15 },  // Matricule
+        { wch: 15 },  // Class
+        { wch: 20 },  // Subclass
+        { wch: 20 },  // Expected Amount
+        { wch: 18 },  // Paid Amount
+        { wch: 18 },  // Outstanding
+        { wch: 12 },  // Payment %
+        { wch: 12 },  // Due Date
+        { wch: 15 }   // Payments Count
+    ];
+    worksheet['!cols'] = colWidths;
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Fee Report');
+    
+    // Generate buffer
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    return buffer;
+}
+
+// Helper function to sanitize text for PDF generation (remove non-WinAnsi characters)
+function sanitizeTextForPDF(text: string): string {
+    return text
+        .replace(/‖/g, '||')  // Replace double vertical line with double pipe
+        .replace(/[^\x00-\xFF]/g, '?')  // Replace any non-Latin-1 characters with ?
+        .replace(/[^\x20-\x7E\xA0-\xFF]/g, ' '); // Keep only printable characters and extended ASCII
 }
 
 // Helper for generating PDF
@@ -56,7 +114,7 @@ async function generatePDF(data: any[]): Promise<Buffer> {
     let y = tableStartY;
 
     const drawHeader = () => {
-        page.drawText('Fee Report', {
+        page.drawText(sanitizeTextForPDF('Fee Report'), {
             x: pageMargin,
             y: y + 50,
             font: boldFont,
@@ -75,7 +133,7 @@ async function generatePDF(data: any[]): Promise<Buffer> {
                 borderColor: rgb(0, 0, 0),
                 borderWidth: 1,
             });
-            page.drawText(col.header, {
+            page.drawText(sanitizeTextForPDF(col.header), {
                 x: x + columnPadding,
                 y: y + (headerHeight / 2) - 5, // Center vertically
                 font: boldFont,
@@ -111,12 +169,13 @@ async function generatePDF(data: any[]): Promise<Buffer> {
                 text = `FCFA ${parseFloat(text).toFixed(2)}`;
             }
 
+            const sanitizedText = sanitizeTextForPDF(text);
             let textX = x + columnPadding;
             if (col.align === AlignmentType.RIGHT) {
-                const textWidth = font.widthOfTextAtSize(text, 9);
+                const textWidth = font.widthOfTextAtSize(sanitizedText, 9);
                 textX = x + col.width - textWidth - columnPadding;
             }
-            page.drawText(text, {
+            page.drawText(sanitizedText, {
                 x: textX,
                 y: y + (rowHeight / 2) - 5,
                 font,
@@ -357,6 +416,11 @@ export async function getAllFees(
         payment_transactions: true
     };
 
+    // Apply database-level pagination
+    const page = paginationOptions?.page || 1;
+    const limit = paginationOptions?.limit || 10;
+    const skip = (page - 1) * limit;
+
     let fees = await prisma.schoolFees.findMany({
         where,
         include,
@@ -364,12 +428,28 @@ export async function getAllFees(
             { enrollment: { sub_class: { class: { name: 'asc' } } } },
             { enrollment: { student: { name: 'asc' } } }
         ],
+        skip,
+        take: limit
     });
 
     // Apply payment status filter after fetching if it requires dynamic comparison
+    // Note: This is less efficient but necessary for complex payment status logic
+    let totalCount = await prisma.schoolFees.count({ where });
+    
     if (filterOptions?.paymentStatus) {
         const status = (filterOptions.paymentStatus as string).toLowerCase();
-        fees = fees.filter(fee => {
+        
+        // For payment status filtering, we need to fetch all and then filter
+        const allFees = await prisma.schoolFees.findMany({
+            where,
+            include,
+            orderBy: [
+                { enrollment: { sub_class: { class: { name: 'asc' } } } },
+                { enrollment: { student: { name: 'asc' } } }
+            ]
+        });
+        
+        const filteredFees = allFees.filter(fee => {
             switch (status) {
                 case 'paid':
                     return fee.amount_paid >= fee.amount_expected;
@@ -378,20 +458,21 @@ export async function getAllFees(
                 case 'unpaid':
                     return fee.amount_paid <= 0;
                 default:
-                    return true; // No filter applied for unknown status
+                    return true;
             }
         });
+        
+        totalCount = filteredFees.length;
+        fees = filteredFees.slice(skip, skip + limit);
     }
 
-    // Manual pagination if filter applied after fetching (less efficient for large datasets)
-    const totalCount = await prisma.schoolFees.count({ where }); // Get total count for pagination metadata
     const paginatedResult: PaginatedResult<SchoolFees> = {
         data: fees,
         meta: {
             total: totalCount,
-            totalPages: paginationOptions?.limit ? Math.ceil(totalCount / paginationOptions.limit) : 1,
-            page: paginationOptions?.page || 1,
-            limit: paginationOptions?.limit || totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            page,
+            limit,
         }
     };
 
@@ -743,7 +824,7 @@ export async function exportFeeReports(
     classId?: number,
     studentIdentifier?: string,
     paymentStatus?: string,
-    format: 'csv' | 'pdf' | 'docx' = 'csv' // Default to CSV
+    format: 'csv' | 'pdf' | 'docx' | 'xlsx' = 'csv' // Default to CSV
 ): Promise<{ buffer: Buffer, contentType: string, filename: string }> {
     try {
         const yearId = await getAcademicYearId(academicYearId);
@@ -862,6 +943,11 @@ export async function exportFeeReports(
                 buffer = await generateDOCX(reportData);
                 contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
                 filename += '.docx';
+                break;
+            case 'xlsx':
+                buffer = await generateExcel(reportData);
+                contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                filename += '.xlsx';
                 break;
             default:
                 throw new Error('Unsupported format');
