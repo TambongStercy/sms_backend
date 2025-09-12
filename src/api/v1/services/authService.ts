@@ -84,6 +84,8 @@ export const login = async (credentials: LoginCredentials): Promise<any> => {
  * @returns The newly created user.
  */
 export const register = async (userData: UserRegistrationData): Promise<User> => {
+    console.log('Registration data received:', userData);
+    
     const {
         name,
         email,
@@ -96,6 +98,19 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
         photo,
         status,
     } = userData;
+
+    // Validate required fields
+    if (!password) {
+        throw new Error('Password is required');
+    }
+    if (!name) {
+        throw new Error('Name is required');
+    }
+    if (!email) {
+        throw new Error('Email is required');
+    }
+
+    console.log('Password received:', password ? 'YES' : 'NO');
 
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({ where: { email: email?.toLowerCase() } });
