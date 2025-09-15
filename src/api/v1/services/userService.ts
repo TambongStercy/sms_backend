@@ -280,17 +280,19 @@ export async function setUserRolesForAcademicYear(userId: number, roles: Role[])
     const uniqueRoles = [...new Set(roles)];
 
     return prisma.$transaction(async (tx) => {
-        // 1. Delete existing roles for the user (UserRole doesn't have academic_year_id)
+        // 1. Delete existing roles for the user for this academic year
         await tx.userRole.deleteMany({
             where: {
                 user_id: userId,
+                academic_year_id: academicYearId,
             },
         });
 
-        // 2. Prepare data for new unique roles (no academic_year_id field)
+        // 2. Prepare data for new unique roles with academic_year_id
         const newRoleData = uniqueRoles.map(role => ({
             user_id: userId,
             role: role,
+            academic_year_id: academicYearId,
         }));
 
         // 3. Create the new roles if any unique roles were provided
@@ -300,10 +302,11 @@ export async function setUserRolesForAcademicYear(userId: number, roles: Role[])
             });
         }
 
-        // 4. Return the newly created roles
+        // 4. Return the newly created roles for this academic year
         return tx.userRole.findMany({
             where: {
                 user_id: userId,
+                academic_year_id: academicYearId,
             },
         });
     });

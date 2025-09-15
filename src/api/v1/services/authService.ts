@@ -3,6 +3,8 @@ import { PrismaClient, User, Role, Gender, UserStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { generateToken } from '../../../config/auth';
 import prisma from '../../../config/db';
+import { generateStaffMatricule } from '../../../utils/matriculeGenerator';
+import { getAcademicYearId } from '../../../utils/academicYear';
 
 interface LoginCredentials {
     email?: string;
@@ -132,6 +134,15 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generate matricule for the default PARENT role
+    const matricule = await generateStaffMatricule([Role.PARENT]);
+
+    // Get current academic year for role assignment tracking
+    const currentAcademicYearId = await getAcademicYearId();
+    if (!currentAcademicYearId) {
+        throw new Error('No academic year found. Please ensure at least one academic year exists.');
+    }
+
     const createdUser = await prisma.user.create({
         data: {
             name,
@@ -141,11 +152,15 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
             date_of_birth: new Date(dateOfBirth),
             phone,
             address,
+            matricule, // Add the generated matricule
             ...(idCardNum && { id_card_num: idCardNum }),
             ...(photo && { photo }),
             status: status || 'ACTIVE',
             user_roles: {
-                create: [{ role: Role.PARENT }], // Default role for new users is PARENT
+                create: [{
+                    role: Role.PARENT,
+                    academic_year_id: currentAcademicYearId // Track when role was assigned
+                }],
             },
         },
         include: {
