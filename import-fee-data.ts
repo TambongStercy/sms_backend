@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 /**
  * Import Fee Data from Excel to Database
  * Maps Excel sheet names to database subclass names and imports students with their payment records
+ * Supports cleanup and re-import for updated data
  */
 
 // Class mapping from Excel sheet names to database subclass names
@@ -63,7 +64,77 @@ interface StudentRecord {
     parentContact?: string;
 }
 
-async function importFeeData(excelFilePath: string) {
+/**
+ * Cleanup all imported fee data (students with SS25ST matricules)
+ */
+async function cleanupImportedData(academicYearId: number): Promise<void> {
+    console.log('🧹 Cleaning up previously imported data...');
+
+    // Find all students that were imported (auto-generated matricules starting with SS25ST)
+    const importedStudents = await prisma.student.findMany({
+        where: {
+            matricule: {
+                startsWith: 'SS25ST'
+            }
+        },
+        include: {
+            enrollments: {
+                where: {
+                    academic_year_id: academicYearId
+                },
+                include: {
+                    school_fees: true,
+                    payment_transactions: true
+                }
+            }
+        }
+    });
+
+    console.log(`📊 Found ${importedStudents.length} imported students to clean up`);
+
+    // Delete in correct order due to foreign key constraints
+    for (const student of importedStudents) {
+        for (const enrollment of student.enrollments) {
+            // Delete payment transactions first
+            await prisma.paymentTransaction.deleteMany({
+                where: { enrollment_id: enrollment.id }
+            });
+
+            // Delete school fees
+            await prisma.schoolFees.deleteMany({
+                where: { enrollment_id: enrollment.id }
+            });
+
+            // Delete enrollment
+            await prisma.enrollment.delete({
+                where: { id: enrollment.id }
+            });
+        }
+
+        // Delete student
+        await prisma.student.delete({
+            where: { id: student.id }
+        });
+    }
+
+    // Reset subclass current_students count for affected subclasses
+    const affectedSubClassIds = new Set(
+        importedStudents.flatMap(s =>
+            s.enrollments.map(e => e.sub_class_id).filter((id): id is number => id !== null)
+        )
+    );
+
+    for (const subClassId of affectedSubClassIds) {
+        await prisma.subClass.update({
+            where: { id: subClassId },
+            data: { current_students: 0 }
+        });
+    }
+
+    console.log(`✅ Cleaned up ${importedStudents.length} students and related data`);
+}
+
+async function importFeeData(excelFilePath: string, cleanup: boolean = false) {
     try {
         console.log('🚀 Starting fee data import...');
         
@@ -81,7 +152,12 @@ async function importFeeData(excelFilePath: string) {
         }
         
         console.log(`📅 Using academic year: ${currentAcademicYear.name}`);
-        
+
+        // Cleanup existing data if requested
+        if (cleanup) {
+            await cleanupImportedData(currentAcademicYear.id);
+        }
+
         let totalStudentsImported = 0;
         let totalPaymentsImported = 0;
         const importSummary: Record<string, { students: number; payments: number }> = {};
@@ -321,16 +397,42 @@ async function importStudent(
 // Command line usage
 if (require.main === module) {
     const args = process.argv.slice(2);
-    
-    if (args.length === 0) {
-        console.log('Usage: npx ts-node import-fee-data.ts <path-to-excel-file>');
-        console.log('Example: npx ts-node import-fee-data.ts "C:/path/to/FEE RECORDE 2025-2026.xlsx"');
+
+    // Parse flags
+    const cleanupFlag = args.includes('--cleanup') || args.includes('--clean');
+    const helpFlag = args.includes('--help') || args.includes('-h');
+
+    // Get excel file path (first non-flag argument)
+    const excelFilePath = args.find(arg => !arg.startsWith('--') && !arg.startsWith('-'));
+
+    if (helpFlag) {
+        console.log(`
+📖 USAGE: npx ts-node import-fee-data.ts [OPTIONS] <path-to-excel-file>
+
+🔧 OPTIONS:
+  --cleanup, --clean    Delete existing imported data before importing
+  --help, -h           Show this help message
+
+📝 EXAMPLES:
+  # Import new data (keeps existing)
+  npx ts-node import-fee-data.ts "C:/path/to/FEE RECORDE 2025-2026.xlsx"
+
+  # Cleanup and re-import updated data
+  npx ts-node import-fee-data.ts --cleanup "C:/path/to/UPDATED_FEE_RECORDE.xlsx"
+
+⚠️  WARNING: --cleanup will permanently delete all students with matricules
+   starting with SS25ST and their related enrollment, fee, and payment data.
+        `);
+        process.exit(0);
+    }
+
+    if (!excelFilePath) {
+        console.log('❌ Error: Excel file path is required');
+        console.log('Use --help for usage information');
         process.exit(1);
     }
-    
-    const excelFilePath = args[0];
-    
-    importFeeData(excelFilePath)
+
+    importFeeData(excelFilePath, cleanupFlag)
         .catch((error) => {
             console.error('Import failed:', error);
             process.exit(1);
