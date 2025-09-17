@@ -117,10 +117,9 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
         }
 
         // Prepare data, converting potential string numbers from body to actual numbers
-        const classData = {
+        const classData: any = {
             name,
             level: level !== undefined ? parseInt(level) : undefined,
-            base_fee: base_fee !== undefined ? parseFloat(base_fee) : undefined,
             new_student_fee: new_student_fee !== undefined ? parseFloat(new_student_fee) : undefined,
             old_student_fee: old_student_fee !== undefined ? parseFloat(old_student_fee) : undefined,
             miscellaneous_fee: miscellaneous_fee !== undefined ? parseFloat(miscellaneous_fee) : undefined,
@@ -128,6 +127,21 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
             second_term_fee: second_term_fee !== undefined ? parseFloat(second_term_fee) : undefined,
             third_term_fee: third_term_fee !== undefined ? parseFloat(third_term_fee) : undefined
         };
+
+        // Auto-calculate base_fee if term fees are provided
+        const termFeesProvided = first_term_fee !== undefined || second_term_fee !== undefined || third_term_fee !== undefined;
+
+        if (termFeesProvided) {
+            // Calculate base_fee as sum of term fees (use 0 as default for missing term fees)
+            const finalFirstTermFee = first_term_fee !== undefined ? parseFloat(first_term_fee) : 0;
+            const finalSecondTermFee = second_term_fee !== undefined ? parseFloat(second_term_fee) : 0;
+            const finalThirdTermFee = third_term_fee !== undefined ? parseFloat(third_term_fee) : 0;
+
+            classData.base_fee = finalFirstTermFee + finalSecondTermFee + finalThirdTermFee;
+        } else if (base_fee !== undefined) {
+            // Only set base_fee manually if no term fees are provided
+            classData.base_fee = parseFloat(base_fee);
+        }
 
         const newClass = await classService.createClass(classData);
         // Response is converted to camelCase by middleware
@@ -205,13 +219,35 @@ export const updateClass = async (req: Request, res: Response): Promise<void> =>
         const updateData: any = {};
         if (name !== undefined) updateData.name = name;
         if (level !== undefined) updateData.level = parseInt(level);
-        if (base_fee !== undefined) updateData.base_fee = parseFloat(base_fee);
         if (new_student_fee !== undefined) updateData.new_student_fee = parseFloat(new_student_fee);
         if (old_student_fee !== undefined) updateData.old_student_fee = parseFloat(old_student_fee);
         if (miscellaneous_fee !== undefined) updateData.miscellaneous_fee = parseFloat(miscellaneous_fee);
         if (first_term_fee !== undefined) updateData.first_term_fee = parseFloat(first_term_fee);
         if (second_term_fee !== undefined) updateData.second_term_fee = parseFloat(second_term_fee);
         if (third_term_fee !== undefined) updateData.third_term_fee = parseFloat(third_term_fee);
+
+        // Auto-calculate base_fee if any term fees are provided
+        const termFeesProvided = first_term_fee !== undefined || second_term_fee !== undefined || third_term_fee !== undefined;
+
+        if (termFeesProvided) {
+            // Get existing class data to fill in missing term fees
+            const existingClass = await classService.getClassById(id);
+            if (!existingClass) {
+                res.status(404).json({ success: false, error: 'Class not found' });
+                return;
+            }
+
+            // Use provided values or fall back to existing values
+            const finalFirstTermFee = first_term_fee !== undefined ? parseFloat(first_term_fee) : existingClass.first_term_fee;
+            const finalSecondTermFee = second_term_fee !== undefined ? parseFloat(second_term_fee) : existingClass.second_term_fee;
+            const finalThirdTermFee = third_term_fee !== undefined ? parseFloat(third_term_fee) : existingClass.third_term_fee;
+
+            // Calculate base_fee as sum of all term fees
+            updateData.base_fee = finalFirstTermFee + finalSecondTermFee + finalThirdTermFee;
+        } else if (base_fee !== undefined) {
+            // Only set base_fee manually if no term fees are provided
+            updateData.base_fee = parseFloat(base_fee);
+        }
 
         if (Object.keys(updateData).length === 0) {
             res.status(400).json({ success: false, error: 'No fields provided for update' });
