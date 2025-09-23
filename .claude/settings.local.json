@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npm run import:students:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

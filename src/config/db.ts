@@ -1,6 +1,6 @@
 import {
-    PrismaClient, User, SchoolFees, AcademicYear, Gender, SubjectCategory, Role, Student, ParentStudent,
-    PaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, SubClass,
+    PrismaClient, User, SchoolFees, ControlSchoolFees, AcademicYear, Gender, SubjectCategory, Role, Student, ParentStudent,
+    PaymentTransaction, ControlPaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, SubClass,
     Mark, ExamSequence, Term, Subject, SubjectTeacher, SubClassSubject, StudentAbsence, TeacherAbsence,
     DisciplineIssue, RoleAssignment, AssignmentRole,
     Period, TeacherPeriod, ExamPaper, ExamPaperQuestion, Question, QuestionType, NotificationStatus,
@@ -25,8 +25,8 @@ console.log(`Using database URL for ${process.env.NODE_ENV} environment`);
 const prisma = new PrismaClient();
 
 export {
-    User, SchoolFees, AcademicYear, Gender, SubjectCategory, Role, Student, ParentStudent,
-    PaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, SubClass,
+    User, SchoolFees, ControlSchoolFees, AcademicYear, Gender, SubjectCategory, Role, Student, ParentStudent,
+    PaymentTransaction, ControlPaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, SubClass,
     Mark, ExamSequence, Term, Subject, SubjectTeacher, SubClassSubject, StudentAbsence, TeacherAbsence,
     DisciplineIssue, RoleAssignment, AssignmentRole,
     Period, TeacherPeriod, ExamPaper, ExamPaperQuestion, Question, QuestionType, NotificationStatus,

@@ -14,7 +14,11 @@
     "sync:trigger": "curl -X POST http://localhost:3000/api/sync/trigger",
     "sync:status": "curl http://localhost:3000/api/sync/status",
     "start:worker": "ts-node src/workers/reportGenerator.ts",
-    "seed:production": "ts-node scripts/production-classes-seed.ts"
+    "seed:production": "ts-node scripts/production-classes-seed.ts",
+    "import:students": "ts-node import-students-and-fees.ts",
+    "import:students:production": "ts-node import-students-and-fees.ts --auto-create-subclasses",
+    "import:summary": "ts-node quick-import-summary.ts",
+    "import:summary:fix": "ts-node quick-import-summary.ts --create-missing"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",

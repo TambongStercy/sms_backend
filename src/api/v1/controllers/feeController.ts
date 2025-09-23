@@ -1,35 +1,83 @@
 // src/api/v1/controllers/feeController.ts
 import { Request, Response } from 'express';
 import * as feeService from '../services/feeService';
+import * as financialReportService from '../services/financialReportService';
 import { PaginationOptions, FilterOptions } from '../../../utils/pagination';
 
 export const getAllFees = async (req: Request, res: Response) => {
     try {
         const academic_year_id = req.query.academicYearId ?
             parseInt(req.query.academicYearId as string) : undefined;
+        const class_id = req.query.classId ?
+            parseInt(req.query.classId as string) : undefined;
+        const student_identifier = req.query.studentIdentifier as string;
+        const report_type = req.query.reportType as string || 'detailed'; // Default to detailed (existing behavior)
 
-        const paginationOptions: PaginationOptions = {
-            page: req.query.page ? parseInt(req.query.page as string) : undefined,
-            limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
-        };
+        // Validate report type
+        if (!['summary', 'detailed', 'analytics'].includes(report_type)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid report type. Supported types are: summary, detailed, analytics.'
+            });
+        }
 
-        const filterOptions: FilterOptions = {
-            search: req.query.search as string, // Consolidated search
-            className: req.query.className as string,
-            subclassName: req.query.subclassName as string,
-            dueDate: req.query.dueDate as string,
-            dueBeforeDate: req.query.dueBeforeDate as string,
-            dueAfterDate: req.query.dueAfterDate as string,
-            classId: req.query.classId as string,
-            subClassId: req.query.subClassId as string,
-            studentIdentifier: req.query.studentIdentifier as string,
-            paymentStatus: req.query.paymentStatus as string
-        };
+        let data: any;
 
-        const fees = await feeService.getAllFees(paginationOptions, filterOptions, academic_year_id);
+        // Route to appropriate service based on report type
+        if (report_type === 'summary') {
+            // Class Fee Summary Report
+            data = await financialReportService.getClassFeeSummaryData(
+                academic_year_id,
+                class_id
+            );
+        } else if (report_type === 'analytics') {
+            // Payment Method Analytics Report
+            data = await financialReportService.getPaymentMethodAnalyticsData(
+                academic_year_id,
+                class_id
+            );
+        } else {
+            // Check if legacy parameters are being used
+            const hasLegacyParams = req.query.page || req.query.limit || req.query.search ||
+                                  req.query.className || req.query.subclassName || req.query.dueDate ||
+                                  req.query.dueBeforeDate || req.query.dueAfterDate || req.query.subClassId ||
+                                  req.query.paymentStatus;
+
+            if (hasLegacyParams) {
+                // Use legacy getAllFees with pagination and filtering
+                const paginationOptions: PaginationOptions = {
+                    page: req.query.page ? parseInt(req.query.page as string) : undefined,
+                    limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+                };
+
+                const filterOptions: FilterOptions = {
+                    search: req.query.search as string,
+                    className: req.query.className as string,
+                    subclassName: req.query.subclassName as string,
+                    dueDate: req.query.dueDate as string,
+                    dueBeforeDate: req.query.dueBeforeDate as string,
+                    dueAfterDate: req.query.dueAfterDate as string,
+                    classId: req.query.classId as string,
+                    subClassId: req.query.subClassId as string,
+                    studentIdentifier: req.query.studentIdentifier as string,
+                    paymentStatus: req.query.paymentStatus as string
+                };
+
+                data = await feeService.getAllFees(paginationOptions, filterOptions, academic_year_id);
+            } else {
+                // Use new detailed fees data (simplified, structured response)
+                data = await financialReportService.getStudentDetailedFeesData(
+                    academic_year_id,
+                    class_id,
+                    student_identifier
+                );
+            }
+        }
+
         res.json({
             success: true,
-            data: fees
+            data: data,
+            reportType: report_type
         });
     } catch (error: any) {
         console.error('Error fetching fees:', error);
@@ -254,6 +302,7 @@ export const exportFeeReports = async (req: Request, res: Response) => {
         const student_identifier = req.query.studentIdentifier as string;
         const payment_status = req.query.paymentStatus as string;
         const format = (req.query.format as string || 'csv').toLowerCase();
+        const report_type = req.query.reportType as string || 'detailed'; // Default to detailed (existing behavior)
 
         // Validate format
         if (!['csv', 'pdf', 'docx', 'xlsx', 'excel'].includes(format)) {
@@ -263,17 +312,52 @@ export const exportFeeReports = async (req: Request, res: Response) => {
             });
         }
 
+        // Validate report type
+        if (!['summary', 'detailed', 'analytics'].includes(report_type)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid report type. Supported types are: summary, detailed, analytics.'
+            });
+        }
+
         // Map 'excel' to 'xlsx' for proper file generation
         const normalizedFormat = format === 'excel' ? 'xlsx' : format;
 
-        const { buffer, contentType, filename } = await feeService.exportFeeReports(
-            academic_year_id,
-            sub_class_id,
-            class_id,
-            student_identifier,
-            payment_status,
-            normalizedFormat as 'csv' | 'pdf' | 'docx' | 'xlsx'
-        );
+        let buffer: Buffer, contentType: string, filename: string;
+
+        // Route to appropriate service based on report type
+        if (report_type === 'summary') {
+            // Class Fee Summary Report
+            const result = await financialReportService.generateClassFeeSummaryReport(
+                academic_year_id,
+                class_id,
+                normalizedFormat as 'csv' | 'xlsx' | 'pdf' | 'docx'
+            );
+            buffer = result.buffer;
+            contentType = result.contentType;
+            filename = result.filename;
+        } else if (report_type === 'analytics') {
+            // Payment Method Analytics Report
+            const result = await financialReportService.generatePaymentMethodAnalyticsReport(
+                academic_year_id,
+                class_id,
+                normalizedFormat as 'csv' | 'xlsx' | 'pdf' | 'docx'
+            );
+            buffer = result.buffer;
+            contentType = result.contentType;
+            filename = result.filename;
+        } else {
+            // Detailed Student Fee Report (default and existing behavior)
+            const result = await financialReportService.generateStudentDetailedFeesReport(
+                academic_year_id,
+                class_id,
+                student_identifier,
+                normalizedFormat as 'csv' | 'xlsx' | 'pdf' | 'docx'
+            );
+            buffer = result.buffer;
+            contentType = result.contentType;
+            filename = result.filename;
+        }
 
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

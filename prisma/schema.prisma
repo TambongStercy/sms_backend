@@ -21,9 +21,11 @@ model AcademicYear {
   exam_papers               ExamPaper[]
   exam_sequences            ExamSequence[]
   generated_reports         GeneratedReport[]
-  payment_transactions      PaymentTransaction[]
-  school_fees               SchoolFees[]
-  first_enrollment_students Student[]            @relation("StudentFirstEnrollment")
+  payment_transactions         PaymentTransaction[]
+  school_fees                  SchoolFees[]
+  control_payment_transactions ControlPaymentTransaction[]
+  control_school_fees          ControlSchoolFees[]
+  first_enrollment_students    Student[]            @relation("StudentFirstEnrollment")
   teacher_periods           TeacherPeriod[]
   terms                     Term[]
   role_assignments          RoleAssignment[]
@@ -74,7 +76,8 @@ model User {
   form_submissions           FormSubmission[]
   audit_logs                 AuditLog[]
   // Fee management
-  recorded_payments          PaymentTransaction[] @relation("RecordedByUser")
+  recorded_payments          PaymentTransaction[]        @relation("RecordedByUser")
+  recorded_control_payments  ControlPaymentTransaction[] @relation("RecordedByUserControl")
   QuizTemplate               QuizTemplate[]
   QuizSubmission             QuizSubmission[]
 }
@@ -196,9 +199,11 @@ model Enrollment {
   class                     Class                    @relation(fields: [class_id], references: [id])
   sub_class                 SubClass?                @relation(fields: [sub_class_id], references: [id])
   marks                     Mark[]
-  payment_transactions      PaymentTransaction[]
-  school_fees               SchoolFees[]
-  absences                  StudentAbsence[]
+  payment_transactions         PaymentTransaction[]
+  school_fees                  SchoolFees[]
+  control_payment_transactions ControlPaymentTransaction[]
+  control_school_fees          ControlSchoolFees[]
+  absences                     StudentAbsence[]
   student_sequence_averages StudentSequenceAverage[]
 
   @@unique([student_id, academic_year_id])
@@ -218,6 +223,23 @@ model SchoolFees {
   payment_transactions PaymentTransaction[]
   academic_year        AcademicYear         @relation(fields: [academic_year_id], references: [id])
   enrollment           Enrollment           @relation(fields: [enrollment_id], references: [id])
+
+  @@unique([enrollment_id, academic_year_id])
+}
+
+model ControlSchoolFees {
+  id                           Int                          @id @default(autoincrement())
+  amount_expected              Float
+  amount_paid                  Float                        @default(0)
+  academic_year_id             Int
+  due_date                     DateTime
+  enrollment_id                Int
+  is_new_student               Boolean                      @default(false) // Different fees for new/old
+  created_at                   DateTime                     @default(now())
+  updated_at                   DateTime                     @updatedAt
+  control_payment_transactions ControlPaymentTransaction[]
+  academic_year                AcademicYear                 @relation(fields: [academic_year_id], references: [id])
+  enrollment                   Enrollment                   @relation(fields: [enrollment_id], references: [id])
 
   @@unique([enrollment_id, academic_year_id])
 }
@@ -421,6 +443,25 @@ model PaymentTransaction {
   enrollment       Enrollment    @relation(fields: [enrollment_id], references: [id])
   school_fees      SchoolFees    @relation(fields: [fee_id], references: [id])
   recorded_by      User          @relation("RecordedByUser", fields: [recorded_by_id], references: [id])
+}
+
+model ControlPaymentTransaction {
+  id                     Int                @id @default(autoincrement())
+  enrollment_id          Int
+  academic_year_id       Int
+  amount                 Float
+  payment_date           DateTime           // Date on receipt (compulsory)
+  receipt_number         String?
+  payment_method         PaymentMethod
+  recorded_by_id         Int
+  notes                  String?            // Feedback notes
+  created_at             DateTime           @default(now())
+  updated_at             DateTime           @updatedAt
+  control_fee_id         Int
+  academic_year          AcademicYear       @relation(fields: [academic_year_id], references: [id])
+  enrollment             Enrollment         @relation(fields: [enrollment_id], references: [id])
+  control_school_fees    ControlSchoolFees  @relation(fields: [control_fee_id], references: [id])
+  recorded_by            User               @relation("RecordedByUserControl", fields: [recorded_by_id], references: [id])
 }
 
 model Announcement {

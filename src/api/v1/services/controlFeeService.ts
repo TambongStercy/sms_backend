@@ -1,5 +1,5 @@
-// src/api/v1/services/feeService.ts
-import prisma, { SchoolFees, PaymentTransaction, PaymentMethod } from '../../../config/db';
+// src/api/v1/services/controlFeeService.ts
+import prisma, { ControlSchoolFees, ControlPaymentTransaction, PaymentMethod } from '../../../config/db';
 import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
 import { shouldPayNewStudentFees, getStudentStatus, StudentStatus } from '../../../utils/studentStatus';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
@@ -13,7 +13,7 @@ import path from 'path';
 // Helper for generating CSV
 async function generateCSV(data: any[]): Promise<Buffer> {
     const fields = [
-        { label: 'Fee ID', value: 'feeId' },
+        { label: 'Control Fee ID', value: 'feeId' },
         { label: 'Student Name', value: 'studentName' },
         { label: 'Matricule', value: 'studentMatricule' },
         { label: 'Class', value: 'className' },
@@ -31,76 +31,48 @@ async function generateCSV(data: any[]): Promise<Buffer> {
 }
 
 // Helper for generating Excel (XLSX)
-async function generateExcel(data: any[], reportMetadata?: any): Promise<Buffer> {
+async function generateExcel(data: any[]): Promise<Buffer> {
     // Create a new workbook
     const workbook = XLSX.utils.book_new();
 
-    // Generate descriptive title
-    const className = reportMetadata?.className || 'All Classes';
-    const academicYear = reportMetadata?.academicYear || new Date().getFullYear();
-    const reportTitle = `${className} Student Fee Report - Academic Year ${academicYear}`;
-
-    // Prepare data with title and headers
-    const titleRow = { A: reportTitle };
-    const dateRow = { A: `Generated on: ${new Date().toLocaleDateString('en-GB')}` };
-    const emptyRow = {};
-
-    // Convert data to worksheet format with selected columns only
-    const simplifiedData = data.map(item => ({
-        'ID': item.feeId,
-        'Student Name': item.studentName,
-        'Matricule': item.studentMatricule,
-        'Class': item.className,
-        'Subclass': item.subClassName || '',
-        'Expected (FCFA)': parseFloat(item.expectedAmount) || 0,
-        'Paid (FCFA)': parseFloat(item.paidAmount) || 0,
-        'Outstanding (FCFA)': parseFloat(item.outstanding) || 0,
-        'Due Date': item.dueDate
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(simplifiedData);
-
-    // Add title rows at the beginning
-    XLSX.utils.sheet_add_json(worksheet, [titleRow, dateRow, emptyRow], {
-        origin: 'A1',
-        skipHeader: true
+    // Convert data to worksheet format
+    const worksheet = XLSX.utils.json_to_sheet(data, {
+        header: ['feeId', 'studentName', 'studentMatricule', 'className', 'subClassName',
+                'expectedAmount', 'paidAmount', 'outstanding', 'paymentPercentage', 'dueDate', 'paymentsCount']
     });
 
-    // Shift data down by 4 rows to accommodate title
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    for (let R = range.e.r; R >= 1; R--) {
-        for (let C = range.s.c; C <= range.e.c; C++) {
-            const cellAddress = XLSX.utils.encode_cell({ c: C, r: R });
-            const newCellAddress = XLSX.utils.encode_cell({ c: C, r: R + 3 });
-            if (worksheet[cellAddress]) {
-                worksheet[newCellAddress] = worksheet[cellAddress];
-                if (R < 4) delete worksheet[cellAddress];
-            }
-        }
-    }
+    // Set column headers
+    const headers = [
+        'Control Fee ID', 'Student Name', 'Matricule', 'Class', 'Subclass',
+        'Expected Amount (FCFA)', 'Paid Amount (FCFA)', 'Outstanding (FCFA)',
+        'Payment %', 'Due Date', 'Payments Count'
+    ];
 
-    // Set column widths for better readability
+    // Update the first row with proper headers
+    headers.forEach((header, index) => {
+        const cellAddress = XLSX.utils.encode_cell({ c: index, r: 0 });
+        if (!worksheet[cellAddress]) worksheet[cellAddress] = {};
+        worksheet[cellAddress].v = header;
+    });
+
+    // Set column widths
     const colWidths = [
-        { wch: 8 },   // ID
-        { wch: 35 },  // Student Name
-        { wch: 18 },  // Matricule
+        { wch: 8 },   // Control Fee ID
+        { wch: 30 },  // Student Name
+        { wch: 15 },  // Matricule
         { wch: 15 },  // Class
-        { wch: 18 },  // Subclass
-        { wch: 18 },  // Expected Amount
-        { wch: 16 },  // Paid Amount
+        { wch: 20 },  // Subclass
+        { wch: 20 },  // Expected Amount
+        { wch: 18 },  // Paid Amount
         { wch: 18 },  // Outstanding
-        { wch: 15 }   // Due Date
+        { wch: 12 },  // Payment %
+        { wch: 12 },  // Due Date
+        { wch: 15 }   // Payments Count
     ];
     worksheet['!cols'] = colWidths;
 
-    // Merge cells for title (A1:I1)
-    if (!worksheet['!merges']) worksheet['!merges'] = [];
-    worksheet['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } });
-    worksheet['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 8 } });
-
-    // Add worksheet to workbook with descriptive name
-    const sheetName = className.length > 20 ? className.substring(0, 20) + '..' : className;
-    XLSX.utils.book_append_sheet(workbook, worksheet, `${sheetName} Fees`);
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Control Fee Report');
 
     // Generate buffer
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
@@ -116,54 +88,38 @@ function sanitizeTextForPDF(text: string): string {
 }
 
 // Helper for generating PDF
-async function generatePDF(data: any[], reportMetadata?: any): Promise<Buffer> {
+async function generatePDF(data: any[]): Promise<Buffer> {
     const pdfDoc = await PDFDocument.create();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    const pageMargin = 30;
-    const tableStartY = 680;
-    const rowHeight = 20;
-    const headerHeight = 25;
-    const columnPadding = 3;
+    const pageMargin = 50;
+    const tableStartY = 700;
+    const rowHeight = 25;
+    const headerHeight = 30;
+    const columnPadding = 5;
 
-    // Better column width distribution for A4 page (595 width - 60 margins = 535 usable)
     const columns = [
-        { header: 'ID', key: 'feeId', width: 35, align: AlignmentType.LEFT },
-        { header: 'Student Name', key: 'studentName', width: 130, align: AlignmentType.LEFT },
-        { header: 'Matricule', key: 'studentMatricule', width: 75, align: AlignmentType.LEFT },
-        { header: 'Class', key: 'className', width: 60, align: AlignmentType.LEFT },
-        { header: 'Expected', key: 'expectedAmount', width: 60, align: AlignmentType.RIGHT },
-        { header: 'Paid', key: 'paidAmount', width: 55, align: AlignmentType.RIGHT },
-        { header: 'Outstanding', key: 'outstanding', width: 65, align: AlignmentType.RIGHT },
-        { header: 'Due Date', key: 'dueDate', width: 55, align: AlignmentType.LEFT },
+        { header: 'Control Fee ID', key: 'feeId', width: 60, align: AlignmentType.LEFT },
+        { header: 'Student Name', key: 'studentName', width: 90, align: AlignmentType.LEFT },
+        { header: 'Matricule', key: 'studentMatricule', width: 60, align: AlignmentType.LEFT },
+        { header: 'Class', key: 'className', width: 55, align: AlignmentType.LEFT },
+        { header: 'Expected (FCFA)', key: 'expectedAmount', width: 60, align: AlignmentType.RIGHT },
+        { header: 'Paid (FCFA)', key: 'paidAmount', width: 60, align: AlignmentType.RIGHT },
+        { header: 'Outstanding (FCFA)', key: 'outstanding', width: 60, align: AlignmentType.RIGHT },
+        { header: 'Due Date', key: 'dueDate', width: 60, align: AlignmentType.LEFT },
     ];
 
-    let page = pdfDoc.addPage(PageSizes.A4);
+    let page = pdfDoc.addPage();
     let y = tableStartY;
 
-    // Generate descriptive title based on filters
-    const className = reportMetadata?.className || 'All Classes';
-    const academicYear = reportMetadata?.academicYear || new Date().getFullYear();
-    const reportTitle = `${className} Student Fee Report - Academic Year ${academicYear}`;
-
     const drawHeader = () => {
-        // Main title
-        page.drawText(sanitizeTextForPDF(reportTitle), {
+        page.drawText(sanitizeTextForPDF('Control Fee Report'), {
             x: pageMargin,
-            y: y + 60,
+            y: y + 50,
             font: boldFont,
-            size: 14,
+            size: 20,
             color: rgb(0, 0.53, 0.71),
-        });
-
-        // Subtitle with generation date
-        page.drawText(sanitizeTextForPDF(`Generated on: ${new Date().toLocaleDateString('en-GB')}`), {
-            x: pageMargin,
-            y: y + 40,
-            font: font,
-            size: 9,
-            color: rgb(0.4, 0.4, 0.4),
         });
 
         y -= headerHeight; // Move Y for table header
@@ -179,9 +135,9 @@ async function generatePDF(data: any[], reportMetadata?: any): Promise<Buffer> {
             });
             page.drawText(sanitizeTextForPDF(col.header), {
                 x: x + columnPadding,
-                y: y + (headerHeight / 2) - 4, // Center vertically
+                y: y + (headerHeight / 2) - 5, // Center vertically
                 font: boldFont,
-                size: 8,
+                size: 9,
                 color: rgb(0, 0, 0),
             });
             x += col.width;
@@ -208,29 +164,22 @@ async function generatePDF(data: any[], reportMetadata?: any): Promise<Buffer> {
                 borderColor: rgb(0, 0, 0),
                 borderWidth: 0.5,
             });
-            let text = String(item[col.key] || '');
+            let text = String(item[col.key]);
             if (col.key === 'expectedAmount' || col.key === 'paidAmount' || col.key === 'outstanding') {
-                // Format numbers with thousands separator, no FCFA prefix to save space
-                const amount = parseFloat(text) || 0; // Handle NaN values
-                text = amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-            }
-            // Truncate long text to fit in column
-            const maxChars = Math.floor(col.width / 4);
-            if (text.length > maxChars && (col.key === 'studentName' || col.key === 'studentMatricule')) {
-                text = text.substring(0, maxChars - 2) + '..';
+                text = `FCFA ${parseFloat(text).toFixed(2)}`;
             }
 
             const sanitizedText = sanitizeTextForPDF(text);
             let textX = x + columnPadding;
             if (col.align === AlignmentType.RIGHT) {
-                const textWidth = font.widthOfTextAtSize(sanitizedText, 7.5);
+                const textWidth = font.widthOfTextAtSize(sanitizedText, 9);
                 textX = x + col.width - textWidth - columnPadding;
             }
             page.drawText(sanitizedText, {
                 x: textX,
-                y: y + (rowHeight / 2) - 4,
+                y: y + (rowHeight / 2) - 5,
                 font,
-                size: 7.5,
+                size: 9,
                 color: rgb(0, 0, 0),
             });
             x += col.width;
@@ -242,50 +191,20 @@ async function generatePDF(data: any[], reportMetadata?: any): Promise<Buffer> {
 }
 
 // Helper for generating DOCX
-async function generateDOCX(data: any[], reportMetadata?: any): Promise<Buffer> {
-    // Generate descriptive title
-    const className = reportMetadata?.className || 'All Classes';
-    const academicYear = reportMetadata?.academicYear || new Date().getFullYear();
-    const reportTitle = `${className} Student Fee Report - Academic Year ${academicYear}`;
-
+async function generateDOCX(data: any[]): Promise<Buffer> {
     const tableRows = data.map(item => new TableRow({
         children: [
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: String(item.feeId), size: 20 })] })],
-                width: { size: 5, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: item.studentName, size: 20 })] })],
-                width: { size: 20, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: item.studentMatricule, size: 20 })] })],
-                width: { size: 12, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: item.className, size: 20 })] })],
-                width: { size: 10, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: item.subClassName || '', size: 20 })] })],
-                width: { size: 10, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: `${(parseFloat(item.expectedAmount) || 0).toLocaleString('en-US')}`, size: 20 })] })],
-                width: { size: 11, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: `${(parseFloat(item.paidAmount) || 0).toLocaleString('en-US')}`, size: 20 })] })],
-                width: { size: 11, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: `${(parseFloat(item.outstanding) || 0).toLocaleString('en-US')}`, size: 20 })] })],
-                width: { size: 11, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text: item.dueDate, size: 20 })] })],
-                width: { size: 10, type: WidthType.PERCENTAGE }
-            }),
+            new TableCell({ children: [new Paragraph(String(item.feeId))] }),
+            new TableCell({ children: [new Paragraph(item.studentName)] }),
+            new TableCell({ children: [new Paragraph(item.studentMatricule)] }),
+            new TableCell({ children: [new Paragraph(item.className)] }),
+            new TableCell({ children: [new Paragraph(item.subClassName)] }),
+            new TableCell({ children: [new Paragraph(`FCFA ${item.expectedAmount}`)] }),
+            new TableCell({ children: [new Paragraph(`FCFA ${item.paidAmount}`)] }),
+            new TableCell({ children: [new Paragraph(`FCFA ${item.outstanding}`)] }),
+            new TableCell({ children: [new Paragraph(`${item.paymentPercentage}%`)] }),
+            new TableCell({ children: [new Paragraph(item.dueDate)] }),
+            new TableCell({ children: [new Paragraph(String(item.paymentsCount))] }),
         ],
     }));
 
@@ -295,74 +214,28 @@ async function generateDOCX(data: any[], reportMetadata?: any): Promise<Buffer> 
                 new Paragraph({
                     children: [
                         new TextRun({
-                            text: reportTitle,
-                            size: 32,
+                            text: 'Control Fee Report',
+                            size: 48,
                             bold: true,
                         }),
                     ],
                     alignment: AlignmentType.CENTER,
-                    spacing: { after: 200 },
-                }),
-                new Paragraph({
-                    children: [
-                        new TextRun({
-                            text: `Generated on: ${new Date().toLocaleDateString('en-GB')}`,
-                            size: 20,
-                            color: '666666',
-                        }),
-                    ],
-                    alignment: AlignmentType.CENTER,
-                    spacing: { after: 400 },
                 }),
                 new Table({
                     rows: [
                         new TableRow({
                             children: [
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'ID', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 5, type: WidthType.PERCENTAGE }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'Student Name', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 20, type: WidthType.PERCENTAGE }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'Matricule', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 12, type: WidthType.PERCENTAGE }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'Class', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 10, type: WidthType.PERCENTAGE }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'Subclass', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 10, type: WidthType.PERCENTAGE }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'Expected', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 11, type: WidthType.PERCENTAGE }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'Paid', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 11, type: WidthType.PERCENTAGE }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'Outstanding', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 11, type: WidthType.PERCENTAGE }
-                                }),
-                                new TableCell({
-                                    children: [new Paragraph({ children: [new TextRun({ text: 'Due Date', bold: true, size: 20 })] })],
-                                    borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } },
-                                    width: { size: 10, type: WidthType.PERCENTAGE }
-                                }),
+                                new TableCell({ children: [new Paragraph('Control Fee ID')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Student Name')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Matricule')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Class')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Subclass')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Expected Amount')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Paid Amount')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Outstanding')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Payment %')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Due Date')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
+                                new TableCell({ children: [new Paragraph('Payments Count')], borders: { top: { style: BorderStyle.SINGLE, size: 1 }, bottom: { style: BorderStyle.SINGLE, size: 1 } } }),
                             ],
                         }),
                         ...tableRows,
@@ -380,11 +253,11 @@ async function generateDOCX(data: any[], reportMetadata?: any): Promise<Buffer> 
 }
 
 
-export async function getAllFees(
+export async function getAllControlFees(
     paginationOptions?: PaginationOptions,
     filterOptions?: FilterOptions,
     academicYearId?: number
-): Promise<PaginatedResult<SchoolFees>> {
+): Promise<PaginatedResult<ControlSchoolFees>> {
     const yearId = await getAcademicYearId(academicYearId);
 
     const where: any = {};
@@ -540,7 +413,7 @@ export async function getAllFees(
             }
         },
         academic_year: true,
-        payment_transactions: true
+        control_payment_transactions: true
     };
 
     // Apply database-level pagination
@@ -548,7 +421,7 @@ export async function getAllFees(
     const limit = paginationOptions?.limit || 10;
     const skip = (page - 1) * limit;
 
-    let fees = await prisma.schoolFees.findMany({
+    let fees = await prisma.controlSchoolFees.findMany({
         where,
         include,
         orderBy: [
@@ -561,13 +434,13 @@ export async function getAllFees(
 
     // Apply payment status filter after fetching if it requires dynamic comparison
     // Note: This is less efficient but necessary for complex payment status logic
-    let totalCount = await prisma.schoolFees.count({ where });
-    
+    let totalCount = await prisma.controlSchoolFees.count({ where });
+
     if (filterOptions?.paymentStatus) {
         const status = (filterOptions.paymentStatus as string).toLowerCase();
-        
+
         // For payment status filtering, we need to fetch all and then filter
-        const allFees = await prisma.schoolFees.findMany({
+        const allFees = await prisma.controlSchoolFees.findMany({
             where,
             include,
             orderBy: [
@@ -575,7 +448,7 @@ export async function getAllFees(
                 { enrollment: { student: { name: 'asc' } } }
             ]
         });
-        
+
         const filteredFees = allFees.filter(fee => {
             switch (status) {
                 case 'paid':
@@ -588,12 +461,12 @@ export async function getAllFees(
                     return true;
             }
         });
-        
+
         totalCount = filteredFees.length;
         fees = filteredFees.slice(skip, skip + limit);
     }
 
-    const paginatedResult: PaginatedResult<SchoolFees> = {
+    const paginatedResult: PaginatedResult<ControlSchoolFees> = {
         data: fees,
         meta: {
             total: totalCount,
@@ -607,12 +480,12 @@ export async function getAllFees(
 }
 
 /**
- * Get a specific fee by ID
- * @param id The ID of the fee record
- * @returns The fee record or null if not found
+ * Get a specific control fee by ID
+ * @param id The ID of the control fee record
+ * @returns The control fee record or null if not found
  */
-export async function getFeeById(id: number): Promise<SchoolFees | null> {
-    return prisma.schoolFees.findUnique({
+export async function getControlFeeById(id: number): Promise<ControlSchoolFees | null> {
+    return prisma.controlSchoolFees.findUnique({
         where: { id },
         include: {
             enrollment: {
@@ -626,12 +499,12 @@ export async function getFeeById(id: number): Promise<SchoolFees | null> {
                 }
             },
             academic_year: true,
-            payment_transactions: true
+            control_payment_transactions: true
         }
     });
 }
 
-export async function createFee(data: {
+export async function createControlFee(data: {
     amount_expected: number;
     amount_paid: number;
     academic_year_id?: number;
@@ -639,7 +512,7 @@ export async function createFee(data: {
     enrollment_id?: number;
     student_id?: number;
     payment_method?: string;
-}): Promise<SchoolFees> {
+}): Promise<ControlSchoolFees> {
     // Handle the case where student_id is provided instead of enrollment_id
     if (data.student_id && !data.enrollment_id) {
         // Convert student_id to number if it's a string
@@ -687,7 +560,7 @@ export async function createFee(data: {
         throw new Error(`Enrollment with ID ${data.enrollment_id} not found`);
     }
 
-    return prisma.schoolFees.create({
+    return prisma.controlSchoolFees.create({
         data: {
             amount_expected: data.amount_expected,
             amount_paid: data.amount_paid,
@@ -699,12 +572,12 @@ export async function createFee(data: {
 }
 
 /**
- * Update an existing fee record
- * @param id The ID of the fee to update
- * @param data The updated fee data
- * @returns The updated fee record
+ * Update an existing control fee record
+ * @param id The ID of the control fee to update
+ * @param data The updated control fee data
+ * @returns The updated control fee record
  */
-export async function updateFee(
+export async function updateControlFee(
     id: number,
     data: {
         amount_expected?: number;
@@ -712,14 +585,14 @@ export async function updateFee(
         payment_method?: string;
         due_date?: string;
     }
-): Promise<SchoolFees> {
-    // First check if the fee exists
-    const fee = await prisma.schoolFees.findUnique({
+): Promise<ControlSchoolFees> {
+    // First check if the control fee exists
+    const fee = await prisma.controlSchoolFees.findUnique({
         where: { id }
     });
 
     if (!fee) {
-        throw new Error(`Fee with ID ${id} not found`);
+        throw new Error(`Control fee with ID ${id} not found`);
     }
 
     // Build update data object
@@ -741,7 +614,7 @@ export async function updateFee(
         updateData.due_date = new Date(data.due_date);
     }
 
-    return prisma.schoolFees.update({
+    return prisma.controlSchoolFees.update({
         where: { id },
         data: updateData,
         include: {
@@ -754,45 +627,45 @@ export async function updateFee(
                 }
             },
             academic_year: true,
-            payment_transactions: true
+            control_payment_transactions: true
         }
     });
 }
 
 /**
- * Delete an existing fee record
- * @param id The ID of the fee to delete
- * @returns The deleted fee record
+ * Delete an existing control fee record
+ * @param id The ID of the control fee to delete
+ * @returns The deleted control fee record
  */
-export async function deleteFee(id: number): Promise<SchoolFees> {
-    // Check if there are any associated payment transactions
-    const paymentCount = await prisma.paymentTransaction.count({
-        where: { fee_id: id }
+export async function deleteControlFee(id: number): Promise<ControlSchoolFees> {
+    // Check if there are any associated control payment transactions
+    const paymentCount = await prisma.controlPaymentTransaction.count({
+        where: { control_fee_id: id }
     });
 
     if (paymentCount > 0) {
-        throw new Error('Cannot delete fee with existing payment records. Please delete associated payments first.');
+        throw new Error('Cannot delete control fee with existing payment records. Please delete associated payments first.');
     }
 
-    return prisma.schoolFees.delete({
+    return prisma.controlSchoolFees.delete({
         where: { id }
     });
 }
 
 /**
- * Get all fees for a specific student
+ * Get all control fees for a specific student
  * @param studentId The ID of the student
  * @param academicYearId Optional academic year ID
- * @returns Array of fees
+ * @returns Array of control fees
  */
-export async function getStudentFees(studentId: number, academicYearId?: number): Promise<SchoolFees[]> {
+export async function getStudentControlFees(studentId: number, academicYearId?: number): Promise<ControlSchoolFees[]> {
     const yearId = await getAcademicYearId(academicYearId);
 
     if (!yearId) {
-        throw new Error("Academic year ID is required to fetch student fees, but none was provided or found.");
+        throw new Error("Academic year ID is required to fetch student control fees, but none was provided or found.");
     }
 
-    return prisma.schoolFees.findMany({
+    return prisma.controlSchoolFees.findMany({
         where: {
             enrollment: {
                 student_id: studentId,
@@ -809,27 +682,27 @@ export async function getStudentFees(studentId: number, academicYearId?: number)
                 }
             },
             academic_year: true,
-            payment_transactions: true
+            control_payment_transactions: true
         },
         orderBy: { due_date: 'asc' }
     });
 }
 
 /**
- * Get fee summary for a sub_class
+ * Get control fee summary for a sub_class
  * @param sub_classId The ID of the sub_class
  * @param academicYearId Optional academic year ID
- * @returns Fee summary object
+ * @returns Control fee summary object
  */
-export async function getSubclassFeesSummary(sub_classId: number, academicYearId?: number): Promise<any> {
+export async function getSubclassControlFeesSummary(sub_classId: number, academicYearId?: number): Promise<any> {
     const yearId = await getAcademicYearId(academicYearId);
 
     if (!yearId) {
-        throw new Error("Academic year ID is required to fetch subclass fees summary, but none was provided or found.");
+        throw new Error("Academic year ID is required to fetch subclass control fees summary, but none was provided or found.");
     }
 
-    // Get all fees for students in the specified sub_class for the academic year
-    const fees = await prisma.schoolFees.findMany({
+    // Get all control fees for students in the specified sub_class for the academic year
+    const fees = await prisma.controlSchoolFees.findMany({
         where: {
             academic_year_id: yearId,
             enrollment: {
@@ -837,7 +710,7 @@ export async function getSubclassFeesSummary(sub_classId: number, academicYearId
             }
         },
         include: {
-            payment_transactions: true
+            control_payment_transactions: true
         }
     });
 
@@ -857,7 +730,7 @@ export async function getSubclassFeesSummary(sub_classId: number, academicYearId
         subClassName: subClassInfo?.name || 'N/A',
         className: subClassInfo?.class?.name || 'N/A',
         academicYearId: yearId,
-        totalStudentsWithFees: fees.length,
+        totalStudentsWithControlFees: fees.length,
         totalExpected: totalExpected,
         totalPaid: totalPaid,
         outstanding: outstanding,
@@ -877,7 +750,7 @@ function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC
     throw new Error(`Invalid payment method: ${method}`);
 }
 
-export async function recordPayment(data: {
+export async function recordControlPayment(data: {
     amount: number;
     payment_date: string;
     receipt_number?: string;
@@ -885,9 +758,9 @@ export async function recordPayment(data: {
     enrollment_id?: number;
     student_id?: number;
     academic_year_id?: number;
-    fee_id: number;
+    control_fee_id: number;
     recorded_by_id?: number;
-}): Promise<PaymentTransaction> {
+}): Promise<ControlPaymentTransaction> {
     // Convert student_id to enrollment_id if student_id is provided
     if (data.student_id && !data.enrollment_id) {
         const studentId = typeof data.student_id === 'string' ? parseInt(data.student_id, 10) : data.student_id;
@@ -903,7 +776,7 @@ export async function recordPayment(data: {
     }
 
     if (!data.enrollment_id) {
-        throw new Error('Enrollment ID is required to record a payment.');
+        throw new Error('Enrollment ID is required to record a control payment.');
     }
 
     const normalizedPaymentMethod = normalizePaymentMethod(data.payment_method);
@@ -911,11 +784,11 @@ export async function recordPayment(data: {
     // Get academic year ID if not provided
     const academicYearId = data.academic_year_id || await getAcademicYearId();
     if (!academicYearId) {
-        throw new Error("Academic year ID is required to record a payment, but none was provided or found.");
+        throw new Error("Academic year ID is required to record a control payment, but none was provided or found.");
     }
 
     const createData: any = {
-        fee_id: data.fee_id,
+        control_fee_id: data.control_fee_id,
         enrollment_id: data.enrollment_id,
         academic_year_id: academicYearId,
         amount: data.amount,
@@ -928,13 +801,13 @@ export async function recordPayment(data: {
         createData.recorded_by_id = data.recorded_by_id;
     }
 
-    const payment = await prisma.paymentTransaction.create({
+    const payment = await prisma.controlPaymentTransaction.create({
         data: createData,
     });
 
-    // Update the amount_paid in the SchoolFees record
-    await prisma.schoolFees.update({
-        where: { id: data.fee_id },
+    // Update the amount_paid in the ControlSchoolFees record
+    await prisma.controlSchoolFees.update({
+        where: { id: data.control_fee_id },
         data: {
             amount_paid: {
                 increment: data.amount // Add the new payment amount to the total paid
@@ -945,7 +818,7 @@ export async function recordPayment(data: {
     return payment;
 }
 
-export async function exportFeeReports(
+export async function exportControlFeeReports(
     academicYearId?: number,
     subClassId?: number,
     classId?: number,
@@ -995,8 +868,8 @@ export async function exportFeeReports(
             };
         }
 
-        // Get all fees for the academic year with filters
-        let fees = await prisma.schoolFees.findMany({
+        // Get all control fees for the academic year with filters
+        let fees = await prisma.controlSchoolFees.findMany({
             where: where,
             include: {
                 enrollment: {
@@ -1010,7 +883,7 @@ export async function exportFeeReports(
                     }
                 },
                 academic_year: true,
-                payment_transactions: true
+                control_payment_transactions: true
             },
             orderBy: [
                 { enrollment: { sub_class: { class: { name: 'asc' } } } },
@@ -1035,51 +908,25 @@ export async function exportFeeReports(
             });
         }
 
-        // Map fees to a flatter structure suitable for reports
+        // Map control fees to a flatter structure suitable for reports
         const reportData = fees.map(fee => ({
             feeId: fee.id,
             studentName: fee.enrollment.student.name,
             studentMatricule: fee.enrollment.student.matricule,
             className: fee.enrollment.sub_class?.class.name || 'No Class',
             subClassName: fee.enrollment.sub_class?.name || 'No Subclass',
-            expectedAmount: parseFloat((fee.amount_expected || 0).toFixed(2)),
-            paidAmount: parseFloat((fee.amount_paid || 0).toFixed(2)),
-            outstanding: parseFloat(((fee.amount_expected || 0) - (fee.amount_paid || 0)).toFixed(2)),
-            paymentPercentage: (fee.amount_expected || 0) > 0 ?
-                parseFloat((((fee.amount_paid || 0) / fee.amount_expected) * 100).toFixed(2)) : 0,
+            expectedAmount: parseFloat(fee.amount_expected.toFixed(2)),
+            paidAmount: parseFloat(fee.amount_paid.toFixed(2)),
+            outstanding: parseFloat((fee.amount_expected - fee.amount_paid).toFixed(2)),
+            paymentPercentage: fee.amount_expected > 0 ?
+                parseFloat(((fee.amount_paid / fee.amount_expected) * 100).toFixed(2)) : 0,
             dueDate: fee.due_date.toISOString().split('T')[0], // Format date
-            paymentsCount: fee.payment_transactions.length
+            paymentsCount: fee.control_payment_transactions.length
         }));
-
-        // Get metadata for report title
-        let className = 'All Classes';
-        if (classId) {
-            const classInfo = await prisma.class.findUnique({
-                where: { id: classId }
-            });
-            className = classInfo?.name || `Class ${classId}`;
-        } else if (subClassId) {
-            const subClassInfo = await prisma.subClass.findUnique({
-                where: { id: subClassId },
-                include: { class: true }
-            });
-            className = subClassInfo?.class?.name || 'Unknown Class';
-        }
-
-        const academicYearInfo = await prisma.academicYear.findUnique({
-            where: { id: yearId }
-        });
-
-        const reportMetadata = {
-            className,
-            academicYear: academicYearInfo?.name || yearId,
-            paymentStatus: paymentStatus || 'All',
-            totalRecords: reportData.length
-        };
 
         let buffer: Buffer;
         let contentType: string;
-        let filename: string = `${className.toLowerCase().replace(/\s+/g, '_')}_fee_report_${yearId}`;
+        let filename: string = `control_fee_report_${yearId}`;
 
         switch (format) {
             case 'csv':
@@ -1088,17 +935,17 @@ export async function exportFeeReports(
                 filename += '.csv';
                 break;
             case 'pdf':
-                buffer = await generatePDF(reportData, reportMetadata);
+                buffer = await generatePDF(reportData);
                 contentType = 'application/pdf';
                 filename += '.pdf';
                 break;
             case 'docx':
-                buffer = await generateDOCX(reportData, reportMetadata);
+                buffer = await generateDOCX(reportData);
                 contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
                 filename += '.docx';
                 break;
             case 'xlsx':
-                buffer = await generateExcel(reportData, reportMetadata);
+                buffer = await generateExcel(reportData);
                 contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                 filename += '.xlsx';
                 break;
@@ -1109,45 +956,45 @@ export async function exportFeeReports(
         return { buffer, contentType, filename };
 
     } catch (error: any) {
-        console.error('Error in exportFeeReports:', error);
+        console.error('Error in exportControlFeeReports:', error);
         throw error;
     }
 }
 
 /**
- * Retrieves all payment transactions for a specific fee record
- * @param feeId The ID of the fee record
- * @returns Array of payment transactions or null if the fee doesn't exist
+ * Retrieves all control payment transactions for a specific control fee record
+ * @param controlFeeId The ID of the control fee record
+ * @returns Array of control payment transactions or null if the control fee doesn't exist
  */
-export async function getFeePayments(feeId: number): Promise<PaymentTransaction[] | null> {
-    // First check if the fee exists
-    const feeExists = await prisma.schoolFees.findUnique({
-        where: { id: feeId }
+export async function getControlFeePayments(controlFeeId: number): Promise<ControlPaymentTransaction[] | null> {
+    // First check if the control fee exists
+    const feeExists = await prisma.controlSchoolFees.findUnique({
+        where: { id: controlFeeId }
     });
 
     if (!feeExists) {
         return null;
     }
 
-    // Get all payment transactions for this fee
-    return prisma.paymentTransaction.findMany({
-        where: { fee_id: feeId },
+    // Get all control payment transactions for this control fee
+    return prisma.controlPaymentTransaction.findMany({
+        where: { control_fee_id: controlFeeId },
         orderBy: { payment_date: 'desc' }
     });
 }
 
 /**
- * Updates all student fees when a class fee structure changes
+ * Updates all student control fees when a class fee structure changes
  * @param classId The ID of the class that had its fee structure updated
  * @param academicYearId Optional academic year ID (defaults to current)
- * @returns The number of updated fee records
+ * @returns The number of updated control fee records
  */
-export async function updateFeesOnClassFeeChange(classId: number, academicYearId?: number): Promise<number> {
+export async function updateControlFeesOnClassFeeChange(classId: number, academicYearId?: number): Promise<number> {
     // Get current academic year if not provided
     const yearId = await getAcademicYearId(academicYearId);
 
     if (!yearId) {
-        throw new Error("Academic year ID is required to update fees, but none was provided or found.");
+        throw new Error("Academic year ID is required to update control fees, but none was provided or found.");
     }
 
     // Get the updated class info
@@ -1170,20 +1017,20 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
         include: {
             student: true,
             sub_class: true,
-            school_fees: {
+            control_school_fees: {
                 where: {
-                    academic_year_id: yearId // Ensure we only get fees for this academic year
+                    academic_year_id: yearId // Ensure we only get control fees for this academic year
                 }
             }
         }
     });
 
-    console.log(`Found ${enrollments.length} enrollments to update fees for class ${classId}`);
+    console.log(`Found ${enrollments.length} enrollments to update control fees for class ${classId}`);
 
     // Track the number of updates
     let updatedCount = 0;
 
-    // For each enrollment, update or create their fees based on class structure
+    // For each enrollment, update or create their control fees based on class structure
     for (const enrollment of enrollments) {
         // Calculate the expected fee amount based on class structure
         // This can be customized based on your fee structure logic
@@ -1206,29 +1053,29 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
             feeAmount += classInfo.old_student_fee;
         }
 
-        console.log(`Calculated fee amount for student ${enrollment.student.name}: ${feeAmount}`);
+        console.log(`Calculated control fee amount for student ${enrollment.student.name}: ${feeAmount}`);
 
-        // Check if this enrollment already has fee records for this academic year
-        if (enrollment.school_fees.length > 0) {
-            // Update existing fee records
-            for (const fee of enrollment.school_fees) {
-                const updatedFee = await prisma.schoolFees.update({
+        // Check if this enrollment already has control fee records for this academic year
+        if (enrollment.control_school_fees.length > 0) {
+            // Update existing control fee records
+            for (const fee of enrollment.control_school_fees) {
+                const updatedFee = await prisma.controlSchoolFees.update({
                     where: { id: fee.id },
                     data: {
                         amount_expected: feeAmount
                     }
                 });
-                console.log(`Updated fee record ${fee.id} for student ${enrollment.student.name}. New expected amount: ${updatedFee.amount_expected}`);
+                console.log(`Updated control fee record ${fee.id} for student ${enrollment.student.name}. New expected amount: ${updatedFee.amount_expected}`);
                 updatedCount++;
             }
         } else {
-            // Create a new fee record if none exists
+            // Create a new control fee record if none exists
             // Get academic year for due date
             const academicYear = await prisma.academicYear.findUnique({
                 where: { id: yearId }
             });
 
-            const newFee = await prisma.schoolFees.create({
+            const newFee = await prisma.controlSchoolFees.create({
                 data: {
                     enrollment_id: enrollment.id,
                     academic_year_id: yearId,
@@ -1237,7 +1084,7 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
                     due_date: academicYear?.end_date || new Date(new Date().getFullYear(), 11, 31)
                 }
             });
-            console.log(`Created new fee record ${newFee.id} for student ${enrollment.student.name}. Expected amount: ${newFee.amount_expected}`);
+            console.log(`Created new control fee record ${newFee.id} for student ${enrollment.student.name}. Expected amount: ${newFee.amount_expected}`);
             updatedCount++;
         }
     }
@@ -1245,13 +1092,13 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
 }
 
 /**
- * Calculates the expected fee amount for a student based on class structure
+ * Calculates the expected control fee amount for a student based on class structure
  * @param classId The ID of the class
  * @param studentId The ID of the student
  * @param academicYearId The ID of the academic year
- * @returns The calculated fee amount
+ * @returns The calculated control fee amount
  */
-async function calculateFeeAmount(classId: number, studentId: number, academicYearId: number): Promise<number> {
+async function calculateControlFeeAmount(classId: number, studentId: number, academicYearId: number): Promise<number> {
     const classInfo = await prisma.class.findUnique({
         where: { id: classId }
     });
@@ -1260,7 +1107,7 @@ async function calculateFeeAmount(classId: number, studentId: number, academicYe
         throw new Error(`Class with ID ${classId} not found.`);
     }
 
-    // Calculate the expected fee amount based on class structure
+    // Calculate the expected control fee amount based on class structure
     let feeAmount = classInfo.base_fee;
 
     // Add all term fees together (simplified workflow for bursar)
@@ -1283,18 +1130,18 @@ async function calculateFeeAmount(classId: number, studentId: number, academicYe
 }
 
 /**
- * Creates or updates a fee record for a student enrollment
+ * Creates or updates a control fee record for a student enrollment
  * @param enrollmentId The ID of the enrollment record
  * @param classId The ID of the class (for fee calculation)
- * @returns The created or updated SchoolFees record
+ * @returns The created or updated ControlSchoolFees record
  */
-export async function createOrUpdateFeeForEnrollment(enrollmentId: number, classId: number): Promise<SchoolFees> {
+export async function createOrUpdateControlFeeForEnrollment(enrollmentId: number, classId: number): Promise<ControlSchoolFees> {
     const enrollment = await prisma.enrollment.findUnique({
         where: { id: enrollmentId },
         include: {
             student: true,
             academic_year: true,
-            school_fees: true
+            control_school_fees: true
         }
     });
 
@@ -1303,11 +1150,11 @@ export async function createOrUpdateFeeForEnrollment(enrollmentId: number, class
     }
 
     if (!enrollment.academic_year_id) {
-        throw new Error('Enrollment must have an academic year to create/update fees.');
+        throw new Error('Enrollment must have an academic year to create/update control fees.');
     }
 
-    // Calculate the expected fee amount
-    const feeAmount = await calculateFeeAmount(classId, enrollment.student_id, enrollment.academic_year_id);
+    // Calculate the expected control fee amount
+    const feeAmount = await calculateControlFeeAmount(classId, enrollment.student_id, enrollment.academic_year_id);
 
     // Set due date to end of academic year or a reasonable default
     const academicYear = await prisma.academicYear.findUnique({
@@ -1316,14 +1163,14 @@ export async function createOrUpdateFeeForEnrollment(enrollmentId: number, class
 
     const dueDate = academicYear?.end_date || new Date(new Date().getFullYear(), 11, 31); // Default to end of current year
 
-    // Check if fee record already exists for this enrollment and academic year
-    const existingFee = enrollment.school_fees.find(fee =>
+    // Check if control fee record already exists for this enrollment and academic year
+    const existingFee = enrollment.control_school_fees.find(fee =>
         fee.academic_year_id === enrollment.academic_year_id
     );
 
     if (existingFee) {
-        // Update existing fee with new amount
-        return prisma.schoolFees.update({
+        // Update existing control fee with new amount
+        return prisma.controlSchoolFees.update({
             where: { id: existingFee.id },
             data: {
                 amount_expected: feeAmount,
@@ -1331,8 +1178,8 @@ export async function createOrUpdateFeeForEnrollment(enrollmentId: number, class
             }
         });
     } else {
-        // Create new fee record
-        return prisma.schoolFees.create({
+        // Create new control fee record
+        return prisma.controlSchoolFees.create({
             data: {
                 enrollment_id: enrollment.id,
                 academic_year_id: enrollment.academic_year_id,
@@ -1345,13 +1192,13 @@ export async function createOrUpdateFeeForEnrollment(enrollmentId: number, class
 }
 
 /**
- * Creates a fee record for a newly enrolled student.
+ * Creates a control fee record for a newly enrolled student.
  * This function should be called during the student enrollment process.
  * @param enrollmentId The ID of the new enrollment record.
- * @returns The newly created SchoolFees record.
- * @deprecated Use createOrUpdateFeeForEnrollment instead
+ * @returns The newly created ControlSchoolFees record.
+ * @deprecated Use createOrUpdateControlFeeForEnrollment instead
  */
-export async function createFeeForNewEnrollment(enrollmentId: number): Promise<SchoolFees> {
+export async function createControlFeeForNewEnrollment(enrollmentId: number): Promise<ControlSchoolFees> {
     const enrollment = await prisma.enrollment.findUnique({
         where: { id: enrollmentId },
         include: {
@@ -1369,8 +1216,8 @@ export async function createFeeForNewEnrollment(enrollmentId: number): Promise<S
 
     const classId = enrollment.sub_class?.class_id || enrollment.class_id;
     if (!enrollment.academic_year_id || !classId) {
-        throw new Error('Enrollment must have an academic year and associated class to create fees.');
+        throw new Error('Enrollment must have an academic year and associated class to create control fees.');
     }
 
-    return createOrUpdateFeeForEnrollment(enrollmentId, classId);
+    return createOrUpdateControlFeeForEnrollment(enrollmentId, classId);
 }
