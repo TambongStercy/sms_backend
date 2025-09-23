@@ -146,7 +146,6 @@ async function processPaymentSheet(
         return {
             studentsFound: 0,
             studentsNotFound: 0,
-            studentsCreated: 0,
             feesUpdated: 0,
             paymentsCreated: 0,
             totalAmount: 0,
