@@ -1,13 +1,11 @@
 // import-fee-payments.ts
-import { PrismaClient, PaymentMethod, Gender } from '@prisma/client';
+import { PrismaClient, PaymentMethod } from '@prisma/client';
 import { analyzeExcelFile } from './excel-analyzer';
 import {
     mapSheetToSubClass,
     findHeaderRow,
     parseStudentFromRow,
     findBestMatchingStudent,
-    generateUniqueMatricule,
-    extractPhoneNumber,
     ParsedStudentData
 } from './src/utils/importUtils';
 import { createOrUpdateFeeForEnrollment } from './src/api/v1/services/feeService';
@@ -23,7 +21,6 @@ const prisma = new PrismaClient();
 interface PaymentImportSummary {
     studentsFound: number;
     studentsNotFound: number;
-    studentsCreated: number;
     feesUpdated: number;
     paymentsCreated: number;
     totalAmountProcessed: number;
@@ -32,81 +29,6 @@ interface PaymentImportSummary {
     processedSheets: string[];
 }
 
-/**
- * Create a new student from payment data when not found in database
- */
-async function createStudentFromPaymentData(
-    studentData: ParsedStudentData,
-    sheetName: string,
-    academicYearId: number
-): Promise<{ student: any; enrollment?: any; error?: string }> {
-
-    try {
-        // Generate unique matricule for payment-imported students
-        const matricule = await generateUniqueMatricule('SS25FP'); // Fee Payment prefix
-
-        // Create new student
-        const student = await prisma.student.create({
-            data: {
-                matricule,
-                name: studentData.name!.trim(),
-                date_of_birth: new Date('2010-01-01'), // Default, should be updated later
-                place_of_birth: 'Unknown',
-                gender: Gender.Male, // Default, should be updated later
-                residence: 'Unknown',
-                former_school: null,
-                is_new_student: true,
-                status: 'NOT_ENROLLED',
-                first_enrollment_year_id: academicYearId,
-            }
-        });
-
-        console.log(`  ➕ Created student from payment data: ${student.name} (${matricule})`);
-
-        // Try to determine the subclass from sheet name
-        const subClassName = mapSheetToSubClass(sheetName);
-        let enrollment = null;
-
-        if (subClassName) {
-            // Find the subclass in database
-            const subClass = await prisma.subClass.findFirst({
-                where: { name: subClassName },
-                include: { class: true }
-            });
-
-            if (subClass) {
-                // Create enrollment
-                enrollment = await prisma.enrollment.create({
-                    data: {
-                        student_id: student.id,
-                        academic_year_id: academicYearId,
-                        class_id: subClass.class_id,
-                        sub_class_id: subClass.id,
-                        repeater: false,
-                        enrollment_date: new Date(),
-                    }
-                });
-
-                // Update student status
-                await prisma.student.update({
-                    where: { id: student.id },
-                    data: { status: 'ENROLLED' }
-                });
-
-                // Create fee record
-                await createOrUpdateFeeForEnrollment(enrollment.id, subClass.class_id);
-
-                console.log(`  📚 Created enrollment for ${student.name} in ${subClass.name}`);
-            }
-        }
-
-        return { student, enrollment };
-
-    } catch (error: any) {
-        console.error(`  ❌ Error creating student ${studentData.name}:`, error.message);
-        return { student: null, error: error.message };
-    }
-}
 
 /**
  * Process individual payment amounts and create transactions
@@ -202,7 +124,6 @@ async function processPaymentSheet(
 ): Promise<{
     studentsFound: number;
     studentsNotFound: number;
-    studentsCreated: number;
     feesUpdated: number;
     paymentsCreated: number;
     totalAmount: number;
@@ -239,7 +160,6 @@ async function processPaymentSheet(
     // Process payment data rows
     let studentsFound = 0;
     let studentsNotFound = 0;
-    let studentsCreated = 0;
     let feesUpdated = 0;
     let paymentsCreated = 0;
     let totalAmount = 0;
@@ -264,34 +184,16 @@ async function processPaymentSheet(
             // Find matching student in database
             const matchResult = await findBestMatchingStudent(studentData.name, academicYearId, 80);
 
-            let student;
-
             if (!matchResult) {
-                console.log(`⚠️ Student not found: ${studentData.name} - Creating new student...`);
-
-                // Create new student from payment data
-                const createResult = await createStudentFromPaymentData(
-                    studentData,
-                    sheetName,
-                    academicYearId
-                );
-
-                if (createResult.error) {
-                    studentsNotFound++;
-                    errors.push(`Failed to create student ${studentData.name}: ${createResult.error}`);
-                    continue;
-                }
-
-                student = createResult.student;
-                studentsCreated++;
-                console.log(`✅ Created new student: ${student.name} (${student.matricule})`);
-
-            } else {
-                const { student: foundStudent, similarity } = matchResult;
-                student = foundStudent;
-                console.log(`✅ Found existing student: ${student.name} (${similarity}% match)`);
-                studentsFound++;
+                console.log(`⚠️ Student not found: ${studentData.name} - Skipping...`);
+                studentsNotFound++;
+                errors.push(`${studentData.name}: Not found in database (must import from class list first)`);
+                continue;
             }
+
+            const { student, similarity } = matchResult;
+            console.log(`✅ Found student: ${student.name} (${similarity}% match)`);
+            studentsFound++;
 
             // Process payments for this student
             const paymentResult = await processStudentPayments(
@@ -314,12 +216,11 @@ async function processPaymentSheet(
         }
     }
 
-    console.log(`✅ ${sheetName}: ${studentsFound} found, ${studentsCreated} created, ${studentsNotFound} failed, ${feesUpdated} fees updated, ${paymentsCreated} payments`);
+    console.log(`✅ ${sheetName}: ${studentsFound} found, ${studentsNotFound} not found, ${feesUpdated} fees updated, ${paymentsCreated} payments`);
 
     return {
         studentsFound,
         studentsNotFound,
-        studentsCreated,
         feesUpdated,
         paymentsCreated,
         totalAmount,
@@ -408,7 +309,6 @@ async function importFeePayments(
         const summary: PaymentImportSummary = {
             studentsFound: 0,
             studentsNotFound: 0,
-            studentsCreated: 0,
             feesUpdated: 0,
             paymentsCreated: 0,
             totalAmountProcessed: 0,
@@ -442,7 +342,6 @@ async function importFeePayments(
 
                 summary.studentsFound += result.studentsFound;
                 summary.studentsNotFound += result.studentsNotFound;
-                summary.studentsCreated += result.studentsCreated;
                 summary.feesUpdated += result.feesUpdated;
                 summary.paymentsCreated += result.paymentsCreated;
                 summary.totalAmountProcessed += result.totalAmount;
@@ -461,7 +360,6 @@ async function importFeePayments(
         console.log('💳 FEE PAYMENT IMPORT SUMMARY');
         console.log('='.repeat(60));
         console.log(`Students Found: ${summary.studentsFound}`);
-        console.log(`Students Created: ${summary.studentsCreated}`);
         console.log(`Students Not Found: ${summary.studentsNotFound}`);
         console.log(`Fees Updated: ${summary.feesUpdated}`);
         console.log(`Payments Created: ${summary.paymentsCreated}`);
@@ -522,10 +420,12 @@ if (require.main === module) {
   npx ts-node import-fee-payments.ts --year=1 "C:/path/to/FEE RECORDE 2025-2026 v3.xlsx"
 
 📋 NOTES:
-  - This script updates existing student fee records with payment information
-  - Students must already exist in the database (run import-class-list.ts first)
+  - This script ONLY updates existing student fee records with payment information
+  - Students MUST already exist in the database (run import-class-list.ts first)
+  - Students not found in database will be skipped (no auto-creation)
   - Payment transactions are created for each installment amount
   - Uses fuzzy name matching to find students (minimum 80% similarity)
+  - Auto-creates missing subclasses if needed for proper organization
         `);
         process.exit(0);
     }

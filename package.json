@@ -18,7 +18,8 @@
     "import:students": "ts-node import-students-and-fees.ts",
     "import:students:production": "ts-node import-students-and-fees.ts --auto-create-subclasses",
     "import:summary": "ts-node quick-import-summary.ts",
-    "import:summary:fix": "ts-node quick-import-summary.ts --create-missing"
+    "import:summary:fix": "ts-node quick-import-summary.ts --create-missing",
+    "postbuild": "node scripts/copy-assets.js"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
@@ -61,6 +62,7 @@
     "@types/swagger-ui-express": "^4.1.8",
     "@types/yamljs": "^0.2.34",
     "prisma": "^5.7.0",
+    "rimraf": "^6.0.1",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.2"
   },
