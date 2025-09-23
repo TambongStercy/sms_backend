@@ -1186,13 +1186,8 @@ export async function updateFeesOnClassFeeChange(classId: number, academicYearId
     // For each enrollment, update or create their fees based on class structure
     for (const enrollment of enrollments) {
         // Calculate the expected fee amount based on class structure
-        // This can be customized based on your fee structure logic
+        // base_fee already contains the sum of all term fees (first_term_fee + second_term_fee + third_term_fee)
         let feeAmount = classInfo.base_fee;
-
-        // Add all term fees together (simplified workflow for bursar)
-        feeAmount += classInfo.first_term_fee;
-        feeAmount += classInfo.second_term_fee;
-        feeAmount += classInfo.third_term_fee;
 
         // Add miscellaneous fees
         feeAmount += classInfo.miscellaneous_fee;
@@ -1261,17 +1256,14 @@ async function calculateFeeAmount(classId: number, studentId: number, academicYe
     }
 
     // Calculate the expected fee amount based on class structure
+    // base_fee already contains the sum of all term fees (first_term_fee + second_term_fee + third_term_fee)
     let feeAmount = classInfo.base_fee;
-
-    // Add all term fees together (simplified workflow for bursar)
-    feeAmount += classInfo.first_term_fee;
-    feeAmount += classInfo.second_term_fee;
-    feeAmount += classInfo.third_term_fee;
 
     // Add miscellaneous fees
     feeAmount += classInfo.miscellaneous_fee;
 
     // Add extra fees based on student status (new vs old)
+    // Since all students are new according to user, always use new_student_fee
     const shouldPayNewFees = await shouldPayNewStudentFees(studentId, academicYearId);
     if (shouldPayNewFees) {
         feeAmount += classInfo.new_student_fee;
