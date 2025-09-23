@@ -30,54 +30,22 @@ async function generateCSV(data: any[]): Promise<Buffer> {
     return Buffer.from(csv);
 }
 
-// Helper for generating Excel (XLSX)
+// Helper for generating Excel (XLSX) with subclass separation
 async function generateExcel(data: any[], reportMetadata?: any): Promise<Buffer> {
     // Create a new workbook
     const workbook = XLSX.utils.book_new();
 
-    // Generate descriptive title
-    const className = reportMetadata?.className || 'All Classes';
     const academicYear = reportMetadata?.academicYear || new Date().getFullYear();
-    const reportTitle = `${className} Student Fee Report - Academic Year ${academicYear}`;
 
-    // Prepare data with title and headers
-    const titleRow = { A: reportTitle };
-    const dateRow = { A: `Generated on: ${new Date().toLocaleDateString('en-GB')}` };
-    const emptyRow = {};
-
-    // Convert data to worksheet format with selected columns only
-    const simplifiedData = data.map(item => ({
-        'ID': item.feeId,
-        'Student Name': item.studentName,
-        'Matricule': item.studentMatricule,
-        'Class': item.className,
-        'Subclass': item.subClassName || '',
-        'Expected (FCFA)': parseFloat(item.expectedAmount) || 0,
-        'Paid (FCFA)': parseFloat(item.paidAmount) || 0,
-        'Outstanding (FCFA)': parseFloat(item.outstanding) || 0,
-        'Due Date': item.dueDate
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(simplifiedData);
-
-    // Add title rows at the beginning
-    XLSX.utils.sheet_add_json(worksheet, [titleRow, dateRow, emptyRow], {
-        origin: 'A1',
-        skipHeader: true
-    });
-
-    // Shift data down by 4 rows to accommodate title
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    for (let R = range.e.r; R >= 1; R--) {
-        for (let C = range.s.c; C <= range.e.c; C++) {
-            const cellAddress = XLSX.utils.encode_cell({ c: C, r: R });
-            const newCellAddress = XLSX.utils.encode_cell({ c: C, r: R + 3 });
-            if (worksheet[cellAddress]) {
-                worksheet[newCellAddress] = worksheet[cellAddress];
-                if (R < 4) delete worksheet[cellAddress];
-            }
+    // Group data by subclass
+    const groupedData = data.reduce((groups, item) => {
+        const subClassName = item.subClassName || 'No Subclass';
+        if (!groups[subClassName]) {
+            groups[subClassName] = [];
         }
-    }
+        groups[subClassName].push(item);
+        return groups;
+    }, {} as Record<string, any[]>);
 
     // Set column widths for better readability
     const colWidths = [
@@ -85,22 +53,88 @@ async function generateExcel(data: any[], reportMetadata?: any): Promise<Buffer>
         { wch: 35 },  // Student Name
         { wch: 18 },  // Matricule
         { wch: 15 },  // Class
-        { wch: 18 },  // Subclass
         { wch: 18 },  // Expected Amount
         { wch: 16 },  // Paid Amount
         { wch: 18 },  // Outstanding
         { wch: 15 }   // Due Date
     ];
-    worksheet['!cols'] = colWidths;
 
-    // Merge cells for title (A1:I1)
-    if (!worksheet['!merges']) worksheet['!merges'] = [];
-    worksheet['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } });
-    worksheet['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 8 } });
+    // Create a sheet for each subclass
+    Object.entries(groupedData).forEach(([subClassName, subClassData]) => {
+        // Generate title for this subclass
+        const reportTitle = `${subClassName} Student Fee Report - Academic Year ${academicYear}`;
 
-    // Add worksheet to workbook with descriptive name
-    const sheetName = className.length > 20 ? className.substring(0, 20) + '..' : className;
-    XLSX.utils.book_append_sheet(workbook, worksheet, `${sheetName} Fees`);
+        // Prepare data with title and headers
+        const titleRow = { A: reportTitle };
+        const dateRow = { A: `Generated on: ${new Date().toLocaleDateString('en-GB')}` };
+        const emptyRow = {};
+
+        // Convert data to worksheet format (remove subclass column since it's the sheet name)
+        const simplifiedData = (subClassData as any[]).map(item => ({
+            'ID': item.feeId,
+            'Student Name': item.studentName,
+            'Matricule': item.studentMatricule,
+            'Class': item.className,
+            'Expected (FCFA)': parseFloat(item.expectedAmount) || 0,
+            'Paid (FCFA)': parseFloat(item.paidAmount) || 0,
+            'Outstanding (FCFA)': parseFloat(item.outstanding) || 0,
+            'Due Date': item.dueDate
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(simplifiedData);
+
+        // Add title rows at the beginning
+        XLSX.utils.sheet_add_json(worksheet, [titleRow, dateRow, emptyRow], {
+            origin: 'A1',
+            skipHeader: true
+        });
+
+        // Shift data down by 4 rows to accommodate title
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        for (let R = range.e.r; R >= 1; R--) {
+            for (let C = range.s.c; C <= range.e.c; C++) {
+                const cellAddress = XLSX.utils.encode_cell({ c: C, r: R });
+                const newCellAddress = XLSX.utils.encode_cell({ c: C, r: R + 3 });
+                if (worksheet[cellAddress]) {
+                    worksheet[newCellAddress] = worksheet[cellAddress];
+                    if (R < 4) delete worksheet[cellAddress];
+                }
+            }
+        }
+
+        // Set column widths
+        worksheet['!cols'] = colWidths;
+
+        // Merge cells for title (A1:H1) - one less column since we removed subclass
+        if (!worksheet['!merges']) worksheet['!merges'] = [];
+        worksheet['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } });
+        worksheet['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } });
+
+        // Create sheet name (Excel sheet names must be <= 31 characters)
+        let sheetName = subClassName;
+        if (sheetName.length > 31) {
+            sheetName = sheetName.substring(0, 28) + '...';
+        }
+
+        // Add worksheet to workbook with subclass name
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    });
+
+    // If no data was grouped, create a single sheet
+    if (Object.keys(groupedData).length === 0) {
+        const reportTitle = `Student Fee Report - Academic Year ${academicYear}`;
+        const titleRow = { A: reportTitle };
+        const dateRow = { A: `Generated on: ${new Date().toLocaleDateString('en-GB')}` };
+        const emptyRow = {};
+
+        const worksheet = XLSX.utils.json_to_sheet([]);
+        XLSX.utils.sheet_add_json(worksheet, [titleRow, dateRow, emptyRow], {
+            origin: 'A1',
+            skipHeader: true
+        });
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'No Data');
+    }
 
     // Generate buffer
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
