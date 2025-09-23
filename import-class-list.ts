@@ -43,17 +43,44 @@ async function importStudentToSubClass(
 ): Promise<{ created: boolean; enrollment?: any; error?: string }> {
 
     try {
+        // First check for exact match (including students with same base name without ellipsis)
+        const baseName = studentData.name!.replace(/[…\.]+$/, '').trim();
+
         // Check if student already exists (fuzzy match)
         const existingMatch = await findBestMatchingStudent(studentData.name!, academicYearId, 80);
 
         let student;
         let created = false;
 
-        if (existingMatch && existingMatch.similarity > 90) {
-            // Use existing student
-            student = existingMatch.student;
-            console.log(`🔄 Found existing student: ${student.name} (${existingMatch.similarity}% match)`);
+        // More strict matching for truncated names
+        if (existingMatch) {
+            // If the name was truncated, be more lenient with matching
+            const isTruncated = studentData.name!.endsWith('…') || studentData.name!.endsWith('...');
+            const matchThreshold = isTruncated ? 85 : 90;
+
+            if (existingMatch.similarity >= matchThreshold) {
+                // Additional check: if the existing student name starts with our base name
+                const existingBaseName = existingMatch.student.name.substring(0, baseName.length);
+                if (existingBaseName.toLowerCase() === baseName.toLowerCase()) {
+                    // Use existing student
+                    student = existingMatch.student;
+                    console.log(`🔄 Found existing student: ${student.name} (${existingMatch.similarity}% match)`);
+                } else if (existingMatch.similarity > 95) {
+                    // Very high similarity, use existing
+                    student = existingMatch.student;
+                    console.log(`🔄 Found existing student: ${student.name} (${existingMatch.similarity}% match)`);
+                } else {
+                    // Create new student despite match
+                    student = null;
+                }
+            } else {
+                student = null;
+            }
         } else {
+            student = null;
+        }
+
+        if (!student) {
             // Create new student
             const matricule = await generateUniqueMatricule('SS25CL');
             const parentPhone = extractPhoneNumber(studentData.phone || '');

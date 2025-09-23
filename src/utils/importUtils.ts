@@ -251,7 +251,17 @@ export function parseStudentFromRow(row: any[], headers: string[]): ParsedStuden
         return null; // Skip rows without valid names
     }
 
-    student.name = String(name).trim();
+    // Clean the name: remove ellipsis and extra spaces
+    let cleanedName = String(name).trim();
+
+    // Warning if name appears truncated
+    if (cleanedName.endsWith('…') || cleanedName.endsWith('...')) {
+        console.warn(`⚠️ Warning: Name appears truncated: "${cleanedName}"`);
+        // Remove the ellipsis but keep the name for matching
+        cleanedName = cleanedName.replace(/[…\.]+$/, '').trim();
+    }
+
+    student.name = cleanedName;
     student.serialNumber = parseInt(rowData['SN'] || rowData['S/N']) || undefined;
     student.status = String(rowData['STATUS'] || '');
     student.phone = String(rowData['TELL'] || rowData['PHONE'] || rowData['PARENT CONTACT'] || '');
