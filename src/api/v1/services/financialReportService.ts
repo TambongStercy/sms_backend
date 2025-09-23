@@ -234,8 +234,57 @@ export async function generateStudentDetailedFeesReport(
 
         case 'xlsx':
             const workbook = XLSX.utils.book_new();
-            const worksheet = XLSX.utils.json_to_sheet(reportData);
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Student Details');
+
+            // Group data by subclass (className field contains subclass name)
+            const groupedData = reportData.reduce((groups, item) => {
+                const subClassName = item.className || 'No Subclass';
+                if (!groups[subClassName]) {
+                    groups[subClassName] = [];
+                }
+                groups[subClassName].push(item);
+                return groups;
+            }, {} as Record<string, any[]>);
+
+            // Create a sheet for each subclass
+            Object.entries(groupedData).forEach(([subClassName, subClassData]) => {
+                // Convert data to worksheet format
+                const worksheetData = subClassData.map(item => ({
+                    'Student Name': item.studentName,
+                    'Matricule': item.studentMatricule,
+                    'Expected (FCFA)': item.expectedAmount,
+                    'Paid (FCFA)': item.paidAmount,
+                    'Outstanding (FCFA)': item.outstanding,
+                    'Due Date': item.dueDate
+                }));
+
+                const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+                // Set column widths for better readability
+                const colWidths = [
+                    { wch: 35 },  // Student Name
+                    { wch: 18 },  // Matricule
+                    { wch: 18 },  // Expected Amount
+                    { wch: 16 },  // Paid Amount
+                    { wch: 18 },  // Outstanding
+                    { wch: 15 }   // Due Date
+                ];
+                worksheet['!cols'] = colWidths;
+
+                // Create sheet name (Excel sheet names must be <= 31 characters)
+                let sheetName = subClassName;
+                if (sheetName.length > 31) {
+                    sheetName = sheetName.substring(0, 28) + '...';
+                }
+
+                // Add worksheet to workbook with subclass name
+                XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            });
+
+            // If no data was grouped, create a single sheet
+            if (Object.keys(groupedData).length === 0) {
+                const worksheet = XLSX.utils.json_to_sheet([]);
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'No Data');
+            }
 
             buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
             contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
