@@ -1,6 +1,12 @@
 // src/api/v1/controllers/studentController.ts
 import { Request, Response } from 'express';
+import prisma from '../../../config/db';
 import * as studentService from '../services/studentService';
+import * as feeService from '../services/feeService';
+import * as controlFeeService from '../services/controlFeeService';
+import * as examService from '../services/examService';
+import * as attendanceService from '../services/attendanceService';
+import * as disciplineService from '../services/disciplineService';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
 import { transformUser } from './userController'; // Assuming transformUser is exported from userController
 import { User, ParentStudent } from '@prisma/client'; // Import User and ParentStudent
@@ -85,8 +91,18 @@ export const createStudent = async (req: Request, res: Response) => {
         // Use the body directly - middleware handles conversion
         const studentData = req.body;
 
-        // Validate required fields
-        const requiredFields = ['name', 'date_of_birth', 'place_of_birth', 'gender', 'residence'];
+        // Require nom + prenom (preferred) OR legacy single `name`
+        const hasSplitName = !!(studentData.nom && studentData.prenom);
+        const hasLegacyName = !!studentData.name;
+        if (!hasSplitName && !hasLegacyName) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: provide both nom (family name) and prenom (given name).'
+            });
+        }
+
+        // Validate other required fields
+        const requiredFields = ['date_of_birth', 'place_of_birth', 'gender', 'residence'];
         const missingFields = requiredFields.filter(field => !studentData[field]);
 
         if (missingFields.length > 0) {
@@ -152,6 +168,63 @@ export const getStudentById = async (req: Request, res: Response): Promise<any> 
             success: false,
             error: error.message
         });
+    }
+};
+
+export const getStudentFullProfile = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid student ID format' });
+        }
+
+        const academicYearId = req.finalQuery?.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string)
+            : undefined;
+
+        const yearId = academicYearId || await getAcademicYearId() || undefined;
+
+        const student = await studentService.getStudentFullProfileBase(id);
+        if (!student) {
+            return res.status(404).json({ success: false, error: 'Student not found' });
+        }
+
+        const [fees, controlFees, marksResult, attendanceSummary, discipline] = await Promise.allSettled([
+            feeService.getStudentFees(id, yearId),
+            controlFeeService.getStudentControlFees(id, yearId),
+            examService.getAllMarks(
+                { page: 1, limit: 1000 },
+                { student_id: id.toString(), include_subject: 'true', include_exam_sequence: 'true' },
+                yearId
+            ),
+            attendanceService.getStudentAttendanceSummary({ student_id: id, academic_year_id: yearId }),
+            disciplineService.getDisciplineHistory(id),
+        ]);
+
+        const enrollments = (student as any).enrollments ?? [];
+        const currentEnrollment = enrollments.find((e: any) => e.academic_year_id === yearId) ?? null;
+
+        const enrichEnrollmentPhoto = (e: any) => ({
+            ...e,
+            photo_url: e?.photo ? getFileUrl(req, e.photo, PhotoType.STUDENT) : null,
+        });
+
+        res.json({
+            success: true,
+            data: {
+                ...student,
+                enrollments: enrollments.map(enrichEnrollmentPhoto),
+                current_enrollment: currentEnrollment ? enrichEnrollmentPhoto(currentEnrollment) : null,
+                fees: fees.status === 'fulfilled' ? fees.value : [],
+                control_fees: controlFees.status === 'fulfilled' ? controlFees.value : [],
+                marks: marksResult.status === 'fulfilled' ? marksResult.value.data : [],
+                attendance_summary: attendanceSummary.status === 'fulfilled' ? attendanceSummary.value : null,
+                discipline: discipline.status === 'fulfilled' ? discipline.value : [],
+            }
+        });
+    } catch (error: any) {
+        console.error('Error fetching student full profile:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
@@ -310,8 +383,8 @@ export const updateStudentEnrollmentPhoto = async (req: Request, res: Response):
 export const getStudentEnrollmentPhoto = async (req: Request, res: Response): Promise<void> => {
     try {
         const studentId = parseInt(req.params.id);
-        const academicYearId = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) :
+        const academicYearId = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) :
             await getAcademicYearId();
 
         if (isNaN(studentId) || !academicYearId) {
@@ -324,14 +397,18 @@ export const getStudentEnrollmentPhoto = async (req: Request, res: Response): Pr
 
         const photoInfo = await studentService.getStudentEnrollmentPhoto(studentId, academicYearId);
 
+        // Service returns null only when the student does not exist at all.
         if (!photoInfo) {
             res.status(404).json({
                 success: false,
-                error: 'No enrollment photo found for this student and academic year'
+                error: 'Student not found'
             });
             return;
         }
 
+        // Always 200: photo may be null (no photo anywhere) and the caller can decide
+        // whether to render a placeholder. `sourceYearId` tells the UI whether the photo
+        // came from the requested year or was inherited from a prior enrollment.
         res.json({
             success: true,
             data: {
@@ -339,7 +416,8 @@ export const getStudentEnrollmentPhoto = async (req: Request, res: Response): Pr
                 academicYearId: academicYearId,
                 photo: photoInfo.photo,
                 photoUrl: photoInfo.photo ? getFileUrl(req, photoInfo.photo, PhotoType.STUDENT) : null,
-                enrollmentId: photoInfo.enrollmentId
+                enrollmentId: photoInfo.enrollmentId,
+                sourceYearId: (photoInfo as any).sourceYearId ?? null
             }
         });
     } catch (error: any) {
@@ -372,6 +450,14 @@ export const linkParent = async (req: Request, res: Response) => {
             return res.status(400).json({
                 success: false,
                 error: 'Parent ID is required'
+            });
+        }
+
+        // Validate optional relationship enum
+        if (linkData.relationship && !['FATHER', 'MOTHER', 'SIBLING', 'GUARDIAN'].includes(String(linkData.relationship).toUpperCase())) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid relationship. Must be FATHER, MOTHER, SIBLING, or GUARDIAN.'
             });
         }
 
@@ -457,7 +543,7 @@ export const enrollStudent = async (req: Request, res: Response): Promise<any> =
         }
 
         // Expect snake_case from middleware
-        const { sub_class_id, academic_year_id, photo, repeater } = req.body;
+        const { sub_class_id, academic_year_id, photo, repeater, ream_of_paper_collected } = req.body;
 
         // Validate and parse sub_class_id
         const parsedSubclassId = parseInt(sub_class_id);
@@ -484,7 +570,8 @@ export const enrollStudent = async (req: Request, res: Response): Promise<any> =
             sub_class_id: parsedSubclassId,
             academic_year_id: parsedAcademicYearId, // Pass parsed or undefined
             photo: photo, // Pass photo as received (can be string or null)
-            repeater: repeater !== undefined ? Boolean(repeater) : false
+            repeater: repeater !== undefined ? Boolean(repeater) : false,
+            ream_of_paper_collected: ream_of_paper_collected !== undefined ? Boolean(ream_of_paper_collected) : undefined
         };
 
         const enrollment = await studentService.enrollStudent(studentId, enrollmentData);
@@ -520,7 +607,7 @@ export const assignStudentToClass = async (req: Request, res: Response): Promise
         }
 
         // Expect snake_case from middleware
-        const { class_id, academic_year_id, photo, repeater } = req.body;
+        const { class_id, academic_year_id, photo, repeater, ream_of_paper_collected } = req.body;
 
         // Validate and parse class_id
         const parsedClassId = parseInt(class_id);
@@ -547,7 +634,8 @@ export const assignStudentToClass = async (req: Request, res: Response): Promise
             class_id: parsedClassId,
             academic_year_id: parsedAcademicYearId,
             photo: photo,
-            repeater: repeater !== undefined ? Boolean(repeater) : false
+            repeater: repeater !== undefined ? Boolean(repeater) : false,
+            ream_of_paper_collected: ream_of_paper_collected !== undefined ? Boolean(ream_of_paper_collected) : undefined
         };
 
         const enrollment = await studentService.assignStudentToClass(studentId, assignmentData);
@@ -628,8 +716,8 @@ export const getStudentStatusInfo = async (req: Request, res: Response): Promise
         }
 
         // Get academic year from query params or use current
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) :
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) :
             await getAcademicYearId();
 
         if (!academic_year_id) {
@@ -664,8 +752,8 @@ export const getStudentStatusInfo = async (req: Request, res: Response): Promise
 export const getStudentsWithStatusInfo = async (req: Request, res: Response): Promise<any> => {
     try {
         // Get academic year from query params or use current
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) :
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) :
             await getAcademicYearId();
 
         if (!academic_year_id) {
@@ -673,8 +761,8 @@ export const getStudentsWithStatusInfo = async (req: Request, res: Response): Pr
         }
 
         // Get sub-class filter if provided
-        const sub_class_id = req.query.sub_class_id ?
-            parseInt(req.query.sub_class_id as string) :
+        const sub_class_id = req.finalQuery.sub_class_id ?
+            parseInt(req.finalQuery.sub_class_id as string) :
             undefined;
 
         const studentsWithStatus = await getStudentsWithStatus(academic_year_id, sub_class_id);
@@ -716,8 +804,8 @@ export const getStudentsBySubclass = async (req: Request, res: Response): Promis
         }
 
         // Get academic year from query params or use current
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const students = await studentService.getStudentsBySubclass(subclassId, academic_year_id);
 
@@ -748,8 +836,8 @@ export const getStudentsByParent = async (req: Request, res: Response): Promise<
         }
 
         // Get academic year from query params or use current  
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const students = await studentService.getStudentsByParentId(parentId, academic_year_id);
 
@@ -785,8 +873,8 @@ export const searchStudents = async (req: Request, res: Response): Promise<any> 
         }
 
         // Get academic year from query params or use current
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         // Get pagination parameters
         const page = parseInt(req.query.page as string) || 1;
@@ -825,5 +913,330 @@ export const getStudentByEnrollmentId = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error('Error fetching student by enrollment ID:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Export the student list of a single subclass as an Excel file.
+ * GET /students/subclass/:id/export
+ */
+export const exportStudentsBySubclass = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const subclassId = parseInt(req.params.id);
+        if (isNaN(subclassId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Subclass ID format' });
+        }
+
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string)
+            : undefined;
+
+        const { buffer, filename } = await studentService.exportSubclassStudentListExcel(
+            subclassId,
+            academicYearId
+        );
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting subclass student list:', error);
+        if (error.message?.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Export the student list of a single subclass as a PDF file.
+ * GET /students/subclass/:id/export/pdf
+ */
+export const exportStudentsBySubclassPdf = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const subclassId = parseInt(req.params.id);
+        if (isNaN(subclassId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Subclass ID format' });
+        }
+
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string)
+            : undefined;
+
+        const { buffer, filename } = await studentService.exportSubclassStudentListPdf(
+            subclassId,
+            academicYearId
+        );
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting subclass student list as PDF:', error);
+        if (error.message?.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Export the student list of a class as a PDF file (one section per subclass).
+ * GET /students/class/:classId/export/pdf
+ */
+export const exportStudentsByClassPdf = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const classId = parseInt(req.params.classId);
+        if (isNaN(classId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Class ID format' });
+        }
+
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string)
+            : undefined;
+
+        const { buffer, filename } = await studentService.exportClassStudentListPdf(
+            classId,
+            academicYearId
+        );
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting class student list as PDF:', error);
+        if (error.message?.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Export the student list of a class as an Excel file with one sheet per subclass.
+ * GET /students/class/:classId/export
+ */
+export const exportStudentsByClass = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const classId = parseInt(req.params.classId);
+        if (isNaN(classId)) {
+            return res.status(400).json({ success: false, error: 'Invalid Class ID format' });
+        }
+
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string)
+            : undefined;
+
+        const { buffer, filename } = await studentService.exportClassStudentListExcel(
+            classId,
+            academicYearId
+        );
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting class student list:', error);
+        if (error.message?.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const getPromotionPreview = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const fromAcademicYearId = req.query.fromAcademicYearId ? parseInt(req.query.fromAcademicYearId as string) : undefined;
+        const toAcademicYearId = req.query.toAcademicYearId ? parseInt(req.query.toAcademicYearId as string) : undefined;
+
+        if (!fromAcademicYearId || !toAcademicYearId) {
+            return res.status(400).json({ success: false, error: 'fromAcademicYearId and toAcademicYearId are required' });
+        }
+
+        const preview = await studentService.getPromotionPreview(fromAcademicYearId, toAcademicYearId);
+        return res.json({ success: true, data: preview });
+    } catch (error: any) {
+        console.error('Error generating promotion preview:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const promoteStudents = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { fromAcademicYearId, toAcademicYearId, promotions } = req.body;
+
+        if (!fromAcademicYearId || !toAcademicYearId) {
+            return res.status(400).json({ success: false, error: 'fromAcademicYearId and toAcademicYearId are required' });
+        }
+        if (!Array.isArray(promotions) || promotions.length === 0) {
+            return res.status(400).json({ success: false, error: 'promotions must be a non-empty array' });
+        }
+
+        const mapped = promotions.map((p: any) => ({
+            student_id: p.studentId ?? p.student_id,
+            target_class_id: p.targetClassId ?? p.target_class_id ?? null,
+            repeater: p.repeater,
+            action: p.action,
+        }));
+
+        const results = await studentService.promoteStudents(fromAcademicYearId, toAcademicYearId, mapped);
+
+        const successCount = results.filter(r => r.success).length;
+        return res.json({
+            success: true,
+            data: {
+                total: results.length,
+                successful: successCount,
+                failed: results.length - successCount,
+                results,
+            },
+        });
+    } catch (error: any) {
+        console.error('Error promoting students:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+// POST /students/:id/unenroll - Unenroll (dismiss) a student from an academic year
+export const unenrollStudent = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid student ID format' });
+        }
+
+        const academicYearIdRaw = req.body?.academic_year_id ?? req.query?.academic_year_id;
+        const academicYearId = academicYearIdRaw !== undefined && academicYearIdRaw !== null && academicYearIdRaw !== ''
+            ? parseInt(academicYearIdRaw as string)
+            : undefined;
+        if (academicYearId !== undefined && isNaN(academicYearId)) {
+            return res.status(400).json({ success: false, error: 'Invalid academic year ID format' });
+        }
+
+        const result = await studentService.unenrollStudent(id, academicYearId);
+        return res.json({ success: true, message: 'Student unenrolled successfully', data: result });
+    } catch (error: any) {
+        console.error('Error unenrolling student:', error);
+        switch (error.message) {
+            case 'STUDENT_NOT_FOUND':
+                return res.status(404).json({ success: false, error: 'Student not found' });
+            case 'ENROLLMENT_NOT_FOUND':
+                return res.status(404).json({ success: false, error: 'Student is not enrolled in the specified academic year' });
+            case 'ACADEMIC_YEAR_NOT_FOUND':
+                return res.status(400).json({ success: false, error: 'No academic year specified and no current academic year is set' });
+            case 'ENROLLMENT_HAS_ACADEMIC_RECORDS':
+                return res.status(409).json({ success: false, error: 'Cannot unenroll: student has marks, attendance or discipline records for this year' });
+            case 'ENROLLMENT_HAS_FINANCIAL_RECORDS':
+                return res.status(409).json({ success: false, error: 'Cannot unenroll: student has payment or refund records for this year' });
+            default:
+                return res.status(500).json({ success: false, error: error.message });
+        }
+    }
+};
+
+// DELETE /students/:id - Permanently delete a student and all related data
+export const deleteStudent = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid student ID format' });
+        }
+
+        await studentService.deleteStudent(id);
+        return res.json({ success: true, message: 'Student deleted successfully' });
+    } catch (error: any) {
+        console.error('Error deleting student:', error);
+        if (error.message === 'STUDENT_NOT_FOUND' || error.code === 'P2025') {
+            return res.status(404).json({ success: false, error: 'Student not found' });
+        }
+        return res.status(500).json({ success: false, error: 'Failed to delete student due to an internal error' });
+    }
+};
+
+// GET /students/:id/siblings - Other students sharing at least one parent with this student
+export const getStudentSiblings = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid student ID format' });
+        }
+        const siblings = await studentService.getStudentSiblings(id);
+        return res.json({ success: true, data: siblings });
+    } catch (error: any) {
+        if (error.message === 'STUDENT_NOT_FOUND') {
+            return res.status(404).json({ success: false, error: 'Student not found' });
+        }
+        console.error('Error fetching siblings:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+// GET /students/:id/previous-schools
+export const listPreviousSchools = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid student ID format' });
+        }
+        const data = await studentService.listPreviousSchools(id);
+        return res.json({ success: true, data });
+    } catch (error: any) {
+        if (error.message === 'STUDENT_NOT_FOUND') {
+            return res.status(404).json({ success: false, error: 'Student not found' });
+        }
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+// POST /students/:id/previous-schools
+export const addPreviousSchool = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid student ID format' });
+        }
+        const data = await studentService.addPreviousSchool(id, req.body);
+        return res.status(201).json({ success: true, data });
+    } catch (error: any) {
+        if (error.message === 'STUDENT_NOT_FOUND') {
+            return res.status(404).json({ success: false, error: 'Student not found' });
+        }
+        return res.status(400).json({ success: false, error: error.message });
+    }
+};
+
+// PUT /students/:id/previous-schools/:psId
+export const updatePreviousSchool = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        const psId = parseInt(req.params.psId);
+        if (isNaN(id) || isNaN(psId)) {
+            return res.status(400).json({ success: false, error: 'Invalid ID format' });
+        }
+        const data = await studentService.updatePreviousSchool(id, psId, req.body);
+        return res.json({ success: true, data });
+    } catch (error: any) {
+        if (error.message === 'PREVIOUS_SCHOOL_NOT_FOUND') {
+            return res.status(404).json({ success: false, error: 'Previous school entry not found' });
+        }
+        return res.status(400).json({ success: false, error: error.message });
+    }
+};
+
+// DELETE /students/:id/previous-schools/:psId
+export const deletePreviousSchool = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        const psId = parseInt(req.params.psId);
+        if (isNaN(id) || isNaN(psId)) {
+            return res.status(400).json({ success: false, error: 'Invalid ID format' });
+        }
+        await studentService.deletePreviousSchool(id, psId);
+        return res.json({ success: true, message: 'Previous school entry deleted' });
+    } catch (error: any) {
+        if (error.message === 'PREVIOUS_SCHOOL_NOT_FOUND') {
+            return res.status(404).json({ success: false, error: 'Previous school entry not found' });
+        }
+        return res.status(500).json({ success: false, error: error.message });
     }
 };

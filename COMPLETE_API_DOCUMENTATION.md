@@ -4154,6 +4154,59 @@ Records a new payment transaction for a specific fee record and updates the fee'
 }
 ```
 
+### Edit a Payment Record
+```http
+PUT /api/v1/fees/payments/:paymentId
+Authorization: Bearer <token>
+```
+
+**Description:**
+Updates an existing payment transaction. When `amount` is changed, the parent fee's `amountPaid` is automatically adjusted by the delta (old vs. new amount) in the same transaction.
+
+**Authorization:**
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`: may edit at any time.
+- `BURSAR`: may only edit within **2 days** of the payment's `createdAt` timestamp. Attempts after the window return `403`.
+
+**Path Parameters:**
+- `paymentId` (number): The ID of the payment transaction to edit.
+
+**Request Body (all fields optional — send only what you want to change):**
+```typescript
+{
+  amount?: number;
+  paymentDate?: string;         // YYYY-MM-DD
+  receiptNumber?: string | null;
+  paymentMethod?: "EXPRESS_UNION" | "CCA" | "F3DC";
+  notes?: string | null;
+}
+```
+
+**Response (Success - 200):**
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    amount: number;
+    paymentDate: string;
+    receiptNumber?: string;
+    paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC";
+    feeId: number;
+    enrollmentId: number;
+    academicYearId: number;
+    recordedById: number;
+    notes?: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+```
+
+**Error Responses:**
+- `400`: Invalid `paymentId` or invalid `paymentMethod`.
+- `403`: Bursar attempted to edit outside the 2-day window.
+- `404`: Payment not found.
+
 ---
 
 ## Discipline Master/SDM
@@ -4273,6 +4326,233 @@ Authorization: Bearer <token>
 {
   date?: string;           // Defaults to today
   academicYearId?: number;
+}
+```
+
+---
+
+### Excuse Absence (Parent Justification)
+```http
+POST /api/v1/discipline/absences/:id/excuse
+Authorization: Bearer <token>
+```
+Marks a `StudentAbsence` as parent-excused. Excused absences do NOT count toward
+warning/summons thresholds. If a warning or summons was previously fired based
+on the now-excused row and no longer stands, the service auto-resolves the
+warning and cancels the summons (audit trail preserved via `meeting_notes`).
+
+**Authorized roles:** `SUPER_MANAGER, MANAGER, PRINCIPAL, VICE_PRINCIPAL, DEAN_OF_DISCIPLINE, DISCIPLINE_MASTER, SENIOR_DISCIPLINE_MASTER, PARENT` (parents may only excuse their own linked students' absences).
+
+**Body:**
+```typescript
+{
+  excusedByParentId?: number; // Defaults to caller if PARENT
+  excuseReason?: string;
+}
+```
+
+**Response:**
+```typescript
+{
+  success: true;
+  data: {
+    absence: StudentAbsence;   // updated row with is_excused=true
+    revertedWarnings: number;  // number of warnings auto-resolved
+    cancelledSummons: number;  // number of summons auto-cancelled
+  }
+}
+```
+
+---
+
+### Record Student Makeup
+```http
+POST /api/v1/discipline/absences/:id/makeup
+Authorization: Bearer <token>
+```
+Records the student-side academic recovery for an absence. Independent of
+parent excuse — does NOT affect warnings or summons.
+
+**Authorized roles:** `TEACHER, DEAN_OF_DISCIPLINE, DISCIPLINE_MASTER, SENIOR_DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL, MANAGER, SUPER_MANAGER`.
+
+**Body:**
+```typescript
+{
+  status: 'PENDING' | 'COMPLETED' | 'WAIVED' | 'NONE';
+  makeupNotes?: string;
+}
+```
+
+---
+
+### List Student Warnings
+```http
+GET /api/v1/discipline/warnings
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+```typescript
+{
+  enrollmentId?: number;
+  studentId?: number;
+  subClassId?: number;
+  resolved?: boolean;         // filter by resolution state
+  academicYearId?: number;
+}
+```
+
+---
+
+### Create Warning (Manual)
+```http
+POST /api/v1/discipline/warnings
+Authorization: Bearer <token>
+```
+
+**Body:**
+```typescript
+{
+  enrollmentId: number;
+  warningLevel?: number;      // Default 1
+  reason: 'CUMULATIVE_ABSENCES' | 'CHRONIC_LATENESS' | 'MISCONDUCT' | 'OTHER';
+  description: string;
+}
+```
+
+---
+
+### Resolve Warning
+```http
+PATCH /api/v1/discipline/warnings/:id/resolve
+Authorization: Bearer <token>
+```
+
+**Body:**
+```typescript
+{
+  resolvedNotes?: string;
+}
+```
+
+---
+
+### List Parent Summons
+```http
+GET /api/v1/discipline/summons
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+```typescript
+{
+  enrollmentId?: number;
+  studentId?: number;
+  subClassId?: number;
+  status?: 'PENDING' | 'SCHEDULED' | 'COMPLETED' | 'MISSED' | 'CANCELLED';
+  academicYearId?: number;
+}
+```
+
+---
+
+### Create Summons (Manual)
+```http
+POST /api/v1/discipline/summons
+Authorization: Bearer <token>
+```
+
+**Body:**
+```typescript
+{
+  enrollmentId: number;
+  parentId?: number;          // Defaults to preferred parent (FATHER > MOTHER > any)
+  reason: string;
+  scheduledDate?: string;     // ISO date
+}
+```
+
+---
+
+### Update Summons
+```http
+PUT /api/v1/discipline/summons/:id
+Authorization: Bearer <token>
+```
+
+**Body (all optional):**
+```typescript
+{
+  status?: 'PENDING' | 'SCHEDULED' | 'COMPLETED' | 'MISSED' | 'CANCELLED';
+  scheduledDate?: string | null;
+  meetingNotes?: string;
+  attended?: boolean;
+  parentId?: number | null;
+}
+```
+
+---
+
+### DM Roll Call — Get Slot Status
+```http
+GET /api/v1/discipline/dm-roll-call/status?subClassId=3&date=2026-07-21
+Authorization: Bearer <token>
+```
+Returns a per-slot map showing which of SLOT_2 / SLOT_5 / SLOT_8 have been
+recorded for a given sub-class and date. Discipline Masters are enforced to
+only query sub-classes they've been assigned to via `RoleAssignment`.
+
+---
+
+### DM Roll Call — Get Roster + Attendance
+```http
+GET /api/v1/discipline/dm-roll-call?subClassId=3&date=2026-07-21&slot=SLOT_2
+Authorization: Bearer <token>
+```
+
+Returns the full enrolled roster of the sub-class with each student's
+recorded status (`PRESENT` / `LATE` / `ABSENT`) or `null` if not yet marked.
+
+---
+
+### DM Roll Call — Record
+```http
+POST /api/v1/discipline/dm-roll-call
+Authorization: Bearer <token>
+```
+
+Records (or replaces) a slot roll call. On `ABSENT`, creates or reuses a
+`StudentAbsence(CLASS_ABSENCE, teacher_period_id=null)` and fires
+`evaluateAbsenceTriggers` → possible `StudentWarning` / `ParentSummons` auto-creation.
+On `LATE` at `SLOT_2`, creates `StudentAbsence(MORNING_LATENESS)`.
+On `LATE` at `SLOT_5` / `SLOT_8`, records a `DisciplineIssue(MISCONDUCT, "Late return after break")`.
+
+**Body:**
+```typescript
+{
+  subClassId: number;
+  date: string;            // ISO date; normalized to UTC midnight
+  slot: 'SLOT_2' | 'SLOT_5' | 'SLOT_8';
+  entries: Array<{
+    enrollmentId: number;
+    status: 'PRESENT' | 'LATE' | 'ABSENT';
+  }>;
+  academicYearId?: number; // Defaults to current year
+}
+```
+
+**Response:**
+```typescript
+{
+  success: true;
+  data: {
+    rollCall: DMRollCall;
+    triggers: Array<{
+      enrollmentId: number;
+      warnings: StudentWarning[];  // any newly-created warnings
+      summons: ParentSummons[];    // any newly-created summons
+    }>;
+  }
 }
 ```
 
@@ -7212,7 +7492,9 @@ Authorization: Bearer <token>
 ```typescript
 {
   matricule?: string;      // Auto-generated if not provided
-  name: string;
+  name?: string;
+  nom?: string;
+  prenom?: string;
   dateOfBirth: string;   // "YYYY-MM-DD"
   placeOfBirth: string;
   gender: "MALE" | "FEMALE";
@@ -7220,6 +7502,16 @@ Authorization: Bearer <token>
   formerSchool?: string;
   isNewStudent?: boolean; // Defaults to true
   status?: "NOT_ENROLLED" | "ENROLLED" | "ASSIGNED_TO_CLASS" | "GRADUATED" | "TRANSFERRED" | "SUSPENDED";
+  // Discipline / profile extensions
+  admissionAcademicYearId?: number;              // User-selectable admission year (any year)
+  healthConditions?: Array<"SICKLE_CELL" | "ASTHMATIC" | "EPILEPTIC" | "DIABETIC" | "ALLERGY" | "HYPERTENSION" | "OTHER">;
+  medicalNotes?: string;
+  previousSchools?: Array<{
+    schoolName: string;
+    fromYear?: string;
+    toYear?: string;
+    notes?: string;
+  }>;
 }
 ```
 
@@ -7242,6 +7534,151 @@ PUT /api/v1/students/:id
 Authorization: Bearer <token>
 ```
 
+**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `BURSAR`, `SECRETARY`
+
+**Request Body (all fields optional — supports every field from Create Student):**
+```typescript
+{
+  matricule?: string;                 // Must remain unique across students
+  name?: string;                      // Auto-recomputed from nom + prenom when either changes
+  nom?: string;                       // Family name (keeps `name` in sync with prenom)
+  prenom?: string;                    // Given name (keeps `name` in sync with nom)
+  dateOfBirth?: string;               // ISO date (e.g. "2010-05-14")
+  placeOfBirth?: string;
+  gender?: "Male" | "Female";
+  residence?: string;
+  formerSchool?: string;
+  isNewStudent?: boolean;             // Triggers fee recalculation if changed
+  status?: "NOT_ENROLLED" | "ENROLLED" | "ASSIGNED_TO_CLASS" | "GRADUATED" | "TRANSFERRED" | "SUSPENDED";
+  // Ream-of-paper collection (stored on the student's Enrollment for the academic year)
+  reamOfPaperCollected?: boolean;
+  academicYearId?: number;            // Optional; targets which enrollment to update. Defaults to current academic year.
+  // Discipline / profile extensions
+  admissionAcademicYearId?: number;
+  healthConditions?: Array<"SICKLE_CELL" | "ASTHMATIC" | "EPILEPTIC" | "DIABETIC" | "ALLERGY" | "HYPERTENSION" | "OTHER">;
+  medicalNotes?: string;
+  // NOTE: previous_schools are managed via /students/:id/previous-schools endpoints, not via Update Student.
+}
+```
+
+**Notes:**
+- `reamOfPaperCollected` updates the `Enrollment.ream_of_paper_collected` flag for the student's enrollment in the given (or current) academic year. The student must already be enrolled in that year — otherwise a 500 error is returned with message `No enrollment found for student <id> in academic year <yearId>...`.
+- When `reamOfPaperCollected` is included, the response `data` will include an `enrollment` object reflecting the updated enrollment record alongside the updated student fields.
+
+**Response (200):**
+```typescript
+{
+  success: true,
+  data: {
+    // ...Student fields (id, name, matricule, ...)
+    enrollment?: {
+      id: number;
+      studentId: number;
+      academicYearId: number;
+      classId: number;
+      subClassId: number | null;
+      reamOfPaperCollected: boolean;
+      repeater: boolean;
+      // ...
+    }
+  }
+}
+```
+
+### Delete Student
+```http
+DELETE /api/v1/students/:id
+Authorization: Bearer <token>
+```
+
+**Authorization:** `SUPER_MANAGER`, `BURSAR` — either role may delete any student.
+
+Permanently removes the student and cascades through all related records (enrollments, marks, fees, payments, absences, discipline issues, parent links, generated reports, etc.).
+
+**Responses:**
+- `200`: `{ success: true, message: "Student deleted successfully" }`
+- `404`: `{ success: false, error: "Student not found" }`
+- `500`: `{ success: false, error: "Failed to delete student due to an internal error" }`
+
+### Get Siblings
+```http
+GET /api/v1/students/:id/siblings
+Authorization: Bearer <token>
+```
+
+Returns every other student who shares at least one parent with the given
+student. Includes each sibling's current-year enrollment (if any) plus the
+shared parent link(s).
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: Array<{
+    student: Student;
+    currentEnrollment: Enrollment | null;
+    sharedParents: Array<{
+      parent: { id: number; name: string; email: string; phone: string };
+      siblingRelationship: "FATHER" | "MOTHER" | "SIBLING" | "GUARDIAN" | null;
+      targetRelationship: "FATHER" | "MOTHER" | "SIBLING" | "GUARDIAN" | null;
+    }>
+  }>
+}
+```
+
+### List Previous Schools
+```http
+GET /api/v1/students/:id/previous-schools
+Authorization: Bearer <token>
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: Array<{
+    id: number;
+    studentId: number;
+    schoolName: string;
+    fromYear: string | null;
+    toYear: string | null;
+    notes: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>
+}
+```
+
+### Add Previous School
+```http
+POST /api/v1/students/:id/previous-schools
+Authorization: Bearer <token>
+```
+
+**Body:**
+```typescript
+{
+  schoolName: string;
+  fromYear?: string;
+  toYear?: string;
+  notes?: string;
+}
+```
+
+### Update Previous School
+```http
+PUT /api/v1/students/:id/previous-schools/:psId
+Authorization: Bearer <token>
+```
+
+Body (all optional): same fields as Add.
+
+### Delete Previous School
+```http
+DELETE /api/v1/students/:id/previous-schools/:psId
+Authorization: Bearer <token>
+```
+
 ### Enroll Student
 ```http
 POST /api/v1/students/:id/enroll
@@ -7254,7 +7691,8 @@ Authorization: Bearer <token>
   subClassId: number;
   academicYearId?: number;
   photo?: string;
-  repeater?: boolean;      // Defaults to false
+  repeater?: boolean;             // Defaults to false
+  reamOfPaperCollected?: boolean; // Optional, used for new students
 }
 ```
 
@@ -7617,10 +8055,31 @@ GET /api/v1/users/:id
 Authorization: Bearer <token>
 ```
 
+**Authorization:** `SUPER_MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `BURSAR`, `SECRETARY`
+
 ### Update User
 ```http
 PUT /api/v1/users/:id
 Authorization: Bearer <token>
+```
+
+**Authorization:** `SUPER_MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `BURSAR`, `SECRETARY`
+
+Used to update any user record — including parents (parents are stored as `User` records with role `PARENT`). Send only the fields you want to change.
+
+**Request Body (all fields optional):**
+```typescript
+{
+  name?: string;
+  email?: string;
+  phone?: string;
+  whatsappNumber?: string;
+  address?: string;
+  gender?: "Male" | "Female";
+  dateOfBirth?: string;               // ISO date
+  password?: string;                  // Will be hashed
+  status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+}
 ```
 
 ### Delete User
@@ -10311,4 +10770,229 @@ Generates a report of students with outstanding fee balances (defaulters).
   error: "Error fetching defaulters report: [error message]";
 }
 ```
+
+---
+
+## Slack-Style Chat (`/chat`)
+
+Slack-like workspace with department channels, subject channels, custom channels, direct messages, threaded replies, reactions, unread tracking, and real-time delivery over Socket.IO. All endpoints require `Authorization: Bearer <JWT>`.
+
+**Auto-seeded channels (on server boot, idempotent):**
+- One `DEPARTMENT` channel per Department (`ACADEMIC`, `DISCIPLINE`, `FINANCE`, `WELFARE`, `FRONT_OFFICE`, `EXECUTIVE`). Staff are auto-added based on their role's department.
+- One `SUBJECT` channel per Subject that has an HOD. Members: HOD (as ADMIN) + all subject teachers.
+
+**Channel types**: `DEPARTMENT` | `SUBJECT` | `CUSTOM` | `DIRECT`
+**Member roles**: `MEMBER` | `ADMIN`
+
+**Parent access rules**: Parents cannot join channels; they can only post in `DIRECT` channels, and only with staff whose role is in `PARENT_CONTACTABLE_ROLES` (`TEACHER`, `HOD`, `BURSAR`, `VICE_PRINCIPAL`, `DEAN_OF_STUDIES`, `GUIDANCE_COUNSELOR`, `PRINCIPAL`).
+
+### `GET /chat/channels`
+List all channels the current user is a member of, with unread counts and last message.
+
+**Response 200:**
+```typescript
+{
+  success: true;
+  data: Array<{
+    id: number;
+    name: string;
+    description: string | null;
+    type: 'DEPARTMENT' | 'SUBJECT' | 'CUSTOM' | 'DIRECT';
+    department: string | null;
+    subject: { id: number; name: string } | null;
+    isPrivate: boolean;
+    isSystem: boolean;
+    myRole: 'MEMBER' | 'ADMIN';
+    muted: boolean;
+    lastReadAt: string | null;
+    unreadCount: number;
+    lastMessage: { id: number; content: string; senderId: number; sender: {...}; createdAt: string } | null;
+    memberCount: number;
+    updatedAt: string;
+  }>;
+}
+```
+
+### `POST /chat/channels`
+Create a custom channel. Not available to `PARENT` role.
+
+**Request:**
+```typescript
+{
+  name: string;                 // required
+  description?: string;
+  memberIds: number[];          // initial members (creator is added automatically as ADMIN)
+  isPrivate?: boolean;
+}
+```
+
+**Response 201:** created `ChatChannel` with members.
+
+### `GET /chat/channels/:id`
+Full channel details plus member list with roles.
+
+### `GET /chat/channels/:id/messages`
+Paginated message list for a channel (or a thread if `threadOf` is passed).
+
+**Query parameters:**
+- `before` (ISO date, optional) — return messages older than this
+- `limit` (default 50, max 200)
+- `threadOf` (message id) — when set, returns replies to that message
+
+**Response 200:** array of `ChatMessage` in chronological order, each with `sender`, `attachments`, `reactions`, `_count.replies`.
+
+### `POST /chat/channels/:id/messages`
+Post a new message in a channel (or reply in a thread).
+
+**Request:**
+```typescript
+{
+  content: string;                    // required unless attachments present
+  parentMessageId?: number | null;    // for thread replies
+  attachments?: Array<{
+    fileUrl: string;
+    fileName: string;
+    mimeType?: string;
+    sizeBytes?: number;
+  }>;
+}
+```
+
+**Side effects:**
+- Emits `message.new` over WebSocket to `channel:<id>` room.
+- Creates in-app `MobileNotification` for every non-muted member except sender.
+
+**Response 201:** created `ChatMessage`.
+
+**403** if user is not a channel member, or is a `PARENT` posting outside a `DIRECT` channel.
+
+### `PATCH /chat/messages/:id`
+Edit a message (sender only). Sets `editedAt`. Emits `message.updated`.
+
+**Request:** `{ content: string }`
+
+### `DELETE /chat/messages/:id`
+Soft-delete a message. Allowed for the sender or channel `ADMIN`. Emits `message.deleted`.
+
+### `POST /chat/messages/:id/reactions`
+Add an emoji reaction to a message. Idempotent (same user + same emoji is a no-op). Emits `reaction.added`.
+
+**Request:** `{ emoji: string }` (e.g. `":+1:"` or an emoji character)
+
+### `DELETE /chat/messages/:id/reactions/:emoji`
+Remove the current user's reaction with the given emoji. Emits `reaction.removed`.
+
+### `POST /chat/channels/:id/read`
+Mark the channel as read up to a point in time.
+
+**Request:** `{ upToMessageId?: number }` — if provided, uses that message's `createdAt`; otherwise uses "now".
+
+**Response 200:** `{ success: true, data: { lastReadAt: string } }`. Emits `read.updated`.
+
+### `POST /chat/channels/:id/members`
+Add a member to a `CUSTOM` channel. Requires the caller to be an `ADMIN` in that channel. System channels (`DEPARTMENT`, `SUBJECT`) reject manual membership changes.
+
+**Request:** `{ userId: number }`
+
+Emits `member.joined` on the channel and `channel.created` to the new member.
+
+### `DELETE /chat/channels/:id/members/:userId`
+Remove a member from a channel, or leave the channel (`:userId` = self). System channels cannot be left. Emits `member.left`.
+
+### `POST /chat/dm`
+Open (or reuse) a direct-message channel with one or more users. If a DM channel with the exact same participants already exists, it is returned; otherwise a new one is created.
+
+**Request:** `{ userIds: number[] }` (creator is added automatically)
+
+**Parent-specific validation**: every counterpart must have a role in `PARENT_CONTACTABLE_ROLES` — otherwise 403.
+
+**Response 200:** the DM `ChatChannel` with members. Also emits `channel.created` to every participant.
+
+---
+
+## WebSocket (Socket.IO)
+
+**Endpoint:** `ws://<host>/socket.io`
+
+**Handshake authentication** — send the JWT in either:
+- `socket.handshake.auth.token`
+- `Authorization: Bearer <token>` header
+
+Blacklisted tokens are rejected. Invalid or missing tokens → connection refused with `unauthorized`.
+
+**Automatic room membership on connect:**
+- `user:<userId>` — personal room
+- `channel:<channelId>` for every channel the user is a member of
+
+**Client → server events:**
+| Event | Payload | Effect |
+|-------|---------|--------|
+| `subscribe` | `{ channelId }` | Join a channel room (only if user is a member) |
+| `unsubscribe` | `{ channelId }` | Leave a channel room |
+| `typing` | `{ channelId }` | Broadcast to other members that user is typing |
+| `presence` | (none) | Announce online status |
+
+**Server → client events:**
+| Event | Emitted when | Payload |
+|-------|--------------|---------|
+| `channel.created` | User is added to a new channel | full `ChatChannel` |
+| `message.new` | Anyone posts in the channel | full `ChatMessage` |
+| `message.updated` | A message is edited | full `ChatMessage` |
+| `message.deleted` | A message is soft-deleted | `{ id, channelId }` |
+| `reaction.added` | A reaction is added | `{ messageId, channelId, reaction }` |
+| `reaction.removed` | A reaction is removed | `{ messageId, channelId, userId, emoji }` |
+| `member.joined` | A member is added | `{ channelId, member }` |
+| `member.left` | A member leaves/is removed | `{ channelId, userId }` |
+| `read.updated` | Someone marks read | `{ channelId, userId, lastReadAt }` |
+| `typing` | Peer is typing | `{ userId, channelId }` |
+| `presence` | Peer connects/disconnects | `{ userId, status }` |
+
+---
+
+## Parent Contact Directory (`/parents/me/*`)
+
+Curated staff directory endpoints for parents. Authorization: `PARENT` role.
+
+### `GET /parents/me/contacts`
+Returns three groups the parent can start a chat with.
+
+**Response 200:**
+```typescript
+{
+  success: true;
+  data: {
+    fixedStaff: Array<{ id, name, matricule, photo, userRoles: [...] }>;   // Principal, VP, Bursar, Dean of Studies
+    childTeachers: Array<{
+      id, name, matricule, photo, userRoles,
+      teaches: Array<{ student: {id, name}, subject: {id, name}, subClass: {id, name} }>;
+    }>;
+    hodsBySubject: Array<{ subject: {id, name}, hod: {id, name, matricule, photo, userRoles} }>;
+  };
+}
+```
+
+### `POST /parents/me/contact/:userId`
+Open (or reuse) a direct-message chat with a staff member.
+
+**Response 200:** the `ChatChannel` — the parent then posts messages via `POST /chat/channels/:id/messages`.
+
+**403** if the target user's role is not in `PARENT_CONTACTABLE_ROLES`.
+
+---
+
+## Report Requests (`/report-requests`) — Generalized
+
+Previously restricted to `DEAN_OF_DISCIPLINE → SDM/DM`. As of 2026-07-21 the workflow is **reporting-chain-aware**: any senior can request a report from anyone below them in the hierarchy defined in `src/utils/roleHierarchy.ts` (`outranks()`).
+
+- Requester's highest role must strictly outrank the recipient's highest role (lower `RoleTier` number).
+- Cannot request from a `PARENT`.
+- Cannot request from yourself.
+
+**Route allow-lists** are broadened but the core authorization is inside the service. The endpoints, payloads, and status flow (`PENDING` → `SUBMITTED` → `REVIEWED` / `CANCELLED`) are unchanged.
+
+Examples of newly-valid pairs:
+- `VICE_PRINCIPAL` → `TEACHER` ✓
+- `HOD` → `TEACHER` ✓
+- `PRINCIPAL` → `BURSAR` ✓
+- `TEACHER` → `VICE_PRINCIPAL` ✗ (403 — requester does not outrank recipient)
 

@@ -741,16 +741,20 @@ export async function getSubclassControlFeesSummary(sub_classId: number, academi
 /**
  * Normalizes payment method string to an enum value
  */
-function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC' {
+function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC' | 'AFRILAND_FIRST_BANK' {
     const upperMethod = method.toUpperCase();
     if (Object.values(PaymentMethod).includes(upperMethod as PaymentMethod)) {
-        return upperMethod as 'EXPRESS_UNION' | 'CCA' | 'F3DC';
+        return upperMethod as 'EXPRESS_UNION' | 'CCA' | 'F3DC' | 'AFRILAND_FIRST_BANK';
     }
     // Default to a known method or throw an error if the method is invalid
     throw new Error(`Invalid payment method: ${method}`);
 }
 
-export async function recordControlPayment(data: {
+// Four-eyes audit: the Controller only records payments. They never enter expected
+// amounts or due dates — the parent ControlSchoolFees row is auto-created as a
+// per-enrollment container with amount_expected=0. Admins compare the running
+// amount_paid against the primary ledger to spot discrepancies.
+export async function recordSimpleControlPayment(data: {
     amount: number;
     payment_date: string;
     receipt_number?: string;
@@ -758,37 +762,58 @@ export async function recordControlPayment(data: {
     enrollment_id?: number;
     student_id?: number;
     academic_year_id?: number;
-    control_fee_id: number;
     recorded_by_id?: number;
 }): Promise<ControlPaymentTransaction> {
-    // Convert student_id to enrollment_id if student_id is provided
+    const academicYearId = data.academic_year_id || await getAcademicYearId();
+    if (!academicYearId) {
+        throw new Error('Academic year ID is required to record a control payment.');
+    }
+
     if (data.student_id && !data.enrollment_id) {
-        const studentId = typeof data.student_id === 'string' ? parseInt(data.student_id, 10) : data.student_id;
-        const yearId = data.academic_year_id || await getAcademicYearId();
-        if (!yearId) {
-            throw new Error("Academic year ID is required to find enrollment by student ID, but none was provided or found.");
-        }
-        const enrollment = await getStudentSubclassByStudentAndYear(studentId, yearId);
+        const studentId = typeof data.student_id === 'string' ? parseInt(data.student_id as any, 10) : data.student_id;
+        const enrollment = await getStudentSubclassByStudentAndYear(studentId, academicYearId);
         if (!enrollment) {
-            throw new Error(`Student with ID ${studentId} not enrolled in academic year ${yearId}`);
+            throw new Error(`Student with ID ${studentId} is not enrolled in academic year ${academicYearId}`);
         }
         data.enrollment_id = enrollment.id;
     }
 
     if (!data.enrollment_id) {
-        throw new Error('Enrollment ID is required to record a control payment.');
+        throw new Error('Either enrollmentId or studentId is required.');
+    }
+
+    if (!data.amount || data.amount <= 0) {
+        throw new Error('Amount must be greater than 0.');
     }
 
     const normalizedPaymentMethod = normalizePaymentMethod(data.payment_method);
 
-    // Get academic year ID if not provided
-    const academicYearId = data.academic_year_id || await getAcademicYearId();
-    if (!academicYearId) {
-        throw new Error("Academic year ID is required to record a control payment, but none was provided or found.");
+    // Find-or-create the per-enrollment container. amount_expected stays at 0 — only
+    // the running amount_paid matters for audit comparison.
+    let container = await prisma.controlSchoolFees.findUnique({
+        where: {
+            enrollment_id_academic_year_id: {
+                enrollment_id: data.enrollment_id,
+                academic_year_id: academicYearId,
+            },
+        },
+    });
+
+    if (!container) {
+        const academicYear = await prisma.academicYear.findUnique({ where: { id: academicYearId } });
+        container = await prisma.controlSchoolFees.create({
+            data: {
+                enrollment_id: data.enrollment_id,
+                academic_year_id: academicYearId,
+                amount_expected: 0,
+                amount_paid: 0,
+                due_date: academicYear?.end_date || new Date(new Date().getFullYear(), 11, 31),
+            },
+        });
     }
 
     const createData: any = {
-        control_fee_id: data.control_fee_id,
+        control_fee_id: container.id,
         enrollment_id: data.enrollment_id,
         academic_year_id: academicYearId,
         amount: data.amount,
@@ -796,23 +821,15 @@ export async function recordControlPayment(data: {
         receipt_number: data.receipt_number,
         payment_method: normalizedPaymentMethod,
     };
-
     if (data.recorded_by_id !== undefined) {
         createData.recorded_by_id = data.recorded_by_id;
     }
 
-    const payment = await prisma.controlPaymentTransaction.create({
-        data: createData,
-    });
+    const payment = await prisma.controlPaymentTransaction.create({ data: createData });
 
-    // Update the amount_paid in the ControlSchoolFees record
     await prisma.controlSchoolFees.update({
-        where: { id: data.control_fee_id },
-        data: {
-            amount_paid: {
-                increment: data.amount // Add the new payment amount to the total paid
-            }
-        }
+        where: { id: container.id },
+        data: { amount_paid: { increment: data.amount } },
     });
 
     return payment;

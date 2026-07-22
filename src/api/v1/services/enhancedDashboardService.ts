@@ -345,11 +345,14 @@ export async function getEnhancedBursarDashboard(academicYearId?: number): Promi
 }
 
 async function getBursarFinancialOverview(yearId?: number) {
-    const [feesData, paymentsData] = await Promise.all([
-        prisma.schoolFees.aggregate({
+    const [feeRows, paymentsData] = await Promise.all([
+        prisma.schoolFees.findMany({
             where: yearId ? { academic_year_id: yearId } : undefined,
-            _sum: { amount_expected: true, amount_paid: true },
-            _count: { id: true }
+            select: {
+                enrollment_id: true,
+                amount_expected: true,
+                amount_paid: true
+            }
         }),
 
         prisma.paymentTransaction.findMany({
@@ -364,12 +367,24 @@ async function getBursarFinancialOverview(yearId?: number) {
         })
     ]);
 
+    // Aggregate outstanding balance per enrollment to count distinct students owing.
+    const owingByEnrollment = new Map<number, number>();
+    for (const row of feeRows) {
+        const balance = (row.amount_expected || 0) - (row.amount_paid || 0);
+        if (balance > 0) {
+            owingByEnrollment.set(
+                row.enrollment_id,
+                (owingByEnrollment.get(row.enrollment_id) || 0) + balance
+            );
+        }
+    }
+    const studentsOwingCount = owingByEnrollment.size;
+    const totalAmountOwed = Array.from(owingByEnrollment.values()).reduce((s, v) => s + v, 0);
+
     return {
-        totalExpected: feesData._sum.amount_expected || 0,
-        totalCollected: feesData._sum.amount_paid || 0,
-        collectionRate: feesData._sum.amount_expected ?
-            (feesData._sum.amount_paid! / feesData._sum.amount_expected) * 100 : 0,
-        totalAccounts: feesData._count.id,
+        studentsOwingCount,
+        totalAmountOwed,
+        totalAccounts: feeRows.length,
         recentPayments: paymentsData.map(p => ({
             id: p.id,
             amount: p.amount,

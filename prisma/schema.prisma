@@ -8,78 +8,128 @@ datasource db {
 }
 
 model AcademicYear {
-  id                        Int                  @id @unique @default(autoincrement())
-  name                      String?
-  start_date                DateTime
-  end_date                  DateTime
-  is_current                Boolean              @default(false)
-  report_deadline           DateTime?
-  created_at                DateTime             @default(now())
-  updated_at                DateTime             @updatedAt
-  announcements             Announcement[]
-  enrollments               Enrollment[]
-  exam_papers               ExamPaper[]
-  exam_sequences            ExamSequence[]
-  generated_reports         GeneratedReport[]
+  id                           Int                         @id @unique @default(autoincrement())
+  name                         String?
+  start_date                   DateTime
+  end_date                     DateTime
+  is_current                   Boolean                     @default(false)
+  report_deadline              DateTime?
+  created_at                   DateTime                    @default(now())
+  updated_at                   DateTime                    @updatedAt
+  announcements                Announcement[]
+  enrollments                  Enrollment[]
+  exam_papers                  ExamPaper[]
+  exam_sequences               ExamSequence[]
+  generated_reports            GeneratedReport[]
   payment_transactions         PaymentTransaction[]
   school_fees                  SchoolFees[]
   control_payment_transactions ControlPaymentTransaction[]
   control_school_fees          ControlSchoolFees[]
-  first_enrollment_students    Student[]            @relation("StudentFirstEnrollment")
-  teacher_periods           TeacherPeriod[]
-  terms                     Term[]
-  role_assignments          RoleAssignment[]
-  QuizTemplate              QuizTemplate[]
-  QuizSubmission            QuizSubmission[]
-  UserRole                  UserRole[]
+  first_enrollment_students    Student[]                   @relation("StudentFirstEnrollment")
+  admitted_students            Student[]                   @relation("StudentAdmissionYear")
+  dm_roll_calls                DMRollCall[]
+  teacher_roll_calls           TeacherRollCall[]
+  seized_items                 SeizedItem[]
+  teacher_periods              TeacherPeriod[]
+  terms                        Term[]
+  role_assignments             RoleAssignment[]
+  QuizTemplate                 QuizTemplate[]
+  QuizSubmission               QuizSubmission[]
+  UserRole                     UserRole[]
+  fee_items                    FeeItem[]
+  subject_schemes              SubjectScheme[]
 }
 
 model User {
-  id                         Int                  @id @unique @default(autoincrement())
-  name                       String
-  gender                     Gender
-  date_of_birth              DateTime
-  photo                      String?
-  phone                      String
-  whatsapp_number            String? // For parents communication
-  address                    String
-  email                      String               @unique
-  password                   String
-  id_card_num                String?
-  matricule                  String?              @unique
-  status                     UserStatus           @default(ACTIVE)
-  total_hours_per_week       Int? // For teachers
-  created_at                 DateTime             @default(now())
-  updated_at                 DateTime             @updatedAt
+  id                            Int                         @id @unique @default(autoincrement())
+  name                          String
+  gender                        Gender
+  date_of_birth                 DateTime
+  photo                         String?
+  phone                         String
+  whatsapp_number               String? // For parents communication
+  address                       String
+  email                         String                      @unique
+  password                      String
+  id_card_num                   String?
+  matricule                     String?                     @unique
+  status                        UserStatus                  @default(ACTIVE)
+  total_hours_per_week          Int? // For teachers
+  last_seen_at                  DateTime? // Presence: updated when a chat websocket disconnects
+  created_at                    DateTime                    @default(now())
+  updated_at                    DateTime                    @updatedAt
   // Relationships
-  announcements              Announcement[]
-  discipline_issues_assigned DisciplineIssue[]    @relation("AssignedDisciplineIssue")
-  discipline_issues_reviewed DisciplineIssue[]    @relation("ReviewedDisciplineIssue")
-  marks                      Mark[]               @relation("RecordedByUser")
-  mobile_notifications       MobileNotification[]
-  parent_students            ParentStudent[]
-  student_absences           StudentAbsence[]
-  class_master_of            SubClass[]           @relation("ClassMaster")
-  hod_subjects               Subject[]            @relation("HODSubject") // Head of Department
-  sub_class_subjects         SubClassSubject[]
-  subject_teachers           SubjectTeacher[]
-  assigned_teacher_absences  TeacherAbsence[]     @relation("AssignedByUser")
-  teacher_absences           TeacherAbsence[]
-  assigned_teacher_periods   TeacherPeriod[]      @relation("TeacherPeriods-AssignedBy")
-  teacher_periods            TeacherPeriod[]      @relation("TeacherPeriods-Teacher")
-  user_roles                 UserRole[]
-  role_assignments           RoleAssignment[]
+  announcements                 Announcement[]
+  discipline_issues_assigned    DisciplineIssue[]           @relation("AssignedDisciplineIssue")
+  discipline_issues_reviewed    DisciplineIssue[]           @relation("ReviewedDisciplineIssue")
+  marks                         Mark[]                      @relation("RecordedByUser")
+  mobile_notifications          MobileNotification[]
+  parent_students               ParentStudent[]
+  student_absences              StudentAbsence[]
+  class_master_of               SubClass[]                  @relation("ClassMaster")
+  hod_subjects                  Subject[]                   @relation("HODSubject") // Head of Department
+  sub_class_subjects            SubClassSubject[]
+  subject_teachers              SubjectTeacher[]
+  assigned_teacher_absences     TeacherAbsence[]            @relation("AssignedByUser")
+  teacher_absences              TeacherAbsence[]
+  assigned_teacher_periods      TeacherPeriod[]             @relation("TeacherPeriods-AssignedBy")
+  teacher_periods               TeacherPeriod[]             @relation("TeacherPeriods-Teacher")
+  user_roles                    UserRole[]
+  role_assignments              RoleAssignment[]
   // Communication
-  sent_messages              Message[]            @relation("SentMessages")
-  received_messages          Message[]            @relation("ReceivedMessages")
+  sent_messages                 Message[]                   @relation("SentMessages")
+  received_messages             Message[]                   @relation("ReceivedMessages")
+  // Slack-style chat
+  chat_channels_created         ChatChannel[]               @relation("ChatChannelCreatedBy")
+  chat_memberships              ChatChannelMember[]
+  chat_messages_sent            ChatMessage[]               @relation("ChatMessageSender")
+  chat_reactions                ChatMessageReaction[]
+  chat_mentions                 ChatMessageMention[]
+  // Personnel inventory
+  inventory_items_created       InventoryItem[]             @relation("InventoryItemCreatedBy")
+  inventory_holdings            InventoryHolding[]
+  inventory_transfers_sent      InventoryTransfer[]         @relation("InventoryTransferFrom")
+  inventory_transfers_received  InventoryTransfer[]         @relation("InventoryTransferTo")
+  inventory_transfers_resolved  InventoryTransfer[]         @relation("InventoryTransferResolvedBy")
+  inventory_ledger              InventoryLedger[]           @relation("InventoryLedgerUser")
+  inventory_ledger_acted        InventoryLedger[]           @relation("InventoryLedgerActor")
   // Forms and tracking
-  form_submissions           FormSubmission[]
-  audit_logs                 AuditLog[]
+  form_submissions              FormSubmission[]
+  audit_logs                    AuditLog[]
   // Fee management
-  recorded_payments          PaymentTransaction[]        @relation("RecordedByUser")
-  recorded_control_payments  ControlPaymentTransaction[] @relation("RecordedByUserControl")
-  QuizTemplate               QuizTemplate[]
-  QuizSubmission             QuizSubmission[]
+  recorded_payments             PaymentTransaction[]        @relation("RecordedByUser")
+  recorded_control_payments     ControlPaymentTransaction[] @relation("RecordedByUserControl")
+  created_fee_items             FeeItem[]                   @relation("FeeItemCreatedBy")
+  recorded_fee_item_payments    FeeItemPayment[]            @relation("FeeItemPaymentRecordedBy")
+  recorded_refunds              Refund[]                    @relation("RefundRecordedBy")
+  finance_requests_made         FinanceRequest[]            @relation("FinanceRequestRequestedBy")
+  finance_requests_acted        FinanceRequest[]            @relation("FinanceRequestActedBy")
+  recorded_expenditures         Expenditure[]               @relation("ExpenditureRecordedBy")
+  received_expenditures         Expenditure[]               @relation("ExpenditureRecipient")
+  saturday_punishments_assigned SaturdayPunishment[]        @relation("SaturdayPunishmentAssignedBy")
+  broken_properties_reported    BrokenProperty[]            @relation("BrokenPropertyReportedBy")
+  disciplinary_actions_decided  DisciplinaryAction[]        @relation("DisciplinaryActionDecidedBy")
+  report_requests_sent          ReportRequest[]             @relation("ReportRequestRequestedBy")
+  report_requests_received      ReportRequest[]             @relation("ReportRequestRequestedFrom")
+  QuizTemplate                  QuizTemplate[]
+  QuizSubmission                QuizSubmission[]
+  created_subject_schemes       SubjectScheme[]             @relation("SubjectSchemeCreatedBy")
+  logbook_entries_taught        LogbookEntry[]              @relation("LogbookEntryTaughtBy")
+  logbook_entries_reviewed      LogbookEntry[]              @relation("LogbookEntryReviewedBy")
+  // Discipline extensions
+  absences_excused              StudentAbsence[]            @relation("AbsenceExcusedByParent")
+  absence_makeups_verified      StudentAbsence[]            @relation("AbsenceMakeupVerifiedBy")
+  student_warnings_issued       StudentWarning[]            @relation("WarningIssuedBy")
+  parent_summons_as_parent      ParentSummons[]             @relation("SummonsParent")
+  parent_summons_created        ParentSummons[]             @relation("SummonsCreatedBy")
+  dm_roll_calls_recorded        DMRollCall[]                @relation("DMRollCallRecordedBy")
+  teacher_roll_calls_recorded   TeacherRollCall[]           @relation("TeacherRollCallRecordedBy")
+  seized_items_seized           SeizedItem[]                @relation("SeizedItemSeizedBy")
+  seized_items_in_custody       SeizedItem[]                @relation("SeizedItemCustodian")
+  seized_items_released_to      SeizedItem[]                @relation("SeizedItemReleasedTo")
+  seized_item_transfers_sent    SeizedItemTransfer[]        @relation("SeizedItemTransferFrom")
+  seized_item_transfers_received SeizedItemTransfer[]       @relation("SeizedItemTransferTo")
+  seized_item_transfers_resolved SeizedItemTransfer[]       @relation("SeizedItemTransferResolvedBy")
 }
 
 model UserRole {
@@ -114,33 +164,40 @@ model RoleAssignment {
 }
 
 model ParentStudent {
-  id         Int      @id @default(autoincrement())
-  parent_id  Int
-  student_id Int
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  parent     User     @relation(fields: [parent_id], references: [id])
-  student    Student  @relation("StudentParents", fields: [student_id], references: [id])
+  id           Int           @id @default(autoincrement())
+  parent_id    Int
+  student_id   Int
+  relationship Relationship?
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+  parent       User          @relation(fields: [parent_id], references: [id])
+  student      Student       @relation("StudentParents", fields: [student_id], references: [id])
 
   @@unique([parent_id, student_id])
 }
 
 model Class {
-  id                Int          @id @unique @default(autoincrement())
+  id                Int             @id @unique @default(autoincrement())
   name              String
-  max_students      Int          @default(80) // Maximum 80 students per class
-  created_at        DateTime     @default(now())
-  updated_at        DateTime     @updatedAt
+  max_students      Int             @default(80) // Maximum 80 students per class
+  pass_mark         Float           @default(10.0) // Minimum annual average to be promoted to next_class
+  next_class_id     Int? // Linear progression target; null = terminal (graduates) or manual choice (e.g. FORM 5 → arts/science)
+  created_at        DateTime        @default(now())
+  updated_at        DateTime        @updatedAt
   // Simplified fee structure
-  base_fee          Float        @default(0)
-  miscellaneous_fee Float        @default(0)
-  new_student_fee   Float        @default(0)
-  old_student_fee   Float        @default(0)
-  first_term_fee    Float        @default(0)
-  second_term_fee   Float        @default(0)
-  third_term_fee    Float        @default(0)
+  base_fee          Float           @default(0)
+  miscellaneous_fee Float           @default(0)
+  new_student_fee   Float           @default(0)
+  old_student_fee   Float           @default(0)
+  first_term_fee    Float           @default(0)
+  second_term_fee   Float           @default(0)
+  third_term_fee    Float           @default(0)
   sub_classes       SubClass[]
   Enrollment        Enrollment[]
+  next_class        Class?          @relation("ClassProgression", fields: [next_class_id], references: [id])
+  previous_classes  Class[]         @relation("ClassProgression")
+  fee_items         FeeItem[]
+  subject_schemes   SubjectScheme[]
 }
 
 model SubClass {
@@ -158,53 +215,88 @@ model SubClass {
   sub_class_subjects SubClassSubject[]
   teacher_periods    TeacherPeriod[]
   role_assignments   RoleAssignment[]
+  fee_items          FeeItem[]
+  dm_roll_calls      DMRollCall[]
 }
 
 model Student {
-  id                       Int               @id @unique @default(autoincrement())
-  matricule                String            @unique
-  name                     String
-  date_of_birth            DateTime
-  place_of_birth           String
-  gender                   Gender
-  residence                String
-  former_school            String?
-  is_new_student           Boolean           @default(true) // Track new vs old students
-  status                   StudentStatus     @default(NOT_ENROLLED) // Track enrollment status
-  first_enrollment_year_id Int?
-  created_at               DateTime          @default(now())
-  updated_at               DateTime          @updatedAt
-  enrollments              Enrollment[]
-  generated_reports        GeneratedReport[]
-  parents                  ParentStudent[]   @relation("StudentParents")
-  first_enrollment_year    AcademicYear?     @relation("StudentFirstEnrollment", fields: [first_enrollment_year_id], references: [id])
-  interview_marks          InterviewMark[] // VP interview marks
-  QuizSubmission           QuizSubmission[]
+  id                         Int                     @id @unique @default(autoincrement())
+  matricule                  String                  @unique
+  name                       String
+  nom                        String?
+  prenom                     String?
+  date_of_birth              DateTime
+  place_of_birth             String
+  gender                     Gender
+  residence                  String
+  former_school              String?
+  is_new_student             Boolean                 @default(true) // Track new vs old students
+  status                     StudentStatus           @default(NOT_ENROLLED) // Track enrollment status
+  first_enrollment_year_id   Int?
+  admission_academic_year_id Int? // User-selectable admission year (independent of first_enrollment_year_id)
+  health_conditions          HealthCondition[]       @default([])
+  medical_notes              String?
+  created_at                 DateTime                @default(now())
+  updated_at                 DateTime                @updatedAt
+  enrollments                Enrollment[]
+  generated_reports          GeneratedReport[]
+  parents                    ParentStudent[]         @relation("StudentParents")
+  first_enrollment_year      AcademicYear?           @relation("StudentFirstEnrollment", fields: [first_enrollment_year_id], references: [id])
+  admission_academic_year    AcademicYear?           @relation("StudentAdmissionYear", fields: [admission_academic_year_id], references: [id])
+  previous_schools           StudentPreviousSchool[]
+  interview_marks            InterviewMark[] // VP interview marks
+  fee_items                  FeeItem[]               @relation("StudentFeeItems")
+  QuizSubmission             QuizSubmission[]
+}
+
+model StudentPreviousSchool {
+  id          Int      @id @default(autoincrement())
+  student_id  Int
+  school_name String
+  from_year   String?
+  to_year     String?
+  notes       String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  student     Student  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([student_id])
 }
 
 model Enrollment {
-  id                        Int                      @id @default(autoincrement())
-  student_id                Int
-  academic_year_id          Int
-  class_id                  Int // Initial class assignment (required)
-  repeater                  Boolean                  @default(false)
-  photo                     String?
-  enrollment_date           DateTime                 @default(now())
-  created_at                DateTime                 @default(now())
-  updated_at                DateTime                 @updatedAt
-  sub_class_id              Int? // Subclass assignment after interview (optional)
-  discipline_issues         DisciplineIssue[]
-  academic_year             AcademicYear             @relation(fields: [academic_year_id], references: [id])
-  student                   Student                  @relation(fields: [student_id], references: [id])
-  class                     Class                    @relation(fields: [class_id], references: [id])
-  sub_class                 SubClass?                @relation(fields: [sub_class_id], references: [id])
-  marks                     Mark[]
+  id                           Int                         @id @default(autoincrement())
+  student_id                   Int
+  academic_year_id             Int
+  class_id                     Int // Initial class assignment (required)
+  repeater                     Boolean                     @default(false)
+  photo                        String?
+  ream_of_paper_collected      Boolean                     @default(false) // Confirms ream-of-paper collection (typically for new students)
+  enrollment_date              DateTime                    @default(now())
+  created_at                   DateTime                    @default(now())
+  updated_at                   DateTime                    @updatedAt
+  sub_class_id                 Int? // Subclass assignment after interview (optional)
+  discipline_issues            DisciplineIssue[]
+  academic_year                AcademicYear                @relation(fields: [academic_year_id], references: [id])
+  student                      Student                     @relation(fields: [student_id], references: [id])
+  class                        Class                       @relation(fields: [class_id], references: [id])
+  sub_class                    SubClass?                   @relation(fields: [sub_class_id], references: [id])
+  marks                        Mark[]
   payment_transactions         PaymentTransaction[]
   school_fees                  SchoolFees[]
   control_payment_transactions ControlPaymentTransaction[]
   control_school_fees          ControlSchoolFees[]
   absences                     StudentAbsence[]
-  student_sequence_averages StudentSequenceAverage[]
+  student_sequence_averages    StudentSequenceAverage[]
+  fee_item_payments            FeeItemPayment[]
+  refunds                      Refund[]
+  saturday_punishments         SaturdayPunishment[]
+  broken_properties            BrokenProperty[]
+  disciplinary_actions         DisciplinaryAction[]
+  student_warnings             StudentWarning[]
+  parent_summons               ParentSummons[]
+  dm_roll_call_entries         DMRollCallEntry[]
+  teacher_roll_call_entries    TeacherRollCallEntry[]
+  seized_items                 SeizedItem[]
 
   @@unique([student_id, academic_year_id])
   @@index([sub_class_id, academic_year_id])
@@ -221,6 +313,7 @@ model SchoolFees {
   created_at           DateTime             @default(now())
   updated_at           DateTime             @updatedAt
   payment_transactions PaymentTransaction[]
+  refunds              Refund[]
   academic_year        AcademicYear         @relation(fields: [academic_year_id], references: [id])
   enrollment           Enrollment           @relation(fields: [enrollment_id], references: [id])
 
@@ -228,18 +321,18 @@ model SchoolFees {
 }
 
 model ControlSchoolFees {
-  id                           Int                          @id @default(autoincrement())
+  id                           Int                         @id @default(autoincrement())
   amount_expected              Float
-  amount_paid                  Float                        @default(0)
+  amount_paid                  Float                       @default(0)
   academic_year_id             Int
   due_date                     DateTime
   enrollment_id                Int
-  is_new_student               Boolean                      @default(false) // Different fees for new/old
-  created_at                   DateTime                     @default(now())
-  updated_at                   DateTime                     @updatedAt
+  is_new_student               Boolean                     @default(false) // Different fees for new/old
+  created_at                   DateTime                    @default(now())
+  updated_at                   DateTime                    @updatedAt
   control_payment_transactions ControlPaymentTransaction[]
-  academic_year                AcademicYear                 @relation(fields: [academic_year_id], references: [id])
-  enrollment                   Enrollment                   @relation(fields: [enrollment_id], references: [id])
+  academic_year                AcademicYear                @relation(fields: [academic_year_id], references: [id])
+  enrollment                   Enrollment                  @relation(fields: [enrollment_id], references: [id])
 
   @@unique([enrollment_id, academic_year_id])
 }
@@ -259,6 +352,8 @@ model Subject {
   teacher_periods    TeacherPeriod[]
   role_assignments   RoleAssignment[]
   QuizTemplate       QuizTemplate[]
+  subject_schemes    SubjectScheme[]
+  chat_channels      ChatChannel[]
 }
 
 model SubClassSubject {
@@ -290,33 +385,50 @@ model SubjectTeacher {
 }
 
 model DisciplineIssue {
-  id             Int            @id @unique @default(autoincrement())
-  enrollment_id  Int
-  issue_type     DisciplineType
-  description    String
-  notes          String?
-  assigned_by_id Int
-  reviewed_by_id Int
-  created_at     DateTime       @default(now())
-  updated_at     DateTime       @updatedAt
-  assigned_by    User           @relation("AssignedDisciplineIssue", fields: [assigned_by_id], references: [id])
-  enrollment     Enrollment     @relation(fields: [enrollment_id], references: [id])
-  reviewed_by    User           @relation("ReviewedDisciplineIssue", fields: [reviewed_by_id], references: [id])
+  id                   Int                  @id @unique @default(autoincrement())
+  enrollment_id        Int
+  issue_type           DisciplineType
+  description          String
+  notes                String?
+  action_taken         String?
+  assigned_by_id       Int
+  reviewed_by_id       Int
+  created_at           DateTime             @default(now())
+  updated_at           DateTime             @updatedAt
+  assigned_by          User                 @relation("AssignedDisciplineIssue", fields: [assigned_by_id], references: [id])
+  enrollment           Enrollment           @relation(fields: [enrollment_id], references: [id])
+  reviewed_by          User                 @relation("ReviewedDisciplineIssue", fields: [reviewed_by_id], references: [id])
+  disciplinary_actions DisciplinaryAction[]
 }
 
 model StudentAbsence {
-  id                Int            @id @default(autoincrement())
-  assigned_by_id    Int
-  teacher_period_id Int?
-  enrollment_id     Int
-  absence_type      AbsenceType    @default(CLASS_ABSENCE)
-  created_at        DateTime       @default(now())
-  updated_at        DateTime       @updatedAt
-  assigned_by       User           @relation(fields: [assigned_by_id], references: [id])
-  enrollment        Enrollment     @relation(fields: [enrollment_id], references: [id])
-  teacher_period    TeacherPeriod? @relation(fields: [teacher_period_id], references: [id])
+  id                    Int               @id @default(autoincrement())
+  assigned_by_id        Int
+  teacher_period_id     Int?
+  enrollment_id         Int
+  absence_type          AbsenceType       @default(CLASS_ABSENCE)
+  // Parent-side excuse (justification). Excused absences don't count toward warning/summons thresholds.
+  is_excused            Boolean           @default(false)
+  excused_by_parent_id  Int?
+  excused_at            DateTime?
+  excuse_reason         String?
+  // Student-side makeup (independent of excuse). Tracked separately for academic recovery.
+  makeup_status         MakeupStatus      @default(NONE)
+  makeup_completed_at   DateTime?
+  makeup_notes          String?
+  makeup_verified_by_id Int?
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+  assigned_by           User              @relation(fields: [assigned_by_id], references: [id])
+  enrollment            Enrollment        @relation(fields: [enrollment_id], references: [id])
+  teacher_period        TeacherPeriod?    @relation(fields: [teacher_period_id], references: [id])
+  excused_by            User?             @relation("AbsenceExcusedByParent", fields: [excused_by_parent_id], references: [id])
+  makeup_verified_by    User?             @relation("AbsenceMakeupVerifiedBy", fields: [makeup_verified_by_id], references: [id])
+  dm_roll_call_entries  DMRollCallEntry[] @relation("DMRollCallAbsence")
+  teacher_roll_call_entries TeacherRollCallEntry[] @relation("TeacherRollCallAbsence")
 
   @@unique([enrollment_id, teacher_period_id])
+  @@index([enrollment_id, is_excused, absence_type])
 }
 
 model TeacherAbsence {
@@ -339,6 +451,7 @@ model ExamSequence {
   sequence_number           Int
   academic_year_id          Int
   term_id                   Int
+  submission_deadline       DateTime?
   created_at                DateTime                 @default(now())
   updated_at                DateTime                 @updatedAt
   status                    ExamSequenceStatus       @default(OPEN)
@@ -360,6 +473,7 @@ model Term {
   fee_deadline     DateTime?
   exam_sequences   ExamSequence[]
   academic_year    AcademicYear?  @relation(fields: [academic_year_id], references: [id])
+  scheme_lessons   SchemeLesson[]
 
   @@unique([start_date, end_date, academic_year_id])
 }
@@ -414,12 +528,12 @@ model TeacherPeriod {
   teacher          User             @relation("TeacherPeriods-Teacher", fields: [teacher_id], references: [id])
   subject          Subject          @relation(fields: [subject_id], references: [id])
 
+  logbook_entries LogbookEntry[]
+  teacher_roll_calls TeacherRollCall[]
+
   // Prevents a teacher from being booked in two different classes at the same time.
   @@unique([teacher_id, period_id, academic_year_id], name: "teacher_period_unique")
-  // Prevents the same class from having two different subjects/teachers at the same time.
-  @@unique([sub_class_id, period_id, academic_year_id], name: "subclass_period_unique")
-  // This original constraint is still useful: prevents assigning the same teacher 
-  // to the same class/subject/period combination twice.
+  // Prevents assigning the same teacher to the same subject in the same period/subclass twice.
   @@unique([teacher_id, subject_id, period_id, sub_class_id, academic_year_id], name: "teacher_subject_subclass_period_unique")
 }
 
@@ -446,22 +560,22 @@ model PaymentTransaction {
 }
 
 model ControlPaymentTransaction {
-  id                     Int                @id @default(autoincrement())
-  enrollment_id          Int
-  academic_year_id       Int
-  amount                 Float
-  payment_date           DateTime           // Date on receipt (compulsory)
-  receipt_number         String?
-  payment_method         PaymentMethod
-  recorded_by_id         Int
-  notes                  String?            // Feedback notes
-  created_at             DateTime           @default(now())
-  updated_at             DateTime           @updatedAt
-  control_fee_id         Int
-  academic_year          AcademicYear       @relation(fields: [academic_year_id], references: [id])
-  enrollment             Enrollment         @relation(fields: [enrollment_id], references: [id])
-  control_school_fees    ControlSchoolFees  @relation(fields: [control_fee_id], references: [id])
-  recorded_by            User               @relation("RecordedByUserControl", fields: [recorded_by_id], references: [id])
+  id                  Int               @id @default(autoincrement())
+  enrollment_id       Int
+  academic_year_id    Int
+  amount              Float
+  payment_date        DateTime // Date on receipt (compulsory)
+  receipt_number      String?
+  payment_method      PaymentMethod
+  recorded_by_id      Int
+  notes               String? // Feedback notes
+  created_at          DateTime          @default(now())
+  updated_at          DateTime          @updatedAt
+  control_fee_id      Int
+  academic_year       AcademicYear      @relation(fields: [academic_year_id], references: [id])
+  enrollment          Enrollment        @relation(fields: [enrollment_id], references: [id])
+  control_school_fees ControlSchoolFees @relation(fields: [control_fee_id], references: [id])
+  recorded_by         User              @relation("RecordedByUserControl", fields: [recorded_by_id], references: [id])
 }
 
 model Announcement {
@@ -603,6 +717,117 @@ model Message {
   receiver            User          @relation("ReceivedMessages", fields: [receiver_id], references: [id])
 }
 
+// Slack-style chat workspace
+model ChatChannel {
+  id            Int         @id @default(autoincrement())
+  name          String
+  description   String?
+  type          ChannelType
+  department    Department?
+  subject_id    Int?
+  is_private    Boolean     @default(false)
+  is_system     Boolean     @default(false)
+  created_by_id Int?
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+
+  subject    Subject?            @relation(fields: [subject_id], references: [id])
+  created_by User?               @relation("ChatChannelCreatedBy", fields: [created_by_id], references: [id])
+  members    ChatChannelMember[]
+  messages   ChatMessage[]
+
+  @@unique([type, department])
+  @@unique([type, subject_id])
+  @@index([type])
+}
+
+model ChatChannelMember {
+  id           Int        @id @default(autoincrement())
+  channel_id   Int
+  user_id      Int
+  role         MemberRole @default(MEMBER)
+  joined_at    DateTime   @default(now())
+  last_read_at DateTime?
+  muted        Boolean    @default(false)
+
+  channel ChatChannel @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [user_id], references: [id])
+
+  @@unique([channel_id, user_id])
+  @@index([user_id])
+}
+
+model ChatMessage {
+  id                Int       @id @default(autoincrement())
+  channel_id        Int
+  sender_id         Int
+  content           String
+  parent_message_id Int?
+  edited_at         DateTime?
+  deleted_at        DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  channel        ChatChannel             @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+  sender         User                    @relation("ChatMessageSender", fields: [sender_id], references: [id])
+  parent_message ChatMessage?            @relation("ChatThread", fields: [parent_message_id], references: [id])
+  replies        ChatMessage[]           @relation("ChatThread")
+  reactions      ChatMessageReaction[]
+  attachments    ChatMessageAttachment[]
+  mentions       ChatMessageMention[]
+
+  @@index([channel_id, created_at])
+  @@index([parent_message_id])
+}
+
+model ChatMessageMention {
+  id         Int      @id @default(autoincrement())
+  message_id Int
+  user_id    Int
+  created_at DateTime @default(now())
+
+  message ChatMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [user_id], references: [id])
+
+  @@unique([message_id, user_id])
+  @@index([user_id])
+}
+
+model ChatMessageReaction {
+  id         Int      @id @default(autoincrement())
+  message_id Int
+  user_id    Int
+  emoji      String
+  created_at DateTime @default(now())
+
+  message ChatMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [user_id], references: [id])
+
+  @@unique([message_id, user_id, emoji])
+}
+
+model ChatMessageAttachment {
+  id            Int                @id @default(autoincrement())
+  message_id    Int
+  file_url      String
+  file_name     String
+  mime_type     String?
+  size_bytes    Int?
+  kind          ChatAttachmentKind @default(FILE)
+  duration_secs Int? // Duration in seconds for AUDIO kind (voice notes)
+  width         Int? // Pixel width for IMAGE kind
+  height        Int? // Pixel height for IMAGE kind
+
+  message ChatMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
+}
+
+enum ChatAttachmentKind {
+  IMAGE
+  AUDIO
+  VIDEO
+  FILE
+}
+
 // Form creation system for Super Manager
 model FormTemplate {
   id               Int              @id @default(autoincrement())
@@ -654,6 +879,7 @@ enum PaymentMethod {
   EXPRESS_UNION
   CCA
   F3DC
+  AFRILAND_FIRST_BANK
 }
 
 enum Audience {
@@ -675,12 +901,19 @@ enum QuestionType {
 
 enum Role {
   SUPER_MANAGER // CEO prefix
-  MANAGER // SA prefix  
+  MANAGER // SA prefix
   PRINCIPAL // SA prefix
   VICE_PRINCIPAL // SA prefix
   BURSAR // SA prefix
+  CONTROLLER // SA prefix - parallel independent fee entry; mutually blind with BURSAR (four-eyes audit)
   TEACHER // ST prefix
-  DISCIPLINE_MASTER // SDM instead of DM
+  DISCIPLINE_MASTER // SO prefix - field-level discipline recording
+  SENIOR_DISCIPLINE_MASTER // SA prefix - aggregates DM reports, sends to Dean of Discipline
+  DEAN_OF_DISCIPLINE // SA prefix - sends general report to VP/Principal
+  DEAN_OF_STUDIES // SA prefix
+  FEE_AUDITOR // SA prefix
+  SECRETARY // SA prefix
+  NURSE // SO prefix
   GUIDANCE_COUNSELOR // SO prefix
   PARENT // SO prefix
   HOD // Head of Department, ST prefix
@@ -689,8 +922,15 @@ enum Role {
 enum AssignmentRole {
   PRINCIPAL
   VICE_PRINCIPAL
-  DISCIPLINE_MASTER // SDM
+  DISCIPLINE_MASTER
+  SENIOR_DISCIPLINE_MASTER
+  DEAN_OF_DISCIPLINE
+  DEAN_OF_STUDIES
+  FEE_AUDITOR
+  SECRETARY
+  NURSE
   BURSAR
+  CONTROLLER
   HOD // Head of Department
 }
 
@@ -707,6 +947,13 @@ enum DayOfWeek {
 enum Gender {
   Female
   Male
+}
+
+enum Relationship {
+  FATHER
+  MOTHER
+  SIBLING
+  GUARDIAN
 }
 
 enum SubjectCategory {
@@ -736,6 +983,28 @@ enum ReportType {
   SUBCLASS
 }
 
+enum ChannelType {
+  DEPARTMENT
+  SUBJECT
+  CUSTOM
+  DIRECT
+}
+
+enum MemberRole {
+  MEMBER
+  ADMIN
+}
+
+enum Department {
+  ACADEMIC
+  DISCIPLINE
+  FINANCE
+  WELFARE
+  FRONT_OFFICE
+  EXECUTIVE
+  EXTERNAL
+}
+
 enum ReportStatus {
   PENDING
   PROCESSING
@@ -762,12 +1031,76 @@ enum DisciplineType {
   MORNING_LATENESS
   CLASS_ABSENCE
   MISCONDUCT
+  BROKEN_PROPERTY
+  FIGHTING
+  THEFT
+  VANDALISM
+  DISRUPTION
+  DRUG_POSSESSION
+  WEAPON_POSSESSION
+  CHEATING
   OTHER
+}
+
+enum PunishmentStatus {
+  PENDING
+  SERVED
+  SKIPPED
 }
 
 enum AbsenceType {
   MORNING_LATENESS
   CLASS_ABSENCE
+}
+
+enum HealthCondition {
+  SICKLE_CELL
+  ASTHMATIC
+  EPILEPTIC
+  DIABETIC
+  ALLERGY
+  HYPERTENSION
+  OTHER
+}
+
+enum MakeupStatus {
+  NONE
+  PENDING
+  COMPLETED
+  WAIVED
+}
+
+enum SummonsTrigger {
+  CONSECUTIVE_ABSENCES
+  CUMULATIVE_ABSENCES
+  MANUAL
+}
+
+enum SummonsStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+enum RollCallSlot {
+  SLOT_2
+  SLOT_5
+  SLOT_8
+}
+
+enum DMRollCallStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
+
+enum WarningReason {
+  CUMULATIVE_ABSENCES
+  CHRONIC_LATENESS
+  MISCONDUCT
+  OTHER
 }
 
 enum MessageStatus {
@@ -860,14 +1193,14 @@ model QuizSubmission {
 }
 
 model QuizResponse {
-  id              Int      @id @default(autoincrement())
-  submission_id   Int
-  question_id     Int
-  answer          String
-  is_correct      Boolean?
-  marks_awarded   Int      @default(0)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  submission_id Int
+  question_id   Int
+  answer        String
+  is_correct    Boolean?
+  marks_awarded Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
   submission QuizSubmission @relation(fields: [submission_id], references: [id], onDelete: Cascade)
   question   QuizQuestion   @relation(fields: [question_id], references: [id])
@@ -889,25 +1222,734 @@ enum QuizStatus {
 model SyncMetadata {
   id          Int      @id @default(autoincrement())
   timestamp   DateTime @default(now())
-  server_type String   // 'local' or 'remote'
+  server_type String // 'local' or 'remote'
   server_id   String?
   created_at  DateTime @default(now())
 }
 
 model SyncLog {
-  id                Int      @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   sync_id           String
   start_time        DateTime
   end_time          DateTime?
-  status            String   // PENDING, IN_PROGRESS, COMPLETED, FAILED
-  direction         String   // PUSH, PULL, BIDIRECTIONAL
-  records_processed Int      @default(0)
-  conflicts         String?  // JSON string
-  errors            String?  // JSON string
-  created_at        DateTime @default(now())
+  status            String // PENDING, IN_PROGRESS, COMPLETED, FAILED
+  direction         String // PUSH, PULL, BIDIRECTIONAL
+  records_processed Int       @default(0)
+  conflicts         String? // JSON string
+  errors            String? // JSON string
+  created_at        DateTime  @default(now())
 
   @@index([sync_id])
   @@index([start_time])
 }
 
+// Bursar-defined ad-hoc fees (e.g. GCE, trips, uniforms) scoped to all/a class/a subclass.
+// When requires_school_fees_paid = true, any payment first cascades into outstanding school fees.
+model FeeItem {
+  id                        Int              @id @default(autoincrement())
+  name                      String
+  description               String?
+  amount                    Float
+  academic_year_id          Int
+  scope                     FeeItemScope
+  class_id                  Int? // populated when scope = CLASS
+  sub_class_id              Int? // populated when scope = SUBCLASS
+  student_id                Int? // populated when scope = STUDENT
+  requires_school_fees_paid Boolean          @default(false)
+  is_active                 Boolean          @default(true)
+  created_by_id             Int
+  created_at                DateTime         @default(now())
+  updated_at                DateTime         @updatedAt
+  academic_year             AcademicYear     @relation(fields: [academic_year_id], references: [id])
+  class                     Class?           @relation(fields: [class_id], references: [id])
+  sub_class                 SubClass?        @relation(fields: [sub_class_id], references: [id])
+  student                   Student?         @relation("StudentFeeItems", fields: [student_id], references: [id])
+  created_by                User             @relation("FeeItemCreatedBy", fields: [created_by_id], references: [id])
+  payments                  FeeItemPayment[]
+  broken_property           BrokenProperty?
 
+  @@index([academic_year_id, is_active])
+  @@index([scope, class_id, sub_class_id])
+  @@index([scope, student_id])
+}
+
+// One row per actual payment recorded against a FeeItem.
+// Use this ledger to compute paid-so-far per (enrollment, fee_item).
+model FeeItemPayment {
+  id                      Int           @id @default(autoincrement())
+  fee_item_id             Int
+  enrollment_id           Int
+  amount                  Float
+  payment_date            DateTime
+  receipt_number          String?
+  payment_method          PaymentMethod
+  recorded_by_id          Int
+  notes                   String?
+  cascaded_to_school_fees Boolean       @default(false) // True when the payment was redirected to SchoolFees by the cascade rule
+  school_fees_payment_id  Int? // FK to PaymentTransaction created during cascade
+  created_at              DateTime      @default(now())
+  updated_at              DateTime      @updatedAt
+  fee_item                FeeItem       @relation(fields: [fee_item_id], references: [id])
+  enrollment              Enrollment    @relation(fields: [enrollment_id], references: [id])
+  recorded_by             User          @relation("FeeItemPaymentRecordedBy", fields: [recorded_by_id], references: [id])
+
+  @@index([fee_item_id, enrollment_id])
+  @@index([enrollment_id])
+}
+
+enum FeeItemScope {
+  ALL
+  CLASS
+  SUBCLASS
+  STUDENT
+}
+
+// Refunds against SchoolFees overpayments. Recording a refund decrements
+// SchoolFees.amount_paid atomically. Immutable once recorded — corrections
+// use a counter-refund (or a Principal-only void endpoint if added later).
+model Refund {
+  id             Int          @id @default(autoincrement())
+  enrollment_id  Int
+  school_fees_id Int
+  amount         Float
+  refund_date    DateTime
+  refund_method  RefundMethod
+  reason         String
+  notes          String?
+  recorded_by_id Int
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+  enrollment     Enrollment   @relation(fields: [enrollment_id], references: [id])
+  school_fees    SchoolFees   @relation(fields: [school_fees_id], references: [id])
+  recorded_by    User         @relation("RefundRecordedBy", fields: [recorded_by_id], references: [id])
+
+  @@index([enrollment_id])
+  @@index([school_fees_id])
+  @@index([refund_date])
+}
+
+enum RefundMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  EXPRESS_UNION
+  CCA
+  F3DC
+  AFRILAND_FIRST_BANK
+}
+
+// Saturday punishment scheduled by the DM, typically after 3 lates in a term.
+// Lifecycle: PENDING -> SERVED or SKIPPED.
+model SaturdayPunishment {
+  id             Int              @id @default(autoincrement())
+  enrollment_id  Int
+  reason         String
+  scheduled_date DateTime?
+  served_date    DateTime?
+  status         PunishmentStatus @default(PENDING)
+  notes          String?
+  assigned_by_id Int
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @updatedAt
+  enrollment     Enrollment       @relation(fields: [enrollment_id], references: [id])
+  assigned_by    User             @relation("SaturdayPunishmentAssignedBy", fields: [assigned_by_id], references: [id])
+
+  @@index([enrollment_id, status])
+  @@index([status, scheduled_date])
+}
+
+// Progressive warning issued to a student. Auto-created by
+// disciplineService.evaluateAbsenceTriggers when cumulative unexcused
+// absences cross the [3, 6, 9] thresholds; may also be issued manually.
+model StudentWarning {
+  id                    Int           @id @default(autoincrement())
+  enrollment_id         Int
+  warning_level         Int
+  reason                WarningReason
+  description           String
+  trigger_absence_count Int?
+  issued_by_id          Int
+  resolved              Boolean       @default(false)
+  resolved_at           DateTime?
+  resolved_notes        String?
+  created_at            DateTime      @default(now())
+  updated_at            DateTime      @updatedAt
+  enrollment            Enrollment    @relation(fields: [enrollment_id], references: [id])
+  issued_by             User          @relation("WarningIssuedBy", fields: [issued_by_id], references: [id])
+
+  @@index([enrollment_id, resolved])
+  @@index([enrollment_id, warning_level])
+}
+
+// Parent summons record. Auto-created by
+// disciplineService.evaluateAbsenceTriggers on 3 consecutive unexcused
+// absences or 6 cumulative unexcused absences in a term; also created
+// manually by DM/admins. Cancelled (never deleted) when triggers reverse
+// after excusing absences, preserving the audit trail.
+model ParentSummons {
+  id                  Int            @id @default(autoincrement())
+  enrollment_id       Int
+  parent_id           Int?
+  reason              String
+  trigger_type        SummonsTrigger
+  trigger_absence_ids Int[]          @default([])
+  scheduled_date      DateTime?
+  status              SummonsStatus  @default(PENDING)
+  meeting_notes       String?
+  attended            Boolean?
+  created_by_id       Int
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+  enrollment          Enrollment     @relation(fields: [enrollment_id], references: [id])
+  parent              User?          @relation("SummonsParent", fields: [parent_id], references: [id])
+  created_by          User           @relation("SummonsCreatedBy", fields: [created_by_id], references: [id])
+
+  @@index([enrollment_id, status])
+  @@index([status, scheduled_date])
+}
+
+// DM roll call at 3 fixed daily slots (2nd/5th/8th period bell).
+// Independent of the Period model; slot is a fixed conceptual marker.
+model DMRollCall {
+  id               Int               @id @default(autoincrement())
+  sub_class_id     Int
+  academic_year_id Int
+  date             DateTime
+  slot             RollCallSlot
+  recorded_by_id   Int
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+  sub_class        SubClass          @relation(fields: [sub_class_id], references: [id])
+  academic_year    AcademicYear      @relation(fields: [academic_year_id], references: [id])
+  recorded_by      User              @relation("DMRollCallRecordedBy", fields: [recorded_by_id], references: [id])
+  entries          DMRollCallEntry[]
+
+  @@unique([sub_class_id, date, slot])
+  @@index([academic_year_id, date])
+}
+
+model DMRollCallEntry {
+  id                Int              @id @default(autoincrement())
+  dm_roll_call_id   Int
+  enrollment_id     Int
+  status            DMRollCallStatus
+  linked_absence_id Int?
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+  dm_roll_call      DMRollCall       @relation(fields: [dm_roll_call_id], references: [id], onDelete: Cascade)
+  enrollment        Enrollment       @relation(fields: [enrollment_id], references: [id])
+  linked_absence    StudentAbsence?  @relation("DMRollCallAbsence", fields: [linked_absence_id], references: [id])
+
+  @@unique([dm_roll_call_id, enrollment_id])
+  @@index([enrollment_id])
+}
+
+// Damage logged by the DM. Auto-creates a STUDENT-scoped FeeItem
+// so the bursar sees the charge on the student's outstanding fees.
+model BrokenProperty {
+  id             Int        @id @default(autoincrement())
+  enrollment_id  Int
+  item_name      String
+  description    String
+  estimated_cost Float
+  action_taken   String?
+  fee_item_id    Int?       @unique
+  reported_by_id Int
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
+  enrollment     Enrollment @relation(fields: [enrollment_id], references: [id])
+  fee_item       FeeItem?   @relation(fields: [fee_item_id], references: [id])
+  reported_by    User       @relation("BrokenPropertyReportedBy", fields: [reported_by_id], references: [id])
+
+  @@index([enrollment_id])
+  @@index([reported_by_id])
+}
+
+// Generic bursar-initiated request that needs an action by someone else:
+// FEE_REDUCTION (Principal approves/rejects, manual fee adjustment after),
+// PERSONNEL_DISBURSEMENT (recipient confirms receipt),
+// BANK_VERIFICATION (whoever goes to the bank marks completed once checked).
+model FinanceRequest {
+  id              Int                  @id @default(autoincrement())
+  type            FinanceRequestType
+  status          FinanceRequestStatus @default(PENDING)
+  amount          Float? // null for BANK_VERIFICATION
+  reason          String
+  notes           String?
+  payload         Json // type-specific fields
+  requested_by_id Int
+  acted_by_id     Int?
+  acted_at        DateTime?
+  acted_notes     String?
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
+  requested_by    User                 @relation("FinanceRequestRequestedBy", fields: [requested_by_id], references: [id])
+  acted_by        User?                @relation("FinanceRequestActedBy", fields: [acted_by_id], references: [id])
+
+  @@index([type, status])
+  @@index([requested_by_id])
+  @@index([created_at])
+}
+
+enum FinanceRequestType {
+  FEE_REDUCTION
+  PERSONNEL_DISBURSEMENT
+  BANK_VERIFICATION
+}
+
+enum FinanceRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+// Free-form expense ledger. No approval workflow — Bursar records what was spent.
+// Edit rules enforced in service: Bursar can edit her own within 7 days; Principal+ anytime.
+model Expenditure {
+  id                Int                 @id @default(autoincrement())
+  date              DateTime
+  category          ExpenditureCategory
+  description       String
+  amount            Float
+  recipient         String? // free text vendor / person name
+  recipient_user_id Int? // optional FK if recipient is a system user
+  payment_method    PaymentMethod?
+  receipt_file      String? // uploaded receipt filename
+  notes             String?
+  recorded_by_id    Int
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+  recorded_by       User                @relation("ExpenditureRecordedBy", fields: [recorded_by_id], references: [id])
+  recipient_user    User?               @relation("ExpenditureRecipient", fields: [recipient_user_id], references: [id])
+
+  @@index([date])
+  @@index([category, date])
+  @@index([recorded_by_id])
+}
+
+enum ExpenditureCategory {
+  SALARY
+  SUPPLIES
+  MAINTENANCE
+  EVENT
+  UTILITY
+  TRANSPORT
+  OTHER
+}
+
+// Structured disciplinary measures decided by the Dean of Discipline (and senior staff).
+// Optionally links to the underlying DisciplineIssue that triggered the action.
+model DisciplinaryAction {
+  id                  Int                      @id @default(autoincrement())
+  enrollment_id       Int
+  discipline_issue_id Int?
+  action_type         DisciplinaryActionType
+  status              DisciplinaryActionStatus @default(PENDING)
+  days                Int? // for SUSPENSION / SUSPENDED_WITH_CHORES
+  start_date          DateTime?
+  end_date            DateTime?
+  reason              String
+  notes               String?
+  decided_by_id       Int
+  created_at          DateTime                 @default(now())
+  updated_at          DateTime                 @updatedAt
+  enrollment          Enrollment               @relation(fields: [enrollment_id], references: [id])
+  discipline_issue    DisciplineIssue?         @relation(fields: [discipline_issue_id], references: [id])
+  decided_by          User                     @relation("DisciplinaryActionDecidedBy", fields: [decided_by_id], references: [id])
+
+  @@index([enrollment_id, status])
+  @@index([action_type, status])
+  @@index([discipline_issue_id])
+}
+
+enum DisciplinaryActionType {
+  SUSPENSION
+  WORK_DUTY
+  SUSPENDED_WITH_CHORES
+  PUNISHMENT
+  DISMISSAL
+  SUSPENDED_DISMISSAL
+  END_OF_YEAR_DISMISSAL
+  DISCIPLINARY_COUNCIL
+}
+
+enum DisciplinaryActionStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// Report request raised by the Dean of Discipline to a Senior Discipline Master
+// or Discipline Master. Status flips to OVERDUE once `due_date` passes without
+// a submission. Dean dashboards poll the overdue list as the reminder mechanism.
+model ReportRequest {
+  id                  Int                 @id @default(autoincrement())
+  requested_by_id     Int
+  requested_from_id   Int
+  subject             String
+  description         String
+  due_date            DateTime
+  status              ReportRequestStatus @default(PENDING)
+  submitted_at        DateTime?
+  submission_notes    String?
+  submission_file_url String?
+  reviewed_at         DateTime?
+  reviewed_notes      String?
+  created_at          DateTime            @default(now())
+  updated_at          DateTime            @updatedAt
+  requested_by        User                @relation("ReportRequestRequestedBy", fields: [requested_by_id], references: [id])
+  requested_from      User                @relation("ReportRequestRequestedFrom", fields: [requested_from_id], references: [id])
+
+  @@index([requested_by_id, status])
+  @@index([requested_from_id, status])
+  @@index([status, due_date])
+}
+
+enum ReportRequestStatus {
+  PENDING
+  SUBMITTED
+  REVIEWED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Subject Scheme of Work + Teacher Logbook
+// ---------------------------------------------------------------------------
+// Scheme of Work owned by VP / Dean of Studies, one per (subject, class, year).
+// Teachers record lessons taught against the scheme via LogbookEntry rows that
+// reference the actual TeacherPeriod they are timetabled in.
+// ---------------------------------------------------------------------------
+
+model SubjectScheme {
+  id                    Int            @id @default(autoincrement())
+  subject_id            Int
+  class_id              Int
+  academic_year_id      Int
+  periods_per_week      Int
+  annual_teaching_hours Int
+  notes                 String?
+  created_by_id         Int
+  created_at            DateTime       @default(now())
+  updated_at            DateTime       @updatedAt
+  subject               Subject        @relation(fields: [subject_id], references: [id])
+  class                 Class          @relation(fields: [class_id], references: [id])
+  academic_year         AcademicYear   @relation(fields: [academic_year_id], references: [id])
+  created_by            User           @relation("SubjectSchemeCreatedBy", fields: [created_by_id], references: [id])
+  modules               SchemeModule[]
+
+  @@unique([subject_id, class_id, academic_year_id], name: "subject_class_year_unique")
+  @@index([academic_year_id])
+}
+
+model SchemeModule {
+  id                Int             @id @default(autoincrement())
+  subject_scheme_id Int
+  order             Int
+  code              String? // e.g. "MODULE I"
+  title             String
+  created_at        DateTime        @default(now())
+  updated_at        DateTime        @updatedAt
+  subject_scheme    SubjectScheme   @relation(fields: [subject_scheme_id], references: [id], onDelete: Cascade)
+  chapters          SchemeChapter[]
+
+  @@unique([subject_scheme_id, order])
+  @@index([subject_scheme_id])
+}
+
+model SchemeChapter {
+  id         Int            @id @default(autoincrement())
+  module_id  Int
+  order      Int
+  code       String? // e.g. "Chapter 3"
+  title      String
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
+  module     SchemeModule   @relation(fields: [module_id], references: [id], onDelete: Cascade)
+  lessons    SchemeLesson[]
+
+  @@unique([module_id, order])
+  @@index([module_id])
+}
+
+model SchemeLesson {
+  id                         Int             @id @default(autoincrement())
+  chapter_id                 Int
+  order                      Int
+  entry_type                 LessonEntryType @default(LESSON)
+  title                      String
+  objectives                 String? // Full multi-bullet objectives / sub-topics
+  hands_on_activities        String?
+  digital_resource_available Boolean         @default(false)
+  digital_resources_used     String?
+  term_id                    Int?
+  week_number                Int? // 1..36
+  periods_count              Int             @default(1)
+  created_at                 DateTime        @default(now())
+  updated_at                 DateTime        @updatedAt
+  chapter                    SchemeChapter   @relation(fields: [chapter_id], references: [id], onDelete: Cascade)
+  term                       Term?           @relation(fields: [term_id], references: [id])
+  logbook_entries            LogbookEntry[]
+
+  @@unique([chapter_id, order])
+  @@index([chapter_id])
+  @@index([term_id, week_number])
+}
+
+enum LessonEntryType {
+  LESSON
+  INTEGRATION
+  EVALUATION
+  REMEDIATION
+  REVISION
+  BREAK
+}
+
+model LogbookEntry {
+  id                Int                @id @default(autoincrement())
+  teacher_period_id Int
+  lesson_id         Int
+  date_taught       DateTime
+  status            LogbookEntryStatus @default(COMPLETED)
+  notes             String?
+  homework_given    String?
+  taught_by_id      Int
+  reviewed_by_id    Int?
+  reviewed_at       DateTime?
+  reviewer_notes    String?
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+  teacher_period    TeacherPeriod      @relation(fields: [teacher_period_id], references: [id])
+  lesson            SchemeLesson       @relation(fields: [lesson_id], references: [id])
+  taught_by         User               @relation("LogbookEntryTaughtBy", fields: [taught_by_id], references: [id])
+  reviewed_by       User?              @relation("LogbookEntryReviewedBy", fields: [reviewed_by_id], references: [id])
+
+  @@unique([teacher_period_id, date_taught], name: "period_date_unique")
+  @@index([taught_by_id, date_taught])
+  @@index([lesson_id])
+}
+
+enum LogbookEntryStatus {
+  COMPLETED
+  PARTIAL
+  NOT_TAUGHT
+}
+
+// ---------- Teacher (per-period) Roll Call ----------
+// The teacher takes attendance for their own class each time they teach.
+// Keyed on (teacher_period_id, date) so the same weekly period yields a
+// distinct record per day. Read access is opened to SDM / Dean of
+// Discipline / VP / Principal for oversight.
+
+model TeacherRollCall {
+  id                Int      @id @default(autoincrement())
+  teacher_period_id Int
+  academic_year_id  Int
+  date              DateTime
+  recorded_by_id    Int
+  notes             String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  teacher_period TeacherPeriod         @relation(fields: [teacher_period_id], references: [id])
+  academic_year  AcademicYear          @relation(fields: [academic_year_id], references: [id])
+  recorded_by    User                  @relation("TeacherRollCallRecordedBy", fields: [recorded_by_id], references: [id])
+  entries        TeacherRollCallEntry[]
+
+  @@unique([teacher_period_id, date])
+  @@index([academic_year_id, date])
+  @@index([date])
+}
+
+model TeacherRollCallEntry {
+  id                    Int                   @id @default(autoincrement())
+  teacher_roll_call_id  Int
+  enrollment_id         Int
+  status                TeacherRollCallStatus
+  linked_absence_id     Int?
+  notes                 String?
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+
+  teacher_roll_call TeacherRollCall @relation(fields: [teacher_roll_call_id], references: [id], onDelete: Cascade)
+  enrollment        Enrollment      @relation(fields: [enrollment_id], references: [id])
+  linked_absence    StudentAbsence? @relation("TeacherRollCallAbsence", fields: [linked_absence_id], references: [id])
+
+  @@unique([teacher_roll_call_id, enrollment_id])
+  @@index([enrollment_id])
+}
+
+enum TeacherRollCallStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
+
+// ---------- Seized Items ----------
+// A DM (or senior discipline role) records an item taken from a student and
+// can transfer custody up the chain, typically to the Principal. Transfers
+// require the recipient to accept before custody actually changes hands.
+// Terminal states: RELEASED (returned to student/parent) or DESTROYED.
+
+model SeizedItem {
+  id                   Int              @id @default(autoincrement())
+  enrollment_id        Int
+  academic_year_id     Int
+  item_description     String
+  reason               String
+  photo_url            String?
+  location             String?
+  seized_by_id         Int
+  seized_at            DateTime         @default(now())
+  current_custodian_id Int?             // null after release/destroy
+  status               SeizedItemStatus @default(IN_CUSTODY)
+  released_to_id       Int?
+  released_at          DateTime?
+  released_notes       String?
+  destroyed_at         DateTime?
+  destroyed_notes      String?
+  created_at           DateTime         @default(now())
+  updated_at           DateTime         @updatedAt
+
+  enrollment        Enrollment           @relation(fields: [enrollment_id], references: [id])
+  academic_year     AcademicYear         @relation(fields: [academic_year_id], references: [id])
+  seized_by         User                 @relation("SeizedItemSeizedBy", fields: [seized_by_id], references: [id])
+  current_custodian User?                @relation("SeizedItemCustodian", fields: [current_custodian_id], references: [id])
+  released_to       User?                @relation("SeizedItemReleasedTo", fields: [released_to_id], references: [id])
+  transfers         SeizedItemTransfer[]
+
+  @@index([enrollment_id, status])
+  @@index([current_custodian_id, status])
+  @@index([academic_year_id, seized_at])
+}
+
+model SeizedItemTransfer {
+  id             Int                        @id @default(autoincrement())
+  seized_item_id Int
+  from_user_id   Int
+  to_user_id     Int
+  status         SeizedItemTransferStatus   @default(PENDING)
+  note           String?
+  initiated_at   DateTime                   @default(now())
+  resolved_at    DateTime?
+  resolved_by_id Int?
+
+  seized_item SeizedItem @relation(fields: [seized_item_id], references: [id], onDelete: Cascade)
+  from_user   User       @relation("SeizedItemTransferFrom",       fields: [from_user_id],   references: [id])
+  to_user     User       @relation("SeizedItemTransferTo",         fields: [to_user_id],     references: [id])
+  resolved_by User?      @relation("SeizedItemTransferResolvedBy", fields: [resolved_by_id], references: [id])
+
+  @@index([seized_item_id, status])
+  @@index([from_user_id, status])
+  @@index([to_user_id, status])
+}
+
+enum SeizedItemStatus {
+  IN_CUSTODY
+  RELEASED
+  DESTROYED
+}
+
+enum SeizedItemTransferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+// ---------- Personnel Inventory ----------
+// Manager maintains a catalog of items and grants stock to personnel.
+// Each staff member has their own inventory and can transfer items to
+// another staff member; the recipient must accept before it lands.
+
+model InventoryItem {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  description   String?
+  unit          String   @default("pcs") // e.g. pcs, box, set, litre
+  is_active     Boolean  @default(true)
+  created_by_id Int?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  created_by User?               @relation("InventoryItemCreatedBy", fields: [created_by_id], references: [id])
+  holdings   InventoryHolding[]
+  transfers  InventoryTransfer[]
+  ledger     InventoryLedger[]
+
+  @@index([is_active])
+}
+
+model InventoryHolding {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  item_id    Int
+  quantity   Int      @default(0)
+  updated_at DateTime @updatedAt
+
+  user User          @relation(fields: [user_id], references: [id])
+  item InventoryItem @relation(fields: [item_id], references: [id])
+
+  @@unique([user_id, item_id])
+  @@index([user_id])
+  @@index([item_id])
+}
+
+model InventoryTransfer {
+  id             Int                     @id @default(autoincrement())
+  item_id        Int
+  from_user_id   Int
+  to_user_id     Int
+  quantity       Int
+  status         InventoryTransferStatus @default(PENDING)
+  note           String?
+  initiated_at   DateTime                @default(now())
+  resolved_at    DateTime?
+  resolved_by_id Int?
+
+  item        InventoryItem @relation(fields: [item_id], references: [id])
+  from_user   User          @relation("InventoryTransferFrom", fields: [from_user_id], references: [id])
+  to_user     User          @relation("InventoryTransferTo", fields: [to_user_id], references: [id])
+  resolved_by User?         @relation("InventoryTransferResolvedBy", fields: [resolved_by_id], references: [id])
+  ledger      InventoryLedger[]
+
+  @@index([from_user_id, status])
+  @@index([to_user_id, status])
+  @@index([status, initiated_at])
+}
+
+enum InventoryTransferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+model InventoryLedger {
+  id          Int                   @id @default(autoincrement())
+  user_id     Int
+  item_id     Int
+  delta       Int                    // +credit, -debit
+  reason      InventoryLedgerReason
+  transfer_id Int?
+  actor_id    Int?
+  note        String?
+  created_at  DateTime              @default(now())
+
+  user     User               @relation("InventoryLedgerUser",  fields: [user_id],     references: [id])
+  item     InventoryItem      @relation(fields: [item_id],     references: [id])
+  actor    User?              @relation("InventoryLedgerActor", fields: [actor_id],    references: [id])
+  transfer InventoryTransfer? @relation(fields: [transfer_id], references: [id])
+
+  @@index([user_id, created_at])
+  @@index([item_id, created_at])
+}
+
+enum InventoryLedgerReason {
+  MANAGER_GRANT
+  MANAGER_ADJUST
+  TRANSFER_SENT
+  TRANSFER_RECEIVED
+  TRANSFER_REFUNDED
+}

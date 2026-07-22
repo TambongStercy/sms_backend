@@ -1,14 +1,26 @@
 import prisma from '../../../config/db';
 import { getCurrentAcademicYear } from '../../../utils/academicYear';
 import { generateStaffMatricule } from '../../../utils/matriculeGenerator';
-import { StudentStatus, Gender, Role } from '@prisma/client';
+import { StudentStatus, Gender, Role, Relationship } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { updateNewStudentStatus } from '../../../utils/studentStatus';
+import { normalizeRelationship } from './studentService';
 
 // Types for bursar operations
+export interface ParentContactInput {
+    name: string;
+    phone: string;
+    phone_is_whatsapp?: boolean; // If true, copy phone -> whatsapp_number
+    whatsapp?: string;
+    address?: string; // optional
+    relationship?: string; // FATHER, MOTHER, SIBLING, GUARDIAN
+}
+
 export interface StudentWithParentData {
-    // Student information
-    student_name: string;
+    // Student information (legacy student_name kept for backward compat — prefer nom + prenom)
+    student_name?: string;
+    student_nom?: string;
+    student_prenom?: string;
     date_of_birth: string;
     place_of_birth: string;
     gender: Gender;
@@ -17,14 +29,18 @@ export interface StudentWithParentData {
     class_id: number;
     is_new_student?: boolean;
     academic_year_id?: number;
+    ream_of_paper_collected?: boolean;
 
-    // Parent information
-    parent_name: string;
-    parent_phone: string;
+    // Up to two parent contacts (first required, second optional).
+    parents?: ParentContactInput[];
+
+    // Legacy single-parent fields (kept for backward compat — used when `parents` is absent).
+    parent_name?: string;
+    parent_phone?: string;
+    parent_phone_is_whatsapp?: boolean;
     parent_whatsapp?: string;
-    parent_email?: string;
-    parent_address: string;
-    relationship?: string; // Father, Mother, Guardian
+    parent_address?: string; // optional
+    relationship?: string;
 }
 
 export interface LinkExistingParentData {
@@ -48,6 +64,15 @@ export interface ParentSearchResult {
     }>;
 }
 
+export interface RegistrationParent {
+    id: number;
+    matricule: string;
+    name: string;
+    phone: string;
+    whatsapp_number: string | null;
+    relationship: string | null;
+}
+
 export interface RegistrationResult {
     student: {
         id: number;
@@ -55,14 +80,8 @@ export interface RegistrationResult {
         name: string;
         status: string;
     };
-    parent: {
-        id: number;
-        matricule: string;
-        name: string;
-        phone: string;
-        email: string;
-        temporary_password: string;
-    };
+    parent: RegistrationParent & { temporary_password: string };
+    parents: RegistrationParent[];
     enrollment: {
         id: number;
         class_name: string;
@@ -94,10 +113,68 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
             throw new Error(`Class with ID ${data.class_id} not found.`);
         }
 
+        // Derive student name from nom + prenom, falling back to legacy student_name
+        const nom = data.student_nom?.trim();
+        const prenom = data.student_prenom?.trim();
+        const studentFullName = (nom && prenom) ? `${nom} ${prenom}` : (data.student_name?.trim() || '');
+        if (!studentFullName) {
+            throw new Error('Provide student nom (family name) and prenom (given name).');
+        }
+
+        const isNewStudent = data.is_new_student ?? true;
+        // Ream of paper only applies to new students; default false otherwise.
+        const reamCollected = isNewStudent ? !!data.ream_of_paper_collected : false;
+
+        // Build the list of parent contacts. Accept either the new `parents[]` array
+        // or fall back to the legacy single-parent fields. First is required, second optional.
+        const parentInputs: ParentContactInput[] = (data.parents && data.parents.length > 0)
+            ? data.parents
+            : (data.parent_name && data.parent_phone ? [{
+                name: data.parent_name,
+                phone: data.parent_phone,
+                phone_is_whatsapp: data.parent_phone_is_whatsapp,
+                whatsapp: data.parent_whatsapp,
+                address: data.parent_address,
+                relationship: data.relationship
+            }] : []);
+
+        if (parentInputs.length === 0) {
+            throw new Error('At least one parent contact is required.');
+        }
+        if (parentInputs.length > 2) {
+            throw new Error('At most two parent contacts are allowed.');
+        }
+        parentInputs.forEach((p, i) => {
+            if (!p.name?.trim() || !p.phone?.trim()) {
+                throw new Error(`Parent #${i + 1} requires name and phone.`);
+            }
+        });
+
         // Generate matricule for student
         const studentMatricule = await generateStaffMatricule([]);
 
-        // Hash password for parent
+        // Pre-generate one matricule per parent before opening the transaction.
+        // generateStaffMatricule reads via the global prisma client, so calling it
+        // twice inside the same transaction would return the same value (the first
+        // parent's row is not yet committed and therefore invisible to the second
+        // lookup) and hit a unique-constraint violation. Generate them here and
+        // bump the counter locally when a candidate collides with one already
+        // reserved for this batch.
+        const parentMatricules: string[] = [];
+        for (let i = 0; i < parentInputs.length; i++) {
+            let candidate = await generateStaffMatricule([Role.PARENT]);
+            while (parentMatricules.includes(candidate)) {
+                const prefix = candidate.slice(0, -4);
+                const nextNum = parseInt(candidate.slice(-4), 10) + 1;
+                if (nextNum > 9999) {
+                    throw new Error(`Maximum parent matricule number (9999) reached for prefix ${prefix}`);
+                }
+                candidate = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+            }
+            parentMatricules.push(candidate);
+        }
+
+        // Hash password for parent (shared default; sent back per parent for handover).
         const hashedPassword = await bcrypt.hash('defaultPassword123', 10);
 
         const result = await prisma.$transaction(async (tx) => {
@@ -105,60 +182,95 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
             const student = await tx.student.create({
                 data: {
                     matricule: studentMatricule,
-                    name: data.student_name,
+                    name: studentFullName,
+                    nom: nom || null,
+                    prenom: prenom || null,
                     date_of_birth: new Date(data.date_of_birth),
                     place_of_birth: data.place_of_birth,
                     gender: data.gender.charAt(0).toUpperCase() + data.gender.slice(1).toLowerCase() as Gender,
                     residence: data.residence,
                     former_school: data.former_school,
-                    is_new_student: data.is_new_student ?? true,
+                    is_new_student: isNewStudent,
                     status: StudentStatus.NOT_ENROLLED
                 }
             });
 
-            // 2. Create parent user
-            const parentUser = await tx.user.create({
-                data: {
-                    name: data.parent_name,
-                    email: data.parent_email || `${data.parent_name.toLowerCase().replace(' ', '.')}@school.com`,
-                    phone: data.parent_phone,
-                    whatsapp_number: data.parent_whatsapp,
-                    address: data.parent_address,
-                    password: hashedPassword,
-                    gender: Gender.Male, // Default, can be updated later
-                    date_of_birth: new Date('1980-01-01'), // Default, can be updated later
-                    matricule: await generateStaffMatricule([Role.PARENT])
-                }
-            });
+            // 2. Create each parent user, role, and link.
+            const parentsCreated: Array<{
+                id: number;
+                matricule: string;
+                name: string;
+                phone: string;
+                whatsapp_number: string | null;
+                relationship: string | null;
+            }> = [];
 
-            // 3. Create parent role
-            await tx.userRole.create({
-                data: {
-                    user_id: parentUser.id,
-                    role: Role.PARENT,
-                    academic_year_id: yearId
-                }
-            });
+            for (let i = 0; i < parentInputs.length; i++) {
+                const p = parentInputs[i];
+                const parentWhatsapp = p.phone_is_whatsapp
+                    ? p.phone.trim()
+                    : (p.whatsapp?.trim() || null);
+                // Email is no longer collected from the user — generate a deterministic
+                // placeholder so the unique-required column keeps working. Phone is unique
+                // enough across parents that this collides only on duplicate phone numbers,
+                // which is correct behavior (don't create two accounts for the same number).
+                const generatedEmail = `parent.${p.phone.replace(/[^\d+]/g, '')}.${student.id}.${parentsCreated.length}@school.local`;
 
-            // 4. Create enrollment
+                const parentMatricule = parentMatricules[i];
+                const parentUser = await tx.user.create({
+                    data: {
+                        name: p.name.trim(),
+                        email: generatedEmail,
+                        phone: p.phone.trim(),
+                        whatsapp_number: parentWhatsapp,
+                        // Address is no longer collected; column is required so default to empty.
+                        address: p.address?.trim() || '',
+                        password: hashedPassword,
+                        gender: Gender.Male, // Default, editable later
+                        date_of_birth: new Date('1980-01-01'),
+                        matricule: parentMatricule
+                    }
+                });
+
+                await tx.userRole.create({
+                    data: {
+                        user_id: parentUser.id,
+                        role: Role.PARENT,
+                        academic_year_id: yearId
+                    }
+                });
+
+                const relationshipEnum = normalizeRelationship(p.relationship);
+                await tx.parentStudent.create({
+                    data: {
+                        parent_id: parentUser.id,
+                        student_id: student.id,
+                        ...(relationshipEnum ? { relationship: relationshipEnum as Relationship } : {})
+                    }
+                });
+
+                parentsCreated.push({
+                    id: parentUser.id,
+                    matricule: parentUser.matricule || '',
+                    name: parentUser.name,
+                    phone: parentUser.phone,
+                    whatsapp_number: parentUser.whatsapp_number,
+                    relationship: relationshipEnum ?? null
+                });
+            }
+
+            // 3. Create enrollment
             const enrollment = await tx.enrollment.create({
                 data: {
                     student_id: student.id,
                     class_id: data.class_id,
                     academic_year_id: yearId,
-                    repeater: false
+                    repeater: false,
+                    ream_of_paper_collected: reamCollected
                 }
             });
 
-            // 5. Link parent to student
-            await tx.parentStudent.create({
-                data: {
-                    parent_id: parentUser.id,
-                    student_id: student.id
-                }
-            });
-
-            // 6. Create initial fee record if class has base fee
+            // 4. Create initial fee record if class has base fee
             let feeRecord = null;
             if (classExists.base_fee && classExists.base_fee > 0) {
                 feeRecord = await tx.schoolFees.create({
@@ -166,7 +278,7 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
                         enrollment_id: enrollment.id,
                         amount_expected: classExists.base_fee,
                         amount_paid: 0,
-                        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+                        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
                         academic_year_id: yearId
                     }
                 });
@@ -179,18 +291,16 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
                     name: student.name,
                     status: student.status
                 },
+                // Primary parent kept for callers that still expect a single `parent` field.
                 parent: {
-                    id: parentUser.id,
-                    matricule: parentUser.matricule || '',
-                    name: parentUser.name,
-                    email: parentUser.email,
-                    phone: parentUser.phone,
-                    temporary_password: 'defaultPassword123' // In production, send this securely
+                    ...parentsCreated[0],
+                    temporary_password: 'defaultPassword123'
                 },
+                parents: parentsCreated,
                 enrollment: {
                     id: enrollment.id,
                     class_name: classExists.name,
-                    status: 'CREATED' // Status for frontend display
+                    status: 'CREATED'
                 },
                 fee_record: feeRecord ? {
                     id: feeRecord.id,
@@ -250,10 +360,12 @@ export async function linkExistingParent(data: LinkExistingParentData): Promise<
         }
 
         // Create the link
+        const relationshipEnum = normalizeRelationship(data.relationship);
         const link = await prisma.parentStudent.create({
             data: {
                 parent_id: data.parent_id,
-                student_id: data.student_id
+                student_id: data.student_id,
+                ...(relationshipEnum ? { relationship: relationshipEnum as Relationship } : {})
             }
         });
 
@@ -344,26 +456,24 @@ export async function getBursarDashboard(academicYearId?: number): Promise<any> 
         }
 
         const [
-            totalFees,
-            totalPayments,
+            owingFees,
             recentPayments,
             newStudents,
             studentsWithParents,
             studentsWithoutParents
         ] = await Promise.all([
-            // Total fees expected
-            prisma.schoolFees.aggregate({
+            // Outstanding-fee rows for this year (one row per enrollment): used to
+            // compute number of students owing and total amount owed.
+            prisma.schoolFees.findMany({
                 where: { academic_year_id: yearId },
-                _sum: { amount_expected: true }
+                select: {
+                    enrollment_id: true,
+                    amount_expected: true,
+                    amount_paid: true
+                }
             }),
 
-            // Total payments received
-            prisma.schoolFees.aggregate({
-                where: { academic_year_id: yearId },
-                _sum: { amount_paid: true }
-            }),
-
-            // Recent payments - using schoolFees as a proxy since feePayment doesn't exist
+            // Recent payments (kept for recentTransactions/recentRegistrations)
             prisma.schoolFees.findMany({
                 where: {
                     academic_year_id: yearId,
@@ -417,16 +527,24 @@ export async function getBursarDashboard(academicYearId?: number): Promise<any> 
             })
         ]);
 
-        const totalFeesExpected = totalFees._sum.amount_expected || 0;
-        const totalFeesCollected = totalPayments._sum.amount_paid || 0;
-        const pendingPayments = totalFeesExpected - totalFeesCollected;
-        const collectionRate = totalFeesExpected > 0 ? (totalFeesCollected / totalFeesExpected) * 100 : 0;
+        // Aggregate outstanding balances per enrollment (one student = one enrollment per year).
+        const owingByEnrollment = new Map<number, number>();
+        for (const row of owingFees) {
+            const balance = (row.amount_expected || 0) - (row.amount_paid || 0);
+            if (balance > 0) {
+                owingByEnrollment.set(
+                    row.enrollment_id,
+                    (owingByEnrollment.get(row.enrollment_id) || 0) + balance
+                );
+            }
+        }
+        const studentsOwingCount = owingByEnrollment.size;
+        const totalAmountOwed = Array.from(owingByEnrollment.values())
+            .reduce((sum, v) => sum + v, 0);
 
         return {
-            totalFeesExpected,
-            totalFeesCollected,
-            pendingPayments,
-            collectionRate,
+            studentsOwingCount,
+            totalAmountOwed,
             recentTransactions: recentPayments.length,
             newStudentsThisMonth: newStudents,
             studentsWithParents,
@@ -434,7 +552,8 @@ export async function getBursarDashboard(academicYearId?: number): Promise<any> 
             paymentMethods: [
                 { method: 'EXPRESS_UNION', count: 0, totalAmount: 0 },
                 { method: 'CCA', count: 0, totalAmount: 0 },
-                { method: '3DC', count: 0, totalAmount: 0 }
+                { method: 'F3DC', count: 0, totalAmount: 0 },
+                { method: 'AFRILAND_FIRST_BANK', count: 0, totalAmount: 0 }
             ],
             recentRegistrations: recentPayments.slice(0, 5).map(payment => ({
                 studentName: payment.enrollment.student.name,

@@ -71,6 +71,24 @@ export async function createExam(data: {
     });
 }
 
+export async function updateExam(
+    id: number,
+    data: {
+        sequence_number?: number;
+        term_id?: number;
+        start_date?: string;
+        end_date?: string;
+    }
+): Promise<ExamSequence> {
+    return prisma.examSequence.update({
+        where: { id },
+        data: {
+            ...(data.sequence_number !== undefined && { sequence_number: data.sequence_number }),
+            ...(data.term_id !== undefined && { term_id: data.term_id }),
+        },
+    });
+}
+
 export async function addQuestionsToExam(exam_paper_id: number, data: { question_id: number; order?: number }[]): Promise<ExamPaperQuestion[]> {
     const questionLinks = [];
     for (const q of data) {
@@ -1241,22 +1259,24 @@ export async function createMark(data: {
         throw new Error('Mark must be between 0 and 20');
     }
 
-    // 1. Find the ExamSequence to get the correct academic year
+    // 1. Find the ExamSequence to get the correct academic year and check submission status
     const examSequence = await prisma.examSequence.findUnique({
         where: { id: data.exam_id },
-        select: { academic_year_id: true } // Select only the academic year ID
+        select: { academic_year_id: true, status: true, submission_deadline: true }
     });
 
     if (!examSequence || !examSequence.academic_year_id) {
-        // If examSequence.academic_year_id could potentially be null based on your schema,
-        // you might need to fetch the current academic year as a fallback.
-        // const currentAcademicYearId = await getAcademicYearId();
-        // if (!currentAcademicYearId) {
-        //     throw new Error('Could not determine academic year for the exam or current year.');
-        // }
-        // academicYearId = currentAcademicYearId;
         throw new Error(`Exam sequence with ID ${data.exam_id} not found or has no associated academic year.`);
     }
+
+    // Check if mark submission is allowed (status and deadline)
+    if (examSequence.status !== 'OPEN') {
+        throw new Error('Mark submission is closed for this exam sequence.');
+    }
+    if (examSequence.submission_deadline && new Date() > new Date(examSequence.submission_deadline)) {
+        throw new Error(`Mark submission deadline has passed (${new Date(examSequence.submission_deadline).toLocaleDateString()}).`);
+    }
+
     const academicYearId = examSequence.academic_year_id;
 
     // 2. Find the enrollment for this student IN THE CORRECT ACADEMIC YEAR
@@ -1335,6 +1355,21 @@ export async function updateMark(
     // Validate the mark score if it's being updated
     if (data.mark !== undefined && (data.mark < 0 || data.mark > 20)) {
         throw new Error('Mark must be between 0 and 20');
+    }
+
+    // Check if mark submission is still allowed
+    const existingMark = await prisma.mark.findUnique({
+        where: { id },
+        select: { exam_sequence: { select: { status: true, submission_deadline: true } } }
+    });
+
+    if (existingMark?.exam_sequence) {
+        if (existingMark.exam_sequence.status !== 'OPEN') {
+            throw new Error('Mark submission is closed for this exam sequence.');
+        }
+        if (existingMark.exam_sequence.submission_deadline && new Date() > new Date(existingMark.exam_sequence.submission_deadline)) {
+            throw new Error(`Mark submission deadline has passed (${new Date(existingMark.exam_sequence.submission_deadline).toLocaleDateString()}).`);
+        }
     }
 
     // Build the update data object
@@ -1790,3 +1825,267 @@ function getStatusMessage(status: string): string {
     }
 }
 
+/**
+ * Get mark submission tracking overview for an exam sequence.
+ * Shows per-subclass, per-subject: how many students, how many marks submitted, which teacher, status.
+ */
+export async function getMarkSubmissionTracking(examSequenceId: number) {
+    const sequence = await prisma.examSequence.findUnique({
+        where: { id: examSequenceId },
+        include: { term: true }
+    });
+
+    if (!sequence) {
+        throw new Error('Exam sequence not found.');
+    }
+
+    // Get all subclasses with enrolled students for this academic year
+    const subClasses = await prisma.subClass.findMany({
+        where: {
+            enrollments: {
+                some: { academic_year_id: sequence.academic_year_id }
+            }
+        },
+        include: {
+            class: true,
+            sub_class_subjects: {
+                include: {
+                    subject: true,
+                }
+            },
+            enrollments: {
+                where: { academic_year_id: sequence.academic_year_id },
+                select: { id: true }
+            }
+        },
+        orderBy: [
+            { class: { name: 'asc' } },
+            { name: 'asc' }
+        ]
+    });
+
+    // Get all marks for this exam sequence
+    const marks = await prisma.mark.findMany({
+        where: { exam_sequence_id: examSequenceId },
+        select: {
+            enrollment_id: true,
+            sub_class_subject_id: true,
+            teacher_id: true,
+            score: true,
+            teacher: { select: { id: true, name: true } }
+        }
+    });
+
+    // Index marks by sub_class_subject_id
+    const marksBySubjectMap = new Map<number, typeof marks>();
+    for (const mark of marks) {
+        if (!marksBySubjectMap.has(mark.sub_class_subject_id)) {
+            marksBySubjectMap.set(mark.sub_class_subject_id, []);
+        }
+        marksBySubjectMap.get(mark.sub_class_subject_id)!.push(mark);
+    }
+
+    // Get teacher assignments for subjects
+    const subjectTeachers = await prisma.subjectTeacher.findMany({
+        include: { teacher: { select: { id: true, name: true } }, subject: true }
+    });
+
+    const teacherMap = new Map<number, { id: number; name: string }[]>();
+    for (const st of subjectTeachers) {
+        if (!teacherMap.has(st.subject_id)) teacherMap.set(st.subject_id, []);
+        teacherMap.get(st.subject_id)!.push(st.teacher);
+    }
+
+    // Build tracking data
+    let totalExpected = 0;
+    let totalSubmitted = 0;
+
+    const classesData = subClasses.map(sc => {
+        const studentCount = sc.enrollments.length;
+        const enrollmentIds = new Set(sc.enrollments.map(e => e.id));
+
+        const subjects = sc.sub_class_subjects.map(scs => {
+            const subjectMarks = marksBySubjectMap.get(scs.id) || [];
+            const submittedCount = subjectMarks.filter(m => enrollmentIds.has(m.enrollment_id)).length;
+            const assignedTeachers = teacherMap.get(scs.subject_id) || [];
+
+            // Find who actually submitted marks
+            const submittedByTeachers = new Map<number, { id: number; name: string; count: number }>();
+            for (const m of subjectMarks) {
+                if (m.teacher && enrollmentIds.has(m.enrollment_id)) {
+                    if (!submittedByTeachers.has(m.teacher.id)) {
+                        submittedByTeachers.set(m.teacher.id, { id: m.teacher.id, name: m.teacher.name, count: 0 });
+                    }
+                    submittedByTeachers.get(m.teacher.id)!.count++;
+                }
+            }
+
+            totalExpected += studentCount;
+            totalSubmitted += submittedCount;
+
+            const percentage = studentCount > 0 ? Math.round((submittedCount / studentCount) * 100) : 0;
+
+            let status: 'complete' | 'partial' | 'missing';
+            if (percentage === 100) status = 'complete';
+            else if (percentage > 0) status = 'partial';
+            else status = 'missing';
+
+            return {
+                subject_id: scs.subject_id,
+                subject_name: scs.subject.name,
+                total_students: studentCount,
+                marks_submitted: submittedCount,
+                marks_missing: studentCount - submittedCount,
+                percentage,
+                status,
+                assigned_teachers: assignedTeachers,
+                submitted_by: Array.from(submittedByTeachers.values()),
+            };
+        });
+
+        const classSubmitted = subjects.reduce((s, sub) => s + sub.marks_submitted, 0);
+        const classExpected = subjects.reduce((s, sub) => s + sub.total_students, 0);
+        const classPercentage = classExpected > 0 ? Math.round((classSubmitted / classExpected) * 100) : 0;
+
+        return {
+            sub_class_id: sc.id,
+            sub_class_name: sc.name,
+            class_name: sc.class.name,
+            total_students: studentCount,
+            overall_percentage: classPercentage,
+            subjects,
+        };
+    });
+
+    const overallPercentage = totalExpected > 0 ? Math.round((totalSubmitted / totalExpected) * 100) : 0;
+
+    return {
+        exam_sequence: {
+            id: sequence.id,
+            sequence_number: sequence.sequence_number,
+            term_name: sequence.term?.name,
+            status: sequence.status,
+            submission_deadline: sequence.submission_deadline,
+        },
+        summary: {
+            total_marks_expected: totalExpected,
+            total_marks_submitted: totalSubmitted,
+            total_marks_missing: totalExpected - totalSubmitted,
+            overall_percentage: overallPercentage,
+        },
+        classes: classesData,
+    };
+}
+
+/**
+ * Get teachers who haven't completed mark submission for an exam sequence.
+ */
+export async function getPendingTeachers(examSequenceId: number) {
+    const sequence = await prisma.examSequence.findUnique({
+        where: { id: examSequenceId },
+    });
+
+    if (!sequence) {
+        throw new Error('Exam sequence not found.');
+    }
+
+    // Get all subject-teacher assignments
+    const subjectTeachers = await prisma.subjectTeacher.findMany({
+        include: {
+            teacher: { select: { id: true, name: true, email: true, phone: true } },
+            subject: { select: { id: true, name: true } },
+        }
+    });
+
+    // Get all subclass-subjects with their student counts
+    const subClassSubjects = await prisma.subClassSubject.findMany({
+        where: {
+            sub_class: {
+                enrollments: { some: { academic_year_id: sequence.academic_year_id } }
+            }
+        },
+        include: {
+            subject: { select: { id: true, name: true } },
+            sub_class: {
+                include: {
+                    class: { select: { name: true } },
+                    enrollments: {
+                        where: { academic_year_id: sequence.academic_year_id },
+                        select: { id: true }
+                    }
+                }
+            }
+        }
+    });
+
+    // Get all marks for this exam sequence
+    const marks = await prisma.mark.findMany({
+        where: { exam_sequence_id: examSequenceId },
+        select: { sub_class_subject_id: true, enrollment_id: true, teacher_id: true }
+    });
+
+    const markCountMap = new Map<string, number>();
+    for (const m of marks) {
+        const key = `${m.teacher_id}_${m.sub_class_subject_id}`;
+        markCountMap.set(key, (markCountMap.get(key) || 0) + 1);
+    }
+
+    // Build pending list per teacher
+    const teacherPendingMap = new Map<number, {
+        teacher: { id: number; name: string; email: string; phone: string };
+        pending_subjects: {
+            subject_name: string;
+            sub_class_name: string;
+            class_name: string;
+            total_students: number;
+            marks_submitted: number;
+            marks_missing: number;
+        }[];
+        total_missing: number;
+    }>();
+
+    for (const st of subjectTeachers) {
+        // Find subclass-subjects for this teacher's subject
+        const relevantSCS = subClassSubjects.filter(scs => scs.subject_id === st.subject_id);
+
+        for (const scs of relevantSCS) {
+            const studentCount = scs.sub_class.enrollments.length;
+            if (studentCount === 0) continue;
+
+            const key = `${st.teacher_id}_${scs.id}`;
+            const submitted = markCountMap.get(key) || 0;
+            const missing = studentCount - submitted;
+
+            if (missing <= 0) continue;
+
+            if (!teacherPendingMap.has(st.teacher_id)) {
+                teacherPendingMap.set(st.teacher_id, {
+                    teacher: st.teacher,
+                    pending_subjects: [],
+                    total_missing: 0,
+                });
+            }
+
+            const entry = teacherPendingMap.get(st.teacher_id)!;
+            entry.pending_subjects.push({
+                subject_name: scs.subject.name,
+                sub_class_name: scs.sub_class.name,
+                class_name: scs.sub_class.class.name,
+                total_students: studentCount,
+                marks_submitted: submitted,
+                marks_missing: missing,
+            });
+            entry.total_missing += missing;
+        }
+    }
+
+    // Sort by most missing first
+    const pendingTeachers = Array.from(teacherPendingMap.values())
+        .sort((a, b) => b.total_missing - a.total_missing);
+
+    return {
+        exam_sequence_id: examSequenceId,
+        total_teachers_pending: pendingTeachers.length,
+        teachers: pendingTeachers,
+    };
+}

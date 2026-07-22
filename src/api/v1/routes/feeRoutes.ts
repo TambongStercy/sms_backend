@@ -13,6 +13,21 @@ router.get('/', authenticate, feeController.getAllFees);
 // Only SUPER_MANAGER, PRINCIPAL, BURSAR can export fee reports
 router.get('/export', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), feeController.exportFeeReports);
 
+// --- Overpayments & Refunds (must be registered before /:id to avoid param capture) ---
+const VIEW_REFUNDS = ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR', 'SECRETARY', 'FEE_AUDITOR'];
+const RECORD_REFUNDS = ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR'];
+
+router.get('/overpaid', authenticate, authorize(VIEW_REFUNDS), feeController.listOverpaid);
+router.get('/overpaid/export', authenticate, authorize(VIEW_REFUNDS), feeController.exportOverpaid);
+router.post('/refunds', authenticate, authorize(RECORD_REFUNDS), feeController.recordRefund);
+router.get('/refunds', authenticate, authorize(VIEW_REFUNDS), feeController.listRefunds);
+router.get('/refunds/:id', authenticate, authorize(VIEW_REFUNDS), feeController.getRefundById);
+
+// PUT /fees/payments/:paymentId - Edit a payment record
+// SUPER_MANAGER/MANAGER/PRINCIPAL can edit anytime; BURSAR restricted to 2 days after creation
+// Registered before /:id so the literal "payments" segment isn't captured as :id
+router.put('/payments/:paymentId', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), feeController.updatePayment);
+
 // GET /fees/:id - Get a specific fee by ID
 router.get('/:id', authenticate, feeController.getFeeById);
 
@@ -31,11 +46,17 @@ router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRIN
 // GET /fees/student/:studentId - Get all fees for a specific student
 router.get('/student/:studentId', authenticate, feeController.getStudentFees);
 
+// GET /fees/student/:studentId/status - Quick fee-paid status for report-card preflight
+router.get('/student/:studentId/status', authenticate, feeController.getStudentFeesStatus);
+
 // GET /fees/sub_class/:sub_classId/summary - Get fee summary for a sub_class
 router.get('/sub_class/:id/summary', authenticate, feeController.getSubclassFeesSummary);
 
 // GET /fees/subclass/:id/summary - Alias for subclass fees summary (for backward compatibility)
 router.get('/subclass/:id/summary', authenticate, feeController.getSubclassFeesSummary);
+
+// GET /fees/subclass/:subClassId/status - Per-student fee-paid status for a whole subclass (preflight for subclass report download)
+router.get('/subclass/:subClassId/status', authenticate, feeController.getSubclassUnpaidStudents);
 
 // GET /fees/:feeId/payments - List all payments for a fee
 router.get('/:feeId/payments', authenticate, feeController.getFeePayments);

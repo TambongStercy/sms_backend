@@ -3,7 +3,8 @@
 import prisma, { DayOfWeek, TeacherPeriod } from '../../../config/db';
 import { getCurrentAcademicYear } from '../../../utils/academicYear';
 import { PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
-import * as academicYearService from './academicYearService'; // Import academicYearService for getCurrentYear
+import * as academicYearService from './academicYearService';
+import * as XLSX from 'xlsx';
 
 export interface TimetableSlotOutput {
     id: number;
@@ -275,7 +276,7 @@ export async function bulkUpdateTimetable(
 
             // --- Logic for clearing assignment (subject and teacher are null) ---
             if (subject_id === null && teacher_id === null) {
-                const existingAssignment = await prisma.teacherPeriod.findFirst({
+                const existingAssignments = await prisma.teacherPeriod.findMany({
                     where: {
                         sub_class_id: subclassId,
                         period_id: period.id,
@@ -283,9 +284,9 @@ export async function bulkUpdateTimetable(
                     }
                 });
 
-                if (existingAssignment) {
+                for (const assignment of existingAssignments) {
                     await prisma.teacherPeriod.delete({
-                        where: { id: existingAssignment.id }
+                        where: { id: assignment.id }
                     });
                     result.deleted++;
                 }
@@ -352,11 +353,12 @@ export async function bulkUpdateTimetable(
                 continue;
             }
 
-            // Find existing assignment for this specific slot
+            // Find existing assignment for this specific subject+period slot
             const existingAssignment = await prisma.teacherPeriod.findFirst({
                 where: {
                     sub_class_id: subclassId,
                     period_id: period.id,
+                    subject_id: parsedSubjectId,
                     academic_year_id: academicYearId
                 }
             });
@@ -397,4 +399,142 @@ export async function bulkUpdateTimetable(
     }
     // Return the summary of changes
     return result;
-} 
+}
+
+const DAY_ORDER: DayOfWeek[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+/**
+ * Exports the timetable for a specific subclass as an Excel file.
+ */
+export async function exportSubclassTimetableExcel(subclassId: number, academicYearId?: number): Promise<{ buffer: Buffer; filename: string }> {
+    const data = await getSubclassTimetable(subclassId, academicYearId);
+    const workbook = XLSX.utils.book_new();
+
+    // Get unique sorted periods (by start_time)
+    const periodsMap = new Map<number, { id: number; name: string; start: string; end: string; isBreak: boolean }>();
+    for (const slot of data.slots) {
+        if (!periodsMap.has(slot.periodId)) {
+            periodsMap.set(slot.periodId, { id: slot.periodId, name: slot.periodName, start: slot.periodStartTime, end: slot.periodEndTime, isBreak: slot.isBreak });
+        }
+    }
+    const periods = Array.from(periodsMap.values()).sort((a, b) => a.start.localeCompare(b.start));
+
+    // Group slots by day+period for multi-subject support
+    const slotMap = new Map<string, TimetableSlotOutput[]>();
+    for (const slot of data.slots) {
+        const key = `${slot.day}_${slot.periodId}`;
+        if (!slotMap.has(key)) slotMap.set(key, []);
+        slotMap.get(key)!.push(slot);
+    }
+
+    // Build grid: rows = periods, columns = days
+    const days = DAY_ORDER.filter(d => data.slots.some(s => s.day === d));
+    const header = ['Period', 'Time', ...days.map(d => d.charAt(0) + d.slice(1).toLowerCase())];
+    const rows: string[][] = [header];
+
+    for (const period of periods) {
+        const row: string[] = [
+            period.name,
+            `${period.start} - ${period.end}`,
+        ];
+        for (const day of days) {
+            if (period.isBreak) {
+                row.push('BREAK');
+            } else {
+                const slots = slotMap.get(`${day}_${period.id}`) || [];
+                const cellLines = slots.map(s => {
+                    const subj = s.subjectName || '';
+                    const teacher = s.teacherName || '';
+                    return teacher ? `${subj} (${teacher})` : subj;
+                });
+                row.push(cellLines.join(' / ') || '-');
+            }
+        }
+        rows.push(row);
+    }
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+
+    // Auto-size columns
+    worksheet['!cols'] = header.map((_, i) => ({ wch: i < 2 ? 18 : 30 }));
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, data.sub_class.name.substring(0, 31));
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    const filename = `timetable_${data.sub_class.name.replace(/\s+/g, '_')}.xlsx`;
+    return { buffer, filename };
+}
+
+/**
+ * Exports the full school timetable as an Excel file with one sheet per subclass.
+ */
+export async function exportFullTimetableExcel(academicYearId?: number): Promise<{ buffer: Buffer; filename: string }> {
+    const data = await getFullSchoolTimetable(academicYearId);
+    const workbook = XLSX.utils.book_new();
+
+    // Group slots by subclass
+    const subclassMap = new Map<number, { name: string; className: string; slots: TimetableSlotOutput[] }>();
+    for (const slot of data.timetableSlots) {
+        if (!subclassMap.has(slot.subClassId)) {
+            subclassMap.set(slot.subClassId, { name: slot.subClassName, className: slot.className, slots: [] });
+        }
+        subclassMap.get(slot.subClassId)!.slots.push(slot);
+    }
+
+    // Get all unique periods across the school
+    const allPeriodsMap = new Map<number, { id: number; name: string; start: string; end: string; isBreak: boolean }>();
+    for (const slot of data.timetableSlots) {
+        if (!allPeriodsMap.has(slot.periodId)) {
+            allPeriodsMap.set(slot.periodId, { id: slot.periodId, name: slot.periodName, start: slot.periodStartTime, end: slot.periodEndTime, isBreak: slot.isBreak });
+        }
+    }
+    const allPeriods = Array.from(allPeriodsMap.values()).sort((a, b) => a.start.localeCompare(b.start));
+    const allDays = DAY_ORDER.filter(d => data.timetableSlots.some(s => s.day === d));
+
+    // Sort subclasses by class name then subclass name
+    const sortedSubclasses = Array.from(subclassMap.entries()).sort((a, b) => {
+        const cmp = a[1].className.localeCompare(b[1].className);
+        return cmp !== 0 ? cmp : a[1].name.localeCompare(b[1].name);
+    });
+
+    for (const [subClassId, sc] of sortedSubclasses) {
+        const slotMap = new Map<string, TimetableSlotOutput[]>();
+        for (const slot of sc.slots) {
+            const key = `${slot.day}_${slot.periodId}`;
+            if (!slotMap.has(key)) slotMap.set(key, []);
+            slotMap.get(key)!.push(slot);
+        }
+
+        const header = ['Period', 'Time', ...allDays.map(d => d.charAt(0) + d.slice(1).toLowerCase())];
+        const rows: string[][] = [header];
+
+        for (const period of allPeriods) {
+            const row: string[] = [period.name, `${period.start} - ${period.end}`];
+            for (const day of allDays) {
+                if (period.isBreak) {
+                    row.push('BREAK');
+                } else {
+                    const slots = slotMap.get(`${day}_${period.id}`) || [];
+                    const cellLines = slots.map(s => {
+                        const subj = s.subjectName || '';
+                        const teacher = s.teacherName || '';
+                        return teacher ? `${subj} (${teacher})` : subj;
+                    });
+                    row.push(cellLines.join(' / ') || '-');
+                }
+            }
+            rows.push(row);
+        }
+
+        const worksheet = XLSX.utils.aoa_to_sheet(rows);
+        worksheet['!cols'] = header.map((_, i) => ({ wch: i < 2 ? 18 : 30 }));
+
+        // Sheet names max 31 chars
+        const sheetName = `${sc.className} - ${sc.name}`.substring(0, 31);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    }
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    const filename = `timetable_full_school_${data.academicYearName.replace(/\s+/g, '_')}.xlsx`;
+    return { buffer, filename };
+}

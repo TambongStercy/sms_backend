@@ -1,0 +1,210 @@
+### Discipline & Student Profile Extensions - HTTP Verification
+### Base host / auth token variables — replace the placeholders below.
+@host = http://localhost:4000/api/v1
+@token = REPLACE_WITH_JWT
+
+### ------------------------------------------------------------------
+### 1. Create student with health + previous schools + admission year
+### ------------------------------------------------------------------
+POST {{host}}/students
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nom": "Doe",
+  "prenom": "Jane",
+  "gender": "FEMALE",
+  "dateOfBirth": "2010-05-01",
+  "placeOfBirth": "Yaounde",
+  "residence": "Bastos",
+  "admissionAcademicYearId": 1,
+  "healthConditions": ["ASTHMATIC", "ALLERGY"],
+  "medicalNotes": "Peanut allergy — carries epi-pen",
+  "previousSchools": [
+    { "schoolName": "GBHS Buea", "fromYear": "2020", "toYear": "2023" }
+  ]
+}
+
+### ------------------------------------------------------------------
+### 2. Update existing student's health info + admission year
+### ------------------------------------------------------------------
+PUT {{host}}/students/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "healthConditions": ["SICKLE_CELL"],
+  "medicalNotes": "Regular hydration required",
+  "admissionAcademicYearId": 2
+}
+
+### ------------------------------------------------------------------
+### 3. Sibling lookup
+### ------------------------------------------------------------------
+GET {{host}}/students/1/siblings
+Authorization: Bearer {{token}}
+
+### ------------------------------------------------------------------
+### 4. Previous school CRUD
+### ------------------------------------------------------------------
+GET {{host}}/students/1/previous-schools
+Authorization: Bearer {{token}}
+
+###
+POST {{host}}/students/1/previous-schools
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "schoolName": "Sacred Heart College",
+  "fromYear": "2018",
+  "toYear": "2020",
+  "notes": "Kindergarten to Class 2"
+}
+
+###
+PUT {{host}}/students/1/previous-schools/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "notes": "KG to Grade 2" }
+
+###
+DELETE {{host}}/students/1/previous-schools/1
+Authorization: Bearer {{token}}
+
+### ------------------------------------------------------------------
+### 5. Bulk absences → triggers warning + summons after 3/6/9 unexcused
+### Re-run 3 times on separate dates to hit warning level 1/2/3.
+### ------------------------------------------------------------------
+POST {{host}}/discipline/absences/bulk
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sub_class_id": 1,
+  "date": "2026-07-21",
+  "assigned_by_id": 1,
+  "absences": [
+    { "student_id": 1 },
+    { "student_id": 2 }
+  ]
+}
+
+### ------------------------------------------------------------------
+### 6. Excuse an absence (parent-justified) → reverses triggers
+### ------------------------------------------------------------------
+POST {{host}}/discipline/absences/1/excuse
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "excusedByParentId": 5,
+  "excuseReason": "Sick — hospital note attached"
+}
+
+### ------------------------------------------------------------------
+### 7. Mark makeup complete (independent of excuse)
+### ------------------------------------------------------------------
+POST {{host}}/discipline/absences/1/makeup
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "COMPLETED",
+  "makeupNotes": "Attended Saturday recovery class"
+}
+
+### ------------------------------------------------------------------
+### 8. List / create / resolve warnings
+### ------------------------------------------------------------------
+GET {{host}}/discipline/warnings?subClassId=1&resolved=false
+Authorization: Bearer {{token}}
+
+###
+POST {{host}}/discipline/warnings
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "enrollmentId": 1,
+  "warningLevel": 1,
+  "reason": "MISCONDUCT",
+  "description": "Disrupted class during math"
+}
+
+###
+PATCH {{host}}/discipline/warnings/1/resolve
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "resolvedNotes": "Behavior improved; case closed" }
+
+### ------------------------------------------------------------------
+### 9. Summons list / create / update
+### ------------------------------------------------------------------
+GET {{host}}/discipline/summons?status=PENDING
+Authorization: Bearer {{token}}
+
+###
+POST {{host}}/discipline/summons
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "enrollmentId": 1,
+  "reason": "Discuss chronic misconduct",
+  "scheduledDate": "2026-07-25"
+}
+
+###
+PUT {{host}}/discipline/summons/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "COMPLETED",
+  "attended": true,
+  "meetingNotes": "Parent agreed to home-based reinforcement plan"
+}
+
+### ------------------------------------------------------------------
+### 10. DM Roll Call — 3 fixed slots per day
+### ------------------------------------------------------------------
+GET {{host}}/discipline/dm-roll-call/status?subClassId=1&date=2026-07-21
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/discipline/dm-roll-call?subClassId=1&date=2026-07-21&slot=SLOT_2
+Authorization: Bearer {{token}}
+
+###
+POST {{host}}/discipline/dm-roll-call
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "subClassId": 1,
+  "date": "2026-07-21",
+  "slot": "SLOT_2",
+  "entries": [
+    { "enrollmentId": 1, "status": "PRESENT" },
+    { "enrollmentId": 2, "status": "LATE" },
+    { "enrollmentId": 3, "status": "ABSENT" }
+  ]
+}
+
+###
+POST {{host}}/discipline/dm-roll-call
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "subClassId": 1,
+  "date": "2026-07-21",
+  "slot": "SLOT_5",
+  "entries": [
+    { "enrollmentId": 1, "status": "PRESENT" },
+    { "enrollmentId": 2, "status": "LATE" }
+  ]
+}

@@ -63,6 +63,8 @@ export const CLASS_SHEET_MAPPINGS = {
     'F2MS': 'FORM 2 MS',
     'F2MN': 'FORM 2 MN',
     'F2M': 'FORM 2 M',
+    'F2W': 'FORM 2 W',
+    '2W': 'FORM 2 W',
 
     'F3N': 'FORM 3 N',
     'F3S': 'FORM 3 S',
@@ -86,6 +88,7 @@ export const CLASS_SHEET_MAPPINGS = {
     'LSS 1': 'LOWER SIXTH S1',
     'LSS 2': 'LOWER SIXTH S2',
 
+    'USA': 'UPPER SIXTH A1',
     'USA 1': 'UPPER SIXTH A1',
     'USA 2': 'UPPER SIXTH A2',
     'USS 1': 'UPPER SIXTH S1',

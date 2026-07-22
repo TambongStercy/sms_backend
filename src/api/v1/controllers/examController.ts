@@ -1,13 +1,53 @@
 // src/api/v1/controllers/examController.ts
 import { Request, Response } from 'express';
 import * as examService from '../services/examService';
+import * as feeService from '../services/feeService';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
 import path from 'path';
 // import { ReportStatus, ReportType } from '@prisma/client';
-import prisma, { ReportStatus, ReportType } from '../../../config/db';
+import prisma, { ReportStatus, ReportType, Role } from '../../../config/db';
 import { Mark, ExamSequenceStatus } from '@prisma/client'; // Import enum
 import { PDFDocument } from 'pdf-lib'; // Added import
 import fs from 'fs';
+import { RoleTier, userHasMinTier } from '../../../utils/roleHierarchy';
+
+/**
+ * Gate: a student's report card cannot be generated/downloaded unless school fees
+ * are fully paid. Principal+ (Tier <= HEAD_OF_SCHOOL) can override via ?bypassFeeCheck=true.
+ * Returns null if allowed, or an error payload to return as 403.
+ */
+async function checkReportCardFeeGate(
+    studentId: number,
+    academicYearId: number,
+    user: any,
+    bypassRequested: boolean
+): Promise<null | { status: number; body: any }> {
+    const status = await feeService.checkStudentSchoolFeesPaid(studentId, academicYearId);
+    if (status.paid_in_full) return null;
+
+    const canBypass = user?.role ? userHasMinTier(user.role as Role[], RoleTier.HEAD_OF_SCHOOL) : false;
+    if (bypassRequested && canBypass) return null;
+
+    return {
+        status: 403,
+        body: {
+            success: false,
+            error: 'Report card cannot be generated: school fees not fully paid',
+            feeStatus: {
+                paidInFull: status.paid_in_full,
+                amountExpected: status.amount_expected,
+                amountPaid: status.amount_paid,
+                shortfall: status.shortfall,
+                hasEnrollment: status.has_enrollment,
+                hasFeesRecord: status.has_fees_record,
+            },
+            bypassAvailable: canBypass,
+            bypassHint: canBypass
+                ? 'You may override by retrying with ?bypassFeeCheck=true (logged action)'
+                : 'Only Principal or above can override this rule. Settle fees with the Bursar first.',
+        },
+    };
+}
 
 // Helper function to transform mark data
 const transformMark = (mark: any) => {
@@ -178,6 +218,32 @@ export const createExam = async (req: Request, res: Response): Promise<any> => {
     }
 };
 
+export const updateExam = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        const { sequence_number, term_id, start_date, end_date } = req.body;
+
+        const exam = await examService.updateExam(id, {
+            sequence_number,
+            term_id,
+            start_date,
+            end_date
+        });
+
+        res.json({
+            success: true,
+            data: exam
+        });
+    } catch (error: any) {
+        console.error('Error updating exam sequence:', error);
+        if (error.code === 'P2025') {
+            res.status(404).json({ success: false, error: 'Exam sequence not found' });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+};
+
 export const createExamPaper = async (req: Request, res: Response): Promise<any> => {
     try {
         // Validate required fields using snake_case
@@ -289,6 +355,14 @@ export const generateStudentReportCard = async (req: Request, res: Response): Pr
                 success: false,
                 error: 'Invalid parameters: studentId, academic_year_id and exam_sequence_id must be valid numbers'
             });
+            return;
+        }
+
+        // Fee gate: block download unless school fees are paid in full (Principal+ may override)
+        const bypassRequested = (req.finalQuery.bypassFeeCheck ?? req.finalQuery.bypass_fee_check) === 'true';
+        const gate = await checkReportCardFeeGate(studentId, academic_year_id, (req as any).user, bypassRequested);
+        if (gate) {
+            res.status(gate.status).json(gate.body);
             return;
         }
 
@@ -766,6 +840,54 @@ export const updateExamSequenceStatusController = async (req: Request, res: Resp
     }
 };
 
+/**
+ * Set or update the submission deadline for an exam sequence.
+ * @route PATCH /exams/:id/deadline
+ */
+export const setSubmissionDeadline = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const examSequenceId = parseInt(req.params.id);
+        const { submission_deadline } = req.body;
+
+        if (isNaN(examSequenceId)) {
+            res.status(400).json({ success: false, error: 'Invalid Exam Sequence ID format.' });
+            return;
+        }
+
+        const sequence = await prisma.examSequence.findUnique({ where: { id: examSequenceId } });
+        if (!sequence) {
+            res.status(404).json({ success: false, error: 'Exam sequence not found.' });
+            return;
+        }
+
+        // Allow null to clear the deadline
+        let deadline: Date | null = null;
+        if (submission_deadline !== null && submission_deadline !== undefined) {
+            deadline = new Date(submission_deadline);
+            if (isNaN(deadline.getTime())) {
+                res.status(400).json({ success: false, error: 'Invalid date format for submission_deadline.' });
+                return;
+            }
+        }
+
+        const updated = await prisma.examSequence.update({
+            where: { id: examSequenceId },
+            data: { submission_deadline: deadline },
+        });
+
+        res.json({
+            success: true,
+            message: deadline
+                ? `Submission deadline set to ${deadline.toISOString()}.`
+                : 'Submission deadline cleared.',
+            data: updated,
+        });
+    } catch (error: any) {
+        console.error('Error setting submission deadline:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 export const deleteExamPaper = async (req: Request, res: Response): Promise<any> => {
     try {
         const id = parseInt(req.params.id);
@@ -810,6 +932,15 @@ export const regenerateStudentReportCard = async (req: Request, res: Response): 
 
         if (isNaN(studentId) || !academic_year_id || !exam_sequence_id) {
             res.status(400).json({ success: false, error: 'Valid studentId, academicYearId, and examSequenceId must be provided.' });
+            return;
+        }
+
+        // Fee gate: same rule as the download endpoint
+        const bypassRequested = (req.body.bypassFeeCheck ?? req.body.bypass_fee_check) === true
+            || (req.body.bypassFeeCheck ?? req.body.bypass_fee_check) === 'true';
+        const gate = await checkReportCardFeeGate(studentId, parseInt(academic_year_id), (req as any).user, bypassRequested);
+        if (gate) {
+            res.status(gate.status).json(gate.body);
             return;
         }
 
@@ -897,15 +1028,33 @@ export const checkStudentReportCardAvailability = async (req: Request, res: Resp
             return;
         }
 
-        const result = await examService.checkStudentReportCardAvailability(
-            studentId,
-            academicYearId,
-            examSequenceId
-        );
+        const [result, feeStatus] = await Promise.all([
+            examService.checkStudentReportCardAvailability(studentId, academicYearId, examSequenceId),
+            feeService.checkStudentSchoolFeesPaid(studentId, academicYearId).catch(() => null),
+        ]);
+
+        const canBypass = (req as any).user?.role
+            ? userHasMinTier((req as any).user.role as Role[], RoleTier.HEAD_OF_SCHOOL)
+            : false;
 
         res.json({
             success: true,
-            data: result
+            data: {
+                ...result,
+                feeStatus: feeStatus ? {
+                    paidInFull: feeStatus.paid_in_full,
+                    amountExpected: feeStatus.amount_expected,
+                    amountPaid: feeStatus.amount_paid,
+                    shortfall: feeStatus.shortfall,
+                    hasEnrollment: feeStatus.has_enrollment,
+                    hasFeesRecord: feeStatus.has_fees_record,
+                } : null,
+                feeGate: feeStatus
+                    ? (feeStatus.paid_in_full
+                        ? { blocked: false }
+                        : { blocked: true, bypassAvailable: canBypass })
+                    : null,
+            }
         });
     } catch (error: any) {
         console.error('Error checking student report card availability:', error);
@@ -950,5 +1099,53 @@ export const checkSubclassReportCardAvailability = async (req: Request, res: Res
             success: false,
             error: error.message || 'Internal server error while checking subclass report card availability'
         });
+    }
+};
+
+/**
+ * Get mark submission tracking overview for an exam sequence.
+ * @route GET /exams/:id/submission-tracking
+ */
+export const getMarkSubmissionTracking = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const examSequenceId = parseInt(req.params.id);
+        if (isNaN(examSequenceId)) {
+            res.status(400).json({ success: false, error: 'Invalid Exam Sequence ID.' });
+            return;
+        }
+
+        const data = await examService.getMarkSubmissionTracking(examSequenceId);
+        res.json({ success: true, data });
+    } catch (error: any) {
+        console.error('Error fetching submission tracking:', error);
+        if (error.message.includes('not found')) {
+            res.status(404).json({ success: false, error: error.message });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+};
+
+/**
+ * Get teachers with pending mark submissions for an exam sequence.
+ * @route GET /exams/:id/pending-teachers
+ */
+export const getPendingTeachers = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const examSequenceId = parseInt(req.params.id);
+        if (isNaN(examSequenceId)) {
+            res.status(400).json({ success: false, error: 'Invalid Exam Sequence ID.' });
+            return;
+        }
+
+        const data = await examService.getPendingTeachers(examSequenceId);
+        res.json({ success: true, data });
+    } catch (error: any) {
+        console.error('Error fetching pending teachers:', error);
+        if (error.message.includes('not found')) {
+            res.status(404).json({ success: false, error: error.message });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
     }
 };

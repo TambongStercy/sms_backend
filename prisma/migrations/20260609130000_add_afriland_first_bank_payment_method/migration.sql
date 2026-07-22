@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "PaymentMethod" ADD VALUE 'AFRILAND_FIRST_BANK';
+
+-- AlterEnum
+ALTER TYPE "RefundMethod" ADD VALUE 'AFRILAND_FIRST_BANK';

@@ -10,6 +10,8 @@ export const createStudentWithParent = async (req: Request, res: Response): Prom
     try {
         const {
             student_name: studentName,
+            student_nom: studentNom,
+            student_prenom: studentPrenom,
             date_of_birth: dateOfBirth,
             place_of_birth: placeOfBirth,
             gender: gender,
@@ -17,26 +19,90 @@ export const createStudentWithParent = async (req: Request, res: Response): Prom
             former_school: formerSchool,
             class_id: classId,
             is_new_student: isNewStudent,
+            ream_of_paper_collected: reamOfPaperCollected,
             academic_year_id: academicYearId,
+            parents: parentsArr, // New: array of up to 2 parent contacts
             parent_name: parentName,
             parent_phone: parentPhone,
+            parent_phone_is_whatsapp: parentPhoneIsWhatsapp,
             parent_whatsapp: parentWhatsapp,
-            parent_email: parentEmail,
             parent_address: parentAddress,
             relationship: relationship
         } = req.body;
 
-        // Validate required fields
-        if (!studentName || !dateOfBirth || !placeOfBirth || !gender || !residence || !classId || !parentName || !parentPhone || !parentAddress) {
+        // Accept either (nom + prenom) or legacy student_name
+        const hasSplitName = !!(studentNom && studentPrenom);
+        const hasLegacyName = !!studentName;
+        if (!hasSplitName && !hasLegacyName) {
             res.status(400).json({
                 success: false,
-                error: 'Missing required fields: studentName, dateOfBirth, placeOfBirth, gender, residence, classId, parentName, parentPhone, parentAddress'
+                error: 'Provide both studentNom (family name) and studentPrenom (given name).'
             });
             return;
         }
 
+        // Validate required fields (student side)
+        if (!dateOfBirth || !placeOfBirth || !gender || !residence || !classId) {
+            res.status(400).json({
+                success: false,
+                error: 'Missing required fields: dateOfBirth, placeOfBirth, gender, residence, classId'
+            });
+            return;
+        }
+
+        // Validate parents array if provided, otherwise require legacy single-parent fields.
+        let parents: any[] | undefined;
+        if (Array.isArray(parentsArr) && parentsArr.length > 0) {
+            if (parentsArr.length > 2) {
+                res.status(400).json({ success: false, error: 'At most two parent contacts allowed.' });
+                return;
+            }
+            for (let i = 0; i < parentsArr.length; i++) {
+                const p = parentsArr[i];
+                if (!p?.name || !p?.phone) {
+                    res.status(400).json({
+                        success: false,
+                        error: `Parent #${i + 1} requires name and phone.`
+                    });
+                    return;
+                }
+                if (p.relationship && !['FATHER', 'MOTHER', 'SIBLING', 'GUARDIAN'].includes(String(p.relationship).toUpperCase())) {
+                    res.status(400).json({
+                        success: false,
+                        error: `Parent #${i + 1}: invalid relationship. Must be FATHER, MOTHER, SIBLING, or GUARDIAN.`
+                    });
+                    return;
+                }
+            }
+            parents = parentsArr.map(p => ({
+                name: p.name,
+                phone: p.phone,
+                phone_is_whatsapp: p.phoneIsWhatsapp !== undefined ? Boolean(p.phoneIsWhatsapp) : (p.phone_is_whatsapp !== undefined ? Boolean(p.phone_is_whatsapp) : undefined),
+                whatsapp: p.whatsapp,
+                address: p.address,
+                relationship: p.relationship
+            }));
+        } else {
+            if (!parentName || !parentPhone) {
+                res.status(400).json({
+                    success: false,
+                    error: 'At least one parent contact is required (parents[] or parent_name/parent_phone).'
+                });
+                return;
+            }
+            if (relationship && !['FATHER', 'MOTHER', 'SIBLING', 'GUARDIAN'].includes(String(relationship).toUpperCase())) {
+                res.status(400).json({
+                    success: false,
+                    error: 'Invalid relationship. Must be FATHER, MOTHER, SIBLING, or GUARDIAN.'
+                });
+                return;
+            }
+        }
+
         const result = await bursarService.createStudentWithParent({
             student_name: studentName,
+            student_nom: studentNom,
+            student_prenom: studentPrenom,
             date_of_birth: dateOfBirth,
             place_of_birth: placeOfBirth,
             gender: gender.toUpperCase() === 'MALE' ? Gender.Male : Gender.Female,
@@ -44,11 +110,13 @@ export const createStudentWithParent = async (req: Request, res: Response): Prom
             former_school: formerSchool,
             class_id: parseInt(classId),
             is_new_student: isNewStudent,
+            ream_of_paper_collected: reamOfPaperCollected !== undefined ? Boolean(reamOfPaperCollected) : undefined,
             academic_year_id: academicYearId ? parseInt(academicYearId) : undefined,
+            parents: parents,
             parent_name: parentName,
             parent_phone: parentPhone,
+            parent_phone_is_whatsapp: parentPhoneIsWhatsapp !== undefined ? Boolean(parentPhoneIsWhatsapp) : undefined,
             parent_whatsapp: parentWhatsapp,
-            parent_email: parentEmail,
             parent_address: parentAddress,
             relationship: relationship
         });
@@ -112,6 +180,15 @@ export const linkExistingParent = async (req: Request, res: Response): Promise<v
             res.status(400).json({
                 success: false,
                 error: 'Missing required fields: studentId, parentId'
+            });
+            return;
+        }
+
+        // Validate optional relationship enum
+        if (relationship && !['FATHER', 'MOTHER', 'SIBLING', 'GUARDIAN'].includes(String(relationship).toUpperCase())) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid relationship. Must be FATHER, MOTHER, SIBLING, or GUARDIAN.'
             });
             return;
         }

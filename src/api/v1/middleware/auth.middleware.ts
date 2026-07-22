@@ -55,6 +55,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { isTokenBlacklisted } from '../services/tokenBlacklistService';
+import { academicYearGuard } from './academicYearGuard.middleware';
 
 // Get JWT secret from environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
@@ -134,8 +135,8 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
         // Add user to request object
         (req as AuthenticatedRequest).user = decoded;
 
-        // Continue to the next middleware or route handler
-        next();
+        // Gate any provided academic_year_id against current year + role
+        return academicYearGuard(req, res, next);
     } catch (error: any) {
         console.error('Authentication error:', error);
 
@@ -186,4 +187,30 @@ export const authorize = (roles: string[]) => {
             error: `Forbidden: Insufficient permissions. Required: ${roles.join(' or ')}, You have: ${user.role.join(', ')}`
         });
     };
-}; 
+};
+
+import { Role } from '@prisma/client';
+import { RoleTier, userHasMinTier, getRolesAtOrAbove } from '../../../utils/roleHierarchy';
+
+/**
+ * Authorize a route by minimum hierarchy tier. Lower tier number = higher authority.
+ * Equivalent to authorize(getRolesAtOrAbove(minTier)) but reads more clearly at the call site.
+ *
+ * @example
+ * router.delete('/students/:id', authenticate, authorizeMinTier(RoleTier.HEAD_OF_SCHOOL), ...);
+ */
+export const authorizeMinTier = (minTier: RoleTier) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        const user = (req as AuthenticatedRequest).user;
+        if (!user || !user.role) {
+            return res.status(401).json({ error: 'Unauthorized: User or role not found' });
+        }
+        if (userHasMinTier(user.role as Role[], minTier)) {
+            return next();
+        }
+        return res.status(403).json({
+            error: `Forbidden: Insufficient tier. Required tier <= ${minTier}, you have: ${user.role.join(', ')}`,
+            allowedRoles: getRolesAtOrAbove(minTier),
+        });
+    };
+};

@@ -6,26 +6,26 @@ const router = Router();
 
 // POST /bursar/create-parent-with-student - Create student with automatic parent account creation
 // This is the main Bursar function for student registration with parent creation
-// Only BURSAR and SUPER_MANAGER can create students with parent accounts
+// BURSAR, SECRETARY, and SUPER_MANAGER can create students with parent accounts
 router.post('/create-parent-with-student',
     authenticate,
-    authorize(['BURSAR', 'SUPER_MANAGER']),
+    authorize(['BURSAR', 'SECRETARY', 'SUPER_MANAGER']),
     bursarController.createStudentWithParent
 );
 
 // GET /bursar/available-parents - Get available parents for selection/linking
-// BURSAR and SUPER_MANAGER can browse/search existing parents
+// BURSAR, SECRETARY, and SUPER_MANAGER can browse/search existing parents
 router.get('/available-parents',
     authenticate,
-    authorize(['BURSAR', 'SUPER_MANAGER']),
+    authorize(['BURSAR', 'SECRETARY', 'SUPER_MANAGER']),
     bursarController.getAvailableParents
 );
 
 // POST /bursar/link-existing-parent - Link existing parent to a student
-// BURSAR and SUPER_MANAGER can link existing parents to students
+// BURSAR, SECRETARY, and SUPER_MANAGER can link existing parents to students
 router.post('/link-existing-parent',
     authenticate,
-    authorize(['BURSAR', 'SUPER_MANAGER']),
+    authorize(['BURSAR', 'SECRETARY', 'SUPER_MANAGER']),
     bursarController.linkExistingParent
 );
 

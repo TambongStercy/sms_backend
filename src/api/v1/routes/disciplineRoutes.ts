@@ -1,53 +1,114 @@
 // Swagger documentation can be found in src/config/swagger/docs/disciplineDocs.ts
 import { Router } from 'express';
 import * as disciplineController from '../controllers/disciplineController';
+import * as brokenPropertyController from '../controllers/brokenPropertyController';
+import * as saturdayPunishmentController from '../controllers/saturdayPunishmentController';
+import * as dmRollCallController from '../controllers/dmRollCallController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import {
+    validateDMSubClassAccess,
+    validateDMAccessForEnrollment,
+    resolveEnrollmentIdFromAbsenceParam,
+} from '../middleware/disciplineAuth.middleware';
 
 const router = Router();
 
-// GET /discipline - List all discipline records (with filters)
-// All authenticated users can view discipline records list
+const DM_AND_ADMIN = ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DEAN_OF_DISCIPLINE', 'DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER'];
+const DM_VIEW_ROLES = [...DM_AND_ADMIN, 'TEACHER'];
+const ADMIN_DELETE = ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL'];
+const EXCUSE_ROLES = [...DM_AND_ADMIN, 'PARENT'];
+
+// === DISCIPLINE ISSUES (general) ===
+
 router.get('/', authenticate, disciplineController.getAllDisciplineIssues);
+router.post('/', authenticate, authorize(DM_VIEW_ROLES), disciplineController.recordDisciplineIssue);
 
-// GET /discipline/:studentId - Get discipline records for a specific student
-router.get('/:studentId', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'TEACHER']), disciplineController.getDisciplineHistory);
+// === SDM LATENESS TRACKING ===
 
-// POST /discipline - Record a discipline issue
-// SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL, DISCIPLINE_MASTER, TEACHER can record discipline issues
-router.post('/', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'TEACHER']), disciplineController.recordDisciplineIssue);
+router.post('/lateness', authenticate, authorize(DM_AND_ADMIN), disciplineController.recordMorningLateness);
+router.post('/lateness/bulk', authenticate, authorize(DM_AND_ADMIN), disciplineController.recordBulkMorningLateness);
+router.get('/lateness/statistics', authenticate, authorize(DM_AND_ADMIN), disciplineController.getLatenessStatistics);
+router.get('/lateness/daily-report', authenticate, authorize(DM_AND_ADMIN), disciplineController.getDailyLatenessReport);
+router.get('/lateness/alerts', authenticate, authorize(DM_AND_ADMIN), disciplineController.getLatenessAlerts);
 
-// === SDM LATENESS TRACKING ROUTES ===
+// === BULK ABSENCES (DM daily roll call) ===
 
-// POST /discipline/lateness - Record morning lateness for a single student
-// Primarily for DISCIPLINE_MASTER (SDM) but also accessible by admin roles
-router.post('/lateness',
+router.get('/absences/form-data', authenticate, authorize(DM_AND_ADMIN), disciplineController.getAbsenceFormData);
+router.post('/absences/bulk', authenticate, authorize(DM_AND_ADMIN), validateDMSubClassAccess, disciplineController.bulkRecordAbsences);
+router.put('/absences/:id', authenticate, authorize(DM_AND_ADMIN), disciplineController.updateStudentAbsence);
+router.delete('/absences/:id', authenticate, authorize(DM_AND_ADMIN), disciplineController.deleteStudentAbsence);
+
+// Excuse / makeup
+router.post('/absences/:id/excuse', authenticate, authorize(EXCUSE_ROLES), disciplineController.excuseAbsence);
+router.post('/absences/:id/makeup',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER']),
-    disciplineController.recordMorningLateness
+    authorize([...DM_AND_ADMIN, 'TEACHER']),
+    disciplineController.markAbsenceMakeup
 );
 
-// POST /discipline/lateness/bulk - Record bulk morning lateness for multiple students
-// Primarily for DISCIPLINE_MASTER (SDM) daily use
-router.post('/lateness/bulk',
+// === STUDENT WARNINGS ===
+
+router.get('/warnings', authenticate, authorize(DM_AND_ADMIN), disciplineController.listWarnings);
+router.post('/warnings', authenticate, authorize(DM_AND_ADMIN), disciplineController.createWarning);
+router.patch('/warnings/:id/resolve', authenticate, authorize(DM_AND_ADMIN), disciplineController.resolveWarning);
+
+// === PARENT SUMMONS ===
+
+router.get('/summons', authenticate, authorize(DM_AND_ADMIN), disciplineController.listSummons);
+router.post('/summons', authenticate, authorize(DM_AND_ADMIN), disciplineController.createSummons);
+router.put('/summons/:id', authenticate, authorize(DM_AND_ADMIN), disciplineController.updateSummons);
+
+// === DM ROLL CALL (3 fixed daily slots) ===
+
+router.get('/dm-roll-call/status',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER']),
-    disciplineController.recordBulkMorningLateness
+    authorize(DM_AND_ADMIN),
+    validateDMSubClassAccess,
+    dmRollCallController.getStatus
+);
+router.get('/dm-roll-call',
+    authenticate,
+    authorize(DM_AND_ADMIN),
+    validateDMSubClassAccess,
+    dmRollCallController.getRollCall
+);
+router.post('/dm-roll-call',
+    authenticate,
+    authorize(DM_AND_ADMIN),
+    validateDMSubClassAccess,
+    dmRollCallController.recordRollCall
 );
 
-// GET /discipline/lateness/statistics - Get lateness statistics for SDM dashboard
-// For DISCIPLINE_MASTER dashboard and admin monitoring
-router.get('/lateness/statistics',
-    authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER']),
-    disciplineController.getLatenessStatistics
-);
+// === UNIFIED ROLL CALL (PRESENT / LATE / ABSENT) ===
 
-// GET /discipline/lateness/daily-report - Get daily lateness report
-// For DISCIPLINE_MASTER and admin oversight
-router.get('/lateness/daily-report',
-    authenticate,
-    authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER']),
-    disciplineController.getDailyLatenessReport
-);
+router.get('/roll-call', authenticate, authorize(DM_AND_ADMIN), disciplineController.getRollCall);
+router.post('/roll-call', authenticate, authorize(DM_AND_ADMIN), disciplineController.recordRollCall);
+
+// === IN-CLASS PERIOD ROLL CALL (teacher) ===
+
+const PERIOD_ROLL_CALL_ROLES = [...DM_AND_ADMIN, 'TEACHER'];
+router.get('/teacher-periods/:id/roll-call', authenticate, authorize(PERIOD_ROLL_CALL_ROLES), disciplineController.getPeriodRollCall);
+router.post('/teacher-periods/:id/roll-call', authenticate, authorize(PERIOD_ROLL_CALL_ROLES), disciplineController.recordPeriodRollCall);
+
+// === BROKEN PROPERTY ===
+
+router.post('/broken-property', authenticate, authorize(DM_AND_ADMIN), brokenPropertyController.createBrokenProperty);
+router.get('/broken-property', authenticate, authorize([...DM_AND_ADMIN, 'BURSAR', 'FEE_AUDITOR']), brokenPropertyController.listBrokenProperty);
+router.get('/broken-property/:id', authenticate, authorize([...DM_AND_ADMIN, 'BURSAR', 'FEE_AUDITOR']), brokenPropertyController.getBrokenPropertyById);
+router.put('/broken-property/:id', authenticate, authorize(DM_AND_ADMIN), brokenPropertyController.updateBrokenProperty);
+router.delete('/broken-property/:id', authenticate, authorize(ADMIN_DELETE), brokenPropertyController.deleteBrokenProperty);
+
+// === SATURDAY PUNISHMENTS ===
+
+router.post('/saturday-punishments', authenticate, authorize(DM_AND_ADMIN), saturdayPunishmentController.createSaturdayPunishment);
+router.get('/saturday-punishments', authenticate, authorize(DM_AND_ADMIN), saturdayPunishmentController.listSaturdayPunishments);
+router.get('/saturday-punishments/:id', authenticate, authorize(DM_AND_ADMIN), saturdayPunishmentController.getSaturdayPunishmentById);
+router.put('/saturday-punishments/:id', authenticate, authorize(DM_AND_ADMIN), saturdayPunishmentController.updateSaturdayPunishment);
+router.delete('/saturday-punishments/:id', authenticate, authorize(ADMIN_DELETE), saturdayPunishmentController.deleteSaturdayPunishment);
+
+// === DISCIPLINE ISSUES (per student / by id) ===
+// IMPORTANT: keep these LAST so static paths above don't get captured by /:studentId
+router.put('/:id', authenticate, authorize(DM_AND_ADMIN), disciplineController.updateDisciplineIssue);
+router.get('/:studentId', authenticate, authorize(DM_VIEW_ROLES), disciplineController.getDisciplineHistory);
 
 export default router;

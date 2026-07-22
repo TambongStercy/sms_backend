@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
 import * as userService from '../services/userService';
 import * as studentService from '../services/studentService'; // Added import for studentService
+import * as subjectService from '../services/subjectService';
 
 // Helper function to transform user data
 export const transformUser = (user: any) => {
@@ -53,7 +54,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
     try {
         const userData = req.body;
         // Basic validation
-        if (!userData.name || !userData.email || !userData.password || !userData.gender || !userData.date_of_birth || !userData.phone || !userData.address) {
+        if (!userData.name || !userData.email || !userData.password || !userData.gender || !userData.date_of_birth || !userData.address) {
             res.status(400).json({ success: false, error: 'Missing required user fields' });
             return;
         }
@@ -77,7 +78,7 @@ export const registerAndAssignRoles = async (req: Request, res: Response): Promi
     try {
         const userData = req.body;
         // Basic validation for user data
-        if (!userData.name || !userData.email || !userData.password || !userData.gender || !userData.date_of_birth || !userData.phone || !userData.address) {
+        if (!userData.name || !userData.email || !userData.password || !userData.gender || !userData.date_of_birth || !userData.address) {
             res.status(400).json({ success: false, error: 'Missing required user fields' });
             return;
         }
@@ -189,6 +190,9 @@ export const getDashboardForRole = async (req: any, res: any) => {
                 break;
             case 'BURSAR':
                 dashboardData = await userService.getBursarDashboard(academicYearId);
+                break;
+            case 'SECRETARY':
+                dashboardData = await userService.getSecretaryDashboard(userId, academicYearId);
                 break;
             case 'PARENT':
                 dashboardData = await userService.getParentDashboard(userId, academicYearId);
@@ -403,6 +407,20 @@ export const createUserWithRole = async (req: Request, res: Response): Promise<v
             res.status(400).json({
                 success: false,
                 error: 'Missing required fields'
+            });
+            return;
+        }
+        // Privilege-escalation guard: a SECRETARY (without any higher admin role) may
+        // only create users with TEACHER or PARENT roles.
+        const requesterRoles = (req.user?.role as string[] | undefined) || [];
+        const hasAdminRole = requesterRoles.some(r =>
+            ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR'].includes(r)
+        );
+        const isOnlySecretary = requesterRoles.includes('SECRETARY') && !hasAdminRole;
+        if (isOnlySecretary && !['TEACHER', 'PARENT'].includes(userData.role)) {
+            res.status(403).json({
+                success: false,
+                error: 'Secretary can only create users with TEACHER or PARENT role'
             });
             return;
         }
@@ -668,5 +686,56 @@ export const getStudentsForParent = async (req: Request, res: Response): Promise
             res.status(404).json({ success: false, error: error.message });
         }
         res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const assignTeacherSubject = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = parseInt(req.params.userId);
+        const { subject_id } = req.body;
+
+        if (isNaN(userId)) {
+            res.status(400).json({ success: false, error: 'Invalid User ID.' });
+            return;
+        }
+
+        if (!subject_id || typeof subject_id !== 'number') {
+            res.status(400).json({ success: false, error: 'Subject ID is required.' });
+            return;
+        }
+
+        const assignment = await subjectService.assignTeacher(subject_id, { teacher_id: userId });
+        res.status(201).json({ success: true, message: 'Teacher assigned to subject successfully.', data: assignment });
+
+    } catch (error: any) {
+        console.error('Error assigning teacher to subject:', error);
+        if (error.message.includes('not found')) {
+            res.status(404).json({ success: false, error: error.message });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+};
+
+export const removeTeacherSubject = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = parseInt(req.params.userId);
+        const subjectId = parseInt(req.params.subjectId);
+
+        if (isNaN(userId) || isNaN(subjectId)) {
+            res.status(400).json({ success: false, error: 'Invalid User ID or Subject ID.' });
+            return;
+        }
+
+        await subjectService.removeTeacher(subjectId, userId);
+        res.status(200).json({ success: true, message: 'Teacher removed from subject successfully.' });
+
+    } catch (error: any) {
+        console.error('Error removing teacher from subject:', error);
+        if (error.message.includes('not found')) {
+            res.status(404).json({ success: false, error: error.message });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
     }
 };

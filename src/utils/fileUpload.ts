@@ -7,6 +7,7 @@ const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 const STUDENT_PHOTOS_DIR = path.join(UPLOAD_DIR, 'students');
 const USER_PHOTOS_DIR = path.join(UPLOAD_DIR, 'users');
 const DEFAULT_PHOTOS_DIR = path.join(UPLOAD_DIR, 'defaults');
+const RECEIPTS_DIR = path.join(UPLOAD_DIR, 'receipts');
 
 // Ensure all upload directories exist
 const ensureDirectoryExists = (dirPath: string) => {
@@ -20,6 +21,7 @@ ensureDirectoryExists(UPLOAD_DIR);
 ensureDirectoryExists(STUDENT_PHOTOS_DIR);
 ensureDirectoryExists(USER_PHOTOS_DIR);
 ensureDirectoryExists(DEFAULT_PHOTOS_DIR);
+ensureDirectoryExists(RECEIPTS_DIR);
 
 // Create default student photo if it doesn't exist
 const createDefaultStudentPhoto = () => {
@@ -180,7 +182,114 @@ export const PHOTO_DIRECTORIES = {
     UPLOAD_DIR,
     STUDENT_PHOTOS_DIR,
     USER_PHOTOS_DIR,
-    DEFAULT_PHOTOS_DIR
+    DEFAULT_PHOTOS_DIR,
+    RECEIPTS_DIR
 };
+
+// --------- Receipt uploads (PDF + image) for expenditures & similar ---------
+const receiptStorage = (multer as any).diskStorage({
+    destination: (_req: any, _file: any, cb: any) => {
+        ensureDirectoryExists(RECEIPTS_DIR);
+        cb(null, RECEIPTS_DIR);
+    },
+    filename: (_req: any, file: any, cb: any) => {
+        const timestamp = Date.now();
+        const ext = path.extname(file.originalname);
+        const safe = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+        cb(null, `receipt-${timestamp}-${safe}${ext}`);
+    },
+});
+
+const receiptFileFilter = (_req: any, file: any, cb: any) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'application/pdf'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPG, PNG, WEBP, or PDF files are allowed for receipts'));
+};
+
+export const receiptUpload = multer({
+    storage: receiptStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: receiptFileFilter,
+});
+
+export const getReceiptUrl = (req: any, filename: string): string => {
+    if (!filename) return '';
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    return `${baseUrl}/uploads/receipts/${filename}`;
+};
+
+export const deleteReceiptFile = (filename: string): boolean => {
+    if (!filename) return false;
+    const filePath = path.join(RECEIPTS_DIR, filename);
+    if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        return true;
+    }
+    return false;
+};
+
+// --------- Chat attachments (images + voice + docs) ---------
+const CHAT_DIR = path.join(UPLOAD_DIR, 'chat');
+ensureDirectoryExists(CHAT_DIR);
+
+const CHAT_ALLOWED_MIME_PREFIXES = ['image/', 'audio/', 'video/'];
+const CHAT_ALLOWED_MIMES = new Set([
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+    'text/csv',
+]);
+
+const chatStorage = (multer as any).diskStorage({
+    destination: (_req: any, _file: any, cb: any) => {
+        ensureDirectoryExists(CHAT_DIR);
+        cb(null, CHAT_DIR);
+    },
+    filename: (_req: any, file: any, cb: any) => {
+        const timestamp = Date.now();
+        const ext = path.extname(file.originalname) || '';
+        const safe = path
+            .basename(file.originalname, ext)
+            .replace(/[^a-zA-Z0-9_-]/g, '_')
+            .slice(0, 40);
+        cb(null, `chat-${timestamp}-${safe}${ext}`);
+    },
+});
+
+const chatFileFilter = (_req: any, file: any, cb: any) => {
+    if (CHAT_ALLOWED_MIME_PREFIXES.some((p) => file.mimetype.startsWith(p))) {
+        return cb(null, true);
+    }
+    if (CHAT_ALLOWED_MIMES.has(file.mimetype)) {
+        return cb(null, true);
+    }
+    return cb(new Error(`Unsupported mime-type for chat: ${file.mimetype}`));
+};
+
+export const chatUpload = multer({
+    storage: chatStorage,
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB — enough for voice notes and photos
+    fileFilter: chatFileFilter,
+});
+
+export const getChatFileUrl = (req: any, filename: string): string => {
+    if (!filename) return '';
+    return `${req.protocol}://${req.get('host')}/uploads/chat/${filename}`;
+};
+
+/**
+ * Classify a mime-type into a `ChatAttachmentKind` value so the client can
+ * render inline previews without having to sniff mime types itself.
+ */
+export function classifyChatMimeType(mime: string | null | undefined): 'IMAGE' | 'AUDIO' | 'VIDEO' | 'FILE' {
+    if (!mime) return 'FILE';
+    if (mime.startsWith('image/')) return 'IMAGE';
+    if (mime.startsWith('audio/')) return 'AUDIO';
+    if (mime.startsWith('video/')) return 'VIDEO';
+    return 'FILE';
+}
 
 export default upload; 

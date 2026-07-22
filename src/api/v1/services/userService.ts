@@ -1427,6 +1427,106 @@ export async function getBursarDashboard(academicYearId?: number): Promise<any> 
     }
 }
 
+// Secretary Dashboard - student/teacher administration overview
+export async function getSecretaryDashboard(userId: number, academicYearId?: number): Promise<any> {
+    try {
+        const yearId = academicYearId || (await getCurrentAcademicYear())?.id;
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+        const [
+            totalStudents,
+            studentsThisYear,
+            studentsCreatedLast7Days,
+            totalTeachers,
+            teachersCreatedLast7Days,
+            totalClasses,
+            totalSubclasses,
+            studentsWithoutPhoto,
+            recentStudents,
+            recentTeachers
+        ] = await Promise.all([
+            prisma.student.count(),
+
+            yearId
+                ? prisma.enrollment.count({
+                    where: { academic_year_id: yearId },
+                })
+                : 0,
+
+            prisma.student.count({
+                where: { created_at: { gte: since } },
+            }),
+
+            prisma.userRole.findMany({
+                where: { role: Role.TEACHER },
+                distinct: ['user_id'],
+                select: { user_id: true },
+            }).then(rows => rows.length),
+
+            prisma.user.count({
+                where: {
+                    created_at: { gte: since },
+                    user_roles: { some: { role: Role.TEACHER } },
+                },
+            }),
+
+            prisma.class.count(),
+            prisma.subClass.count(),
+
+            yearId
+                ? prisma.enrollment.count({
+                    where: { academic_year_id: yearId, photo: null },
+                })
+                : 0,
+
+            prisma.student.findMany({
+                orderBy: { created_at: 'desc' },
+                take: 10,
+                select: {
+                    id: true,
+                    matricule: true,
+                    name: true,
+                    gender: true,
+                    created_at: true,
+                },
+            }),
+
+            prisma.user.findMany({
+                where: { user_roles: { some: { role: Role.TEACHER } } },
+                orderBy: { created_at: 'desc' },
+                take: 10,
+                select: {
+                    id: true,
+                    matricule: true,
+                    name: true,
+                    email: true,
+                    created_at: true,
+                },
+            }),
+        ]);
+
+        return {
+            totals: {
+                totalStudents,
+                studentsEnrolledThisYear: studentsThisYear,
+                totalTeachers,
+                totalClasses,
+                totalSubclasses,
+                studentsWithoutPhoto,
+            },
+            recentActivity: {
+                studentsCreatedLast7Days,
+                teachersCreatedLast7Days,
+                recentStudents,
+                recentTeachers,
+            },
+        };
+    } catch (error) {
+        console.error('Error fetching Secretary dashboard:', error);
+        throw new Error('Failed to fetch Secretary dashboard data');
+    }
+}
+
 // Parent Dashboard - Child's school progress
 export async function getParentDashboard(userId: number, academicYearId?: number): Promise<any> {
     try {

@@ -111,9 +111,6 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
     if (!email) {
         throw new Error('Email is required');
     }
-    if (!phone) {
-        throw new Error('Phone is required');
-    }
     if (!gender) {
         throw new Error('Gender is required');
     }

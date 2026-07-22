@@ -8,7 +8,9 @@ import {
     getSchoolAnnouncements,
     getChildQuizResults,
     getChildAnalytics,
-    checkChildReportCardAvailability
+    checkChildReportCardAvailability,
+    getMyContacts,
+    openStaffDirectMessage
 } from '../controllers/parentController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -70,4 +72,18 @@ router.get('/announcements',
     getSchoolAnnouncements
 );
 
-export default router; 
+// Curated staff directory (executives + child teachers + all HODs by subject)
+router.get('/me/contacts',
+    authenticate,
+    authorize(['PARENT']),
+    getMyContacts
+);
+
+// Open (or reuse) a DM with a staff member; returns the chat channel
+router.post('/me/contact/:userId',
+    authenticate,
+    authorize(['PARENT']),
+    openStaffDirectMessage
+);
+
+export default router;

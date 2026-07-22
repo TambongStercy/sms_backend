@@ -93,6 +93,46 @@ export const getStudentFeeComparison = async (req: Request, res: Response) => {
     }
 };
 
+export const getEnrolledStudentsFeeStatus = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const academic_year_id = req.query.academicYearId ?
+            parseInt(req.query.academicYearId as string) : undefined;
+
+        const status = req.query.status as string | undefined;
+        const allowed = ['MATCHED', 'PAYMENT_MISMATCH', 'MISSING_PRIMARY', 'MISSING_CONTROL', 'NO_RECORDS'];
+        if (status && !allowed.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid status. Allowed: ${allowed.join(', ')}`
+            });
+        }
+
+        const studentStatus = req.query.studentStatus as string | undefined;
+        const allowedStudentStatus = ['NEW', 'OLD', 'REPEATER'];
+        if (studentStatus && !allowedStudentStatus.includes(studentStatus)) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid studentStatus. Allowed: ${allowedStudentStatus.join(', ')}`
+            });
+        }
+
+        const result = await feeComparisonService.getEnrolledStudentsFeeStatus(academic_year_id, {
+            page: req.query.page ? parseInt(req.query.page as string) : undefined,
+            limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+            classId: req.query.classId ? parseInt(req.query.classId as string) : undefined,
+            subClassId: req.query.subClassId ? parseInt(req.query.subClassId as string) : undefined,
+            search: req.query.search as string | undefined,
+            status: status as any,
+            studentStatus: studentStatus as any,
+        });
+
+        res.json({ success: true, data: result });
+    } catch (error: any) {
+        console.error('Error fetching enrolled students fee status:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 export const exportDiscrepancyReports = async (req: Request, res: Response) => {
     try {
         const academic_year_id = req.query.academicYearId ?

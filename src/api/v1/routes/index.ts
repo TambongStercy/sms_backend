@@ -5,6 +5,9 @@ import userRoutes from './userRoutes';
 import classRoutes from './classRoutes';
 import studentRoutes from './studentRoutes';
 import feeRoutes from './feeRoutes';
+import feeItemRoutes from './feeItemRoutes';
+import financeRequestRoutes from './financeRequestRoutes';
+import expenditureRoutes from './expenditureRoutes';
 import controlFeeRoutes from './controlFeeRoutes';
 import feeComparisonRoutes from './feeComparisonRoutes';
 import unifiedPaymentRoutes from './unifiedPaymentRoutes';
@@ -31,8 +34,16 @@ import systemRoutes from './systemRoutes';
 import principalRoutes from './principalRoutes';
 import vicePrincipalRoutes from './vicePrincipalRoutes';
 import disciplineMasterRoutes from './disciplineMasterRoutes';
+import disciplinaryActionRoutes from './disciplinaryActionRoutes';
+import reportRequestRoutes from './reportRequestRoutes';
 import messagingRoutes from './messagingRoutes';
+import chatRoutes from './chatRoutes';
+import inventoryRoutes from './inventoryRoutes';
+import rollCallRoutes from './rollCallRoutes';
+import seizedItemRoutes from './seizedItemRoutes';
 import managerRoutes from './managerRoutes';
+import subjectSchemeRoutes from './subjectSchemeRoutes';
+import logbookRoutes from './logbookRoutes';
 import express from 'express';
 import path from 'path';
 import * as disciplineController from '../controllers/disciplineController';
@@ -51,6 +62,9 @@ router.use('/users', userRoutes);
 router.use('/classes', classRoutes);
 router.use('/students', studentRoutes);
 router.use('/fees', feeRoutes);
+router.use('/fee-items', feeItemRoutes);
+router.use('/finance-requests', financeRequestRoutes);
+router.use('/expenditures', expenditureRoutes);
 router.use('/control-fees', controlFeeRoutes);
 router.use('/fee-comparison', feeComparisonRoutes);
 router.use('/payments', unifiedPaymentRoutes);
@@ -88,8 +102,26 @@ router.use('/vice-principal', vicePrincipalRoutes);
 // Mount discipline master routes at /discipline-master
 router.use('/discipline-master', disciplineMasterRoutes);
 
+// Structured disciplinary actions (Dean of Discipline)
+router.use('/disciplinary-actions', disciplinaryActionRoutes);
+
+// Report requests (Dean of Discipline → SDM/DM)
+router.use('/report-requests', reportRequestRoutes);
+
 // Mount messaging routes at /messaging
 router.use('/messaging', messagingRoutes);
+
+// Mount Slack-style chat (channels + DMs + threads + WebSockets) at /chat
+router.use('/chat', chatRoutes);
+
+// Personnel inventory (manager grants stock; peer-to-peer transfers with accept flow)
+router.use('/inventory', inventoryRoutes);
+
+// Teacher per-period roll call oversight (SDM / Dean of Discipline / VP / Principal / Manager)
+router.use('/roll-calls', rollCallRoutes);
+
+// Items seized from students by the discipline chain (with transfer-accept flow)
+router.use('/seized-items', seizedItemRoutes);
 
 // Mount manager routes at /manager
 router.use('/manager', managerRoutes);
@@ -138,5 +170,11 @@ router.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Register routes
 router.use('/student-averages', studentAverageRoutes);
+
+// Subject scheme of work (Module → Chapter → Lesson) — owned by VP / Dean of Studies
+router.use('/subject-schemes', subjectSchemeRoutes);
+
+// Teacher logbook (records of lessons taught against the scheme)
+router.use('/logbook', logbookRoutes);
 
 export default router;

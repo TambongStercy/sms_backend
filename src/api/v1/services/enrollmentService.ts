@@ -5,7 +5,9 @@ import { updateNewStudentStatus } from '../../../utils/studentStatus';
 
 // Types for the enrollment workflow
 export interface BursarRegistrationData {
-    name: string;
+    name?: string; // Legacy single name (derived from nom + prenom if those are provided)
+    nom?: string; // Family name
+    prenom?: string; // Given name
     date_of_birth: string;
     place_of_birth: string;
     gender: Gender;
@@ -14,6 +16,7 @@ export interface BursarRegistrationData {
     class_id: number;
     academic_year_id?: number;
     is_new_student?: boolean;
+    ream_of_paper_collected?: boolean;
 }
 
 export interface InterviewData {
@@ -49,15 +52,28 @@ export async function registerStudentToClass(data: BursarRegistrationData) {
         throw new Error(`Class with ID ${data.class_id} not found.`);
     }
 
+    // Derive full name from nom + prenom (or accept legacy single name)
+    const nom = data.nom?.trim();
+    const prenom = data.prenom?.trim();
+    const fullName = (nom && prenom) ? `${nom} ${prenom}` : (data.name?.trim() || '');
+    if (!fullName) {
+        throw new Error('Provide nom (family name) and prenom (given name).');
+    }
+
+    const isNewStudent = data.is_new_student ?? true;
+    const reamCollected = isNewStudent ? !!data.ream_of_paper_collected : false;
+
     // Generate matricule (will be done automatically by the student creation hook)
     const studentData = {
-        name: data.name,
+        name: fullName,
+        nom: nom || null,
+        prenom: prenom || null,
         date_of_birth: new Date(data.date_of_birth),
         place_of_birth: data.place_of_birth,
         gender: data.gender,
         residence: data.residence,
         former_school: data.former_school,
-        is_new_student: data.is_new_student ?? true,
+        is_new_student: isNewStudent,
         status: StudentStatus.ASSIGNED_TO_CLASS,
         first_enrollment_year_id: yearId,
         matricule: `TEMP_${Date.now()}` // Will be updated by matricule generator
@@ -78,6 +94,7 @@ export async function registerStudentToClass(data: BursarRegistrationData) {
                 class_id: data.class_id,
                 sub_class_id: null, // Will be assigned after interview
                 repeater: false,
+                ream_of_paper_collected: reamCollected,
                 enrollment_date: new Date()
             }
         });

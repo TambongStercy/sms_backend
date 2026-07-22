@@ -1442,6 +1442,6 @@ export async function getTeacherTimetable(teacherId: number, academicYearId?: nu
             weeklyHours,
             todayClasses,
         },
-        schedule: teacherPeriods,
+        schedule: teacherPeriods.map(tp => ({ ...tp, teacher_period_id: tp.id })),
     };
 }

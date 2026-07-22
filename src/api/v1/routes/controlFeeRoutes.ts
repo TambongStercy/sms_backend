@@ -1,47 +1,37 @@
-// Swagger documentation can be found in src/config/swagger/docs/controlFeeDocs.ts
+// Four-eyes audit: CONTROLLER records collected payments; BURSAR has NO access.
+// Admins (SUPER_MANAGER, MANAGER, PRINCIPAL) can read both sides for oversight.
+//
+// Swagger documentation in src/config/swagger/docs/controlFeeDocs.ts
 import { Router } from 'express';
 import * as controlFeeController from '../controllers/controlFeeController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// GET /control-fees - List all control fees (with filters)
-// All authenticated users can view control fees list
-router.get('/', authenticate, controlFeeController.getAllControlFees);
+const CONTROL_WRITE = ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'CONTROLLER'];
+const CONTROL_READ = ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'CONTROLLER'];
 
-// GET /control-fees/export - Export control fee data (Excel/Word) - Moved before /:id
-// Only SUPER_MANAGER, PRINCIPAL, BURSAR can export control fee reports
-router.get('/export', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), controlFeeController.exportControlFeeReports);
+// POST /control-fees/payments - Record a payment collected by the Controller.
+// Must precede the parameterised /:controlFeeId/payments route below.
+router.post('/payments', authenticate, authorize(CONTROL_WRITE), controlFeeController.recordControlPayment);
 
-// GET /control-fees/:id - Get a specific control fee by ID
-router.get('/:id', authenticate, controlFeeController.getControlFeeById);
+// GET /control-fees/export - Export control payments. Must precede /:id.
+router.get('/export', authenticate, authorize(CONTROL_READ), controlFeeController.exportControlFeeReports);
 
-// POST /control-fees - Create a control fee record for a student
-// Only SUPER_MANAGER, PRINCIPAL, BURSAR can create control fee records
-router.post('/', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), controlFeeController.createControlFee);
+// GET /control-fees - List per-enrollment control records (with filters)
+router.get('/', authenticate, authorize(CONTROL_READ), controlFeeController.getAllControlFees);
 
-// PUT /control-fees/:id - Update a control fee record
-// Only SUPER_MANAGER, PRINCIPAL, BURSAR can update control fee records
-router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), controlFeeController.updateControlFee);
+// GET /control-fees/student/:studentId - All control records for a student
+router.get('/student/:studentId', authenticate, authorize(CONTROL_READ), controlFeeController.getStudentControlFees);
 
-// DELETE /control-fees/:id - Delete a control fee record
-// Only SUPER_MANAGER, PRINCIPAL, BURSAR can delete control fee records
-router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), controlFeeController.deleteControlFee);
+// GET /control-fees/sub_class/:id/summary - Per-subclass totals
+router.get('/sub_class/:id/summary', authenticate, authorize(CONTROL_READ), controlFeeController.getSubclassControlFeesSummary);
+router.get('/subclass/:id/summary', authenticate, authorize(CONTROL_READ), controlFeeController.getSubclassControlFeesSummary);
 
-// GET /control-fees/student/:studentId - Get all control fees for a specific student
-router.get('/student/:studentId', authenticate, controlFeeController.getStudentControlFees);
+// GET /control-fees/:controlFeeId/payments - Payments under one control record
+router.get('/:controlFeeId/payments', authenticate, authorize(CONTROL_READ), controlFeeController.getControlFeePayments);
 
-// GET /control-fees/sub_class/:sub_classId/summary - Get control fee summary for a sub_class
-router.get('/sub_class/:id/summary', authenticate, controlFeeController.getSubclassControlFeesSummary);
-
-// GET /control-fees/subclass/:id/summary - Alias for subclass control fees summary (for backward compatibility)
-router.get('/subclass/:id/summary', authenticate, controlFeeController.getSubclassControlFeesSummary);
-
-// GET /control-fees/:controlFeeId/payments - List all payments for a control fee
-router.get('/:controlFeeId/payments', authenticate, controlFeeController.getControlFeePayments);
-
-// POST /control-fees/:controlFeeId/payments - Record a payment for a specific control fee
-// Only SUPER_MANAGER, PRINCIPAL, BURSAR can record control payments
-router.post('/:controlFeeId/payments', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), controlFeeController.recordControlPayment);
+// GET /control-fees/:id - Single control record by id
+router.get('/:id', authenticate, authorize(CONTROL_READ), controlFeeController.getControlFeeById);
 
 export default router;

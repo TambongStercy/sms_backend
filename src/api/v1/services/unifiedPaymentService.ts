@@ -6,10 +6,10 @@ import { shouldPayNewStudentFees } from '../../../utils/studentStatus';
 /**
  * Normalizes payment method string to an enum value
  */
-function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC' {
+function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC' | 'AFRILAND_FIRST_BANK' {
     const upperMethod = method.toUpperCase();
     if (Object.values(PaymentMethod).includes(upperMethod as PaymentMethod)) {
-        return upperMethod as 'EXPRESS_UNION' | 'CCA' | 'F3DC';
+        return upperMethod as 'EXPRESS_UNION' | 'CCA' | 'F3DC' | 'AFRILAND_FIRST_BANK';
     }
     throw new Error(`Invalid payment method: ${method}`);
 }

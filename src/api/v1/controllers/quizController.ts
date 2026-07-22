@@ -51,7 +51,7 @@ export const getAvailableQuizzes = async (req: Request, res: Response): Promise<
         const authReq = req as AuthenticatedRequest;
         const parentId = authReq.user?.id;
         const studentId = parseInt(req.params.studentId);
-        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         if (!parentId) {
             res.status(401).json({
@@ -207,7 +207,7 @@ export const getQuizResults = async (req: Request, res: Response): Promise<void>
         const authReq = req as AuthenticatedRequest;
         const parentId = authReq.user?.id;
         const studentId = parseInt(req.params.studentId);
-        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         if (!parentId) {
             res.status(401).json({
@@ -316,8 +316,8 @@ export const getQuizStatistics = async (req: Request, res: Response): Promise<vo
  */
 export const getAllQuizzes = async (req: Request, res: Response): Promise<void> => {
     try {
-        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
-        const subjectId = req.query.subject_id ? parseInt(req.query.subject_id as string) : undefined;
+        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+        const subjectId = req.finalQuery.subject_id ? parseInt(req.finalQuery.subject_id as string) : undefined;
 
         // Build filter options
         const whereClause: any = {};

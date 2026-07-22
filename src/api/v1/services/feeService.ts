@@ -819,6 +819,137 @@ export async function deleteFee(id: number): Promise<SchoolFees> {
  * @param academicYearId Optional academic year ID
  * @returns Array of fees
  */
+export interface SchoolFeesStatus {
+    paid_in_full: boolean;
+    amount_expected: number;
+    amount_paid: number;
+    shortfall: number;
+    school_fees_id: number | null;
+    enrollment_id: number | null;
+    academic_year_id: number | null;
+    has_enrollment: boolean;
+    has_fees_record: boolean;
+}
+
+/**
+ * Check whether a student has paid their school fees in full for a given academic year.
+ * Used by report-card generation as a gate.
+ */
+export async function checkStudentSchoolFeesPaid(
+    studentId: number,
+    academicYearId?: number
+): Promise<SchoolFeesStatus> {
+    const yearId = await getAcademicYearId(academicYearId);
+    if (!yearId) throw new Error('Academic year is required to check fee status');
+
+    const enrollment = await prisma.enrollment.findUnique({
+        where: { student_id_academic_year_id: { student_id: studentId, academic_year_id: yearId } },
+        include: { school_fees: { where: { academic_year_id: yearId } } },
+    });
+
+    if (!enrollment) {
+        return {
+            paid_in_full: false,
+            amount_expected: 0,
+            amount_paid: 0,
+            shortfall: 0,
+            school_fees_id: null,
+            enrollment_id: null,
+            academic_year_id: yearId,
+            has_enrollment: false,
+            has_fees_record: false,
+        };
+    }
+
+    const fees = enrollment.school_fees[0];
+    if (!fees) {
+        return {
+            paid_in_full: false,
+            amount_expected: 0,
+            amount_paid: 0,
+            shortfall: 0,
+            school_fees_id: null,
+            enrollment_id: enrollment.id,
+            academic_year_id: yearId,
+            has_enrollment: true,
+            has_fees_record: false,
+        };
+    }
+
+    const shortfall = Math.max(0, fees.amount_expected - fees.amount_paid);
+    return {
+        paid_in_full: shortfall === 0,
+        amount_expected: fees.amount_expected,
+        amount_paid: fees.amount_paid,
+        shortfall,
+        school_fees_id: fees.id,
+        enrollment_id: enrollment.id,
+        academic_year_id: yearId,
+        has_enrollment: true,
+        has_fees_record: true,
+    };
+}
+
+/**
+ * List every student in a subclass with their school-fees status for a given academic year.
+ * Useful as a preflight check before downloading a combined subclass report.
+ */
+export async function getSubclassFeesStatus(
+    subClassId: number,
+    academicYearId?: number
+): Promise<{
+    sub_class_id: number;
+    academic_year_id: number;
+    total_students: number;
+    paid_in_full_count: number;
+    unpaid_count: number;
+    students: Array<{
+        student_id: number;
+        enrollment_id: number;
+        name: string;
+        matricule: string;
+        amount_expected: number;
+        amount_paid: number;
+        shortfall: number;
+        paid_in_full: boolean;
+    }>;
+}> {
+    const yearId = await getAcademicYearId(academicYearId);
+    if (!yearId) throw new Error('Academic year is required');
+
+    const enrollments = await prisma.enrollment.findMany({
+        where: { sub_class_id: subClassId, academic_year_id: yearId },
+        include: { student: true, school_fees: { where: { academic_year_id: yearId } } },
+        orderBy: { student: { name: 'asc' } },
+    });
+
+    const students = enrollments.map(e => {
+        const fees = e.school_fees[0];
+        const expected = fees?.amount_expected ?? 0;
+        const paid = fees?.amount_paid ?? 0;
+        const shortfall = Math.max(0, expected - paid);
+        return {
+            student_id: e.student_id,
+            enrollment_id: e.id,
+            name: e.student.name,
+            matricule: e.student.matricule,
+            amount_expected: expected,
+            amount_paid: paid,
+            shortfall,
+            paid_in_full: shortfall === 0 && expected > 0,
+        };
+    });
+
+    return {
+        sub_class_id: subClassId,
+        academic_year_id: yearId,
+        total_students: students.length,
+        paid_in_full_count: students.filter(s => s.paid_in_full).length,
+        unpaid_count: students.filter(s => !s.paid_in_full).length,
+        students,
+    };
+}
+
 export async function getStudentFees(studentId: number, academicYearId?: number): Promise<SchoolFees[]> {
     const yearId = await getAcademicYearId(academicYearId);
 
@@ -902,10 +1033,10 @@ export async function getSubclassFeesSummary(sub_classId: number, academicYearId
 /**
  * Normalizes payment method string to an enum value
  */
-function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC' {
+function normalizePaymentMethod(method: string): 'EXPRESS_UNION' | 'CCA' | 'F3DC' | 'AFRILAND_FIRST_BANK' {
     const upperMethod = method.toUpperCase();
     if (Object.values(PaymentMethod).includes(upperMethod as PaymentMethod)) {
-        return upperMethod as 'EXPRESS_UNION' | 'CCA' | 'F3DC';
+        return upperMethod as 'EXPRESS_UNION' | 'CCA' | 'F3DC' | 'AFRILAND_FIRST_BANK';
     }
     // Default to a known method or throw an error if the method is invalid
     throw new Error(`Invalid payment method: ${method}`);
@@ -1146,6 +1277,86 @@ export async function exportFeeReports(
         console.error('Error in exportFeeReports:', error);
         throw error;
     }
+}
+
+// Bursar edits are restricted to a 2-day window after payment creation.
+// Higher roles (SUPER_MANAGER, MANAGER, PRINCIPAL) bypass this check.
+const BURSAR_EDIT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+export class PaymentEditWindowClosedError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'PaymentEditWindowClosedError';
+    }
+}
+
+export async function updatePayment(
+    paymentId: number,
+    data: {
+        amount?: number;
+        payment_date?: string;
+        receipt_number?: string | null;
+        payment_method?: string;
+        notes?: string | null;
+    },
+    userRoles: string[] = []
+): Promise<PaymentTransaction> {
+    const existing = await prisma.paymentTransaction.findUnique({
+        where: { id: paymentId },
+    });
+
+    if (!existing) {
+        throw new Error(`Payment with ID ${paymentId} not found`);
+    }
+
+    const isPrivileged = userRoles.some(r =>
+        ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL'].includes(r)
+    );
+    if (!isPrivileged) {
+        const ageMs = Date.now() - new Date(existing.created_at).getTime();
+        if (ageMs > BURSAR_EDIT_WINDOW_MS) {
+            throw new PaymentEditWindowClosedError(
+                'Edit window has closed. Bursars can only edit a payment within 2 days of its creation.'
+            );
+        }
+    }
+
+    const updateData: any = {};
+    if (data.amount !== undefined) {
+        updateData.amount = typeof data.amount === 'string' ? parseFloat(data.amount) : data.amount;
+    }
+    if (data.payment_date !== undefined) {
+        updateData.payment_date = new Date(data.payment_date);
+    }
+    if (data.receipt_number !== undefined) {
+        updateData.receipt_number = data.receipt_number;
+    }
+    if (data.payment_method !== undefined) {
+        updateData.payment_method = normalizePaymentMethod(data.payment_method);
+    }
+    if (data.notes !== undefined) {
+        updateData.notes = data.notes;
+    }
+
+    const amountDelta =
+        updateData.amount !== undefined ? updateData.amount - existing.amount : 0;
+
+    const [updated] = await prisma.$transaction([
+        prisma.paymentTransaction.update({
+            where: { id: paymentId },
+            data: updateData,
+        }),
+        ...(amountDelta !== 0
+            ? [
+                prisma.schoolFees.update({
+                    where: { id: existing.fee_id },
+                    data: { amount_paid: { increment: amountDelta } },
+                }),
+            ]
+            : []),
+    ]);
+
+    return updated;
 }
 
 /**

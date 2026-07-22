@@ -1,4 +1,4 @@
-// Fee comparison routes for Super Admin only
+// Fee comparison routes — Principal-level oversight of the BURSAR vs CONTROLLER ledgers
 import { Router } from 'express';
 import * as feeComparisonController from '../controllers/feeComparisonController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -6,19 +6,23 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 const router = Router();
 
 // GET /fee-comparison/discrepancies - Get all fee discrepancies
-// Only SUPER_MANAGER can view fee discrepancies
-router.get('/discrepancies', authenticate, authorize(['SUPER_MANAGER']), feeComparisonController.getFeeDiscrepancies);
+// SUPER_MANAGER, MANAGER, PRINCIPAL can view fee discrepancies
+router.get('/discrepancies', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), feeComparisonController.getFeeDiscrepancies);
 
 // GET /fee-comparison/summary - Get comparison summary statistics
-// Only SUPER_MANAGER can view comparison summary
-router.get('/summary', authenticate, authorize(['SUPER_MANAGER']), feeComparisonController.getComparisonSummary);
+// SUPER_MANAGER, MANAGER, PRINCIPAL can view comparison summary
+router.get('/summary', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), feeComparisonController.getComparisonSummary);
 
 // GET /fee-comparison/student/:studentId - Get fee comparison for a specific student
-// Only SUPER_MANAGER can view student fee comparisons
-router.get('/student/:studentId', authenticate, authorize(['SUPER_MANAGER']), feeComparisonController.getStudentFeeComparison);
+// SUPER_MANAGER, MANAGER, PRINCIPAL can view student fee comparisons
+router.get('/student/:studentId', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), feeComparisonController.getStudentFeeComparison);
+
+// GET /fee-comparison/students - Full roster of enrolled students with primary + control totals side-by-side
+// SUPER_MANAGER, MANAGER, PRINCIPAL only
+router.get('/students', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), feeComparisonController.getEnrolledStudentsFeeStatus);
 
 // GET /fee-comparison/export - Export discrepancy reports
-// Only SUPER_MANAGER can export discrepancy reports
-router.get('/export', authenticate, authorize(['SUPER_MANAGER']), feeComparisonController.exportDiscrepancyReports);
+// SUPER_MANAGER, MANAGER, PRINCIPAL can export discrepancy reports
+router.get('/export', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), feeComparisonController.exportDiscrepancyReports);
 
 export default router;

@@ -56,6 +56,17 @@ export async function assignTeacher(subject_id: number, data: { teacher_id: numb
     });
 }
 
+export async function removeTeacher(subject_id: number, teacher_id: number): Promise<void> {
+    await prisma.subjectTeacher.delete({
+        where: {
+            subject_id_teacher_id: {
+                subject_id,
+                teacher_id,
+            }
+        }
+    });
+}
+
 export async function linkSubjectToSubClass(
     subject_id: number,
     data: {

@@ -1,6 +1,7 @@
 // src/api/v1/controllers/feeController.ts
 import { Request, Response } from 'express';
 import * as feeService from '../services/feeService';
+import * as feeRefundService from '../services/feeRefundService';
 import * as financialReportService from '../services/financialReportService';
 import { PaginationOptions, FilterOptions } from '../../../utils/pagination';
 
@@ -200,8 +201,8 @@ export const getStudentFees = async (req: Request, res: Response) => {
     try {
         const studentId = parseInt(req.params.studentId);
 
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const fees = await feeService.getStudentFees(studentId, academic_year_id);
 
@@ -222,8 +223,8 @@ export const getSubclassFeesSummary = async (req: Request, res: Response) => {
     try {
         const sub_classId = parseInt(req.params.sub_classId ?? req.params.id);
 
-        const academic_year_id = req.query.academic_year_id ?
-            parseInt(req.query.academic_year_id as string) : undefined;
+        const academic_year_id = req.finalQuery.academic_year_id ?
+            parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const summary = await feeService.getSubclassFeesSummary(sub_classId, academic_year_id);
 
@@ -237,6 +238,38 @@ export const getSubclassFeesSummary = async (req: Request, res: Response) => {
             success: false,
             error: error.message
         });
+    }
+};
+
+export const getStudentFeesStatus = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const studentId = parseInt(req.params.studentId);
+        if (isNaN(studentId)) return res.status(400).json({ success: false, error: 'Invalid studentId' });
+
+        const academicYearId = req.query.academicYearId ? parseInt(req.query.academicYearId as string)
+            : req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+
+        const status = await feeService.checkStudentSchoolFeesPaid(studentId, academicYearId);
+        return res.json({ success: true, data: status });
+    } catch (error: any) {
+        console.error('Error fetching student fee status:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const getSubclassUnpaidStudents = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const subClassId = parseInt(req.params.subClassId ?? req.params.id);
+        if (isNaN(subClassId)) return res.status(400).json({ success: false, error: 'Invalid subClassId' });
+
+        const academicYearId = req.query.academicYearId ? parseInt(req.query.academicYearId as string)
+            : req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+
+        const result = await feeService.getSubclassFeesStatus(subClassId, academicYearId);
+        return res.json({ success: true, data: result });
+    } catch (error: any) {
+        console.error('Error fetching subclass fee status:', error);
+        return res.status(500).json({ success: false, error: error.message });
     }
 };
 
@@ -262,6 +295,33 @@ export const recordPayment = async (req: Request, res: Response) => {
             success: false,
             error: error.message
         });
+    }
+};
+
+export const updatePayment = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const paymentId = parseInt(req.params.paymentId);
+        if (isNaN(paymentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid paymentId' });
+        }
+
+        const userRoles = ((req as any).user?.role || []) as string[];
+        const updated = await feeService.updatePayment(paymentId, req.body, userRoles);
+
+        return res.json({ success: true, data: updated });
+    } catch (error: any) {
+        console.error('Error updating payment:', error);
+
+        if (error instanceof feeService.PaymentEditWindowClosedError) {
+            return res.status(403).json({ success: false, error: error.message });
+        }
+        if (error.message?.includes('not found')) {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        if (error.message?.includes('Invalid payment method')) {
+            return res.status(400).json({ success: false, error: error.message });
+        }
+        return res.status(500).json({ success: false, error: error.message });
     }
 };
 
@@ -369,5 +429,91 @@ export const exportFeeReports = async (req: Request, res: Response) => {
             success: false,
             error: error.message || 'Internal server error during fee report export.'
         });
+    }
+};
+
+export const listOverpaid = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const result = await feeRefundService.listOverpaid({
+            academic_year_id: req.query.academicYearId ? Number(req.query.academicYearId) : undefined,
+            class_id: req.query.classId ? Number(req.query.classId) : undefined,
+            sub_class_id: req.query.subClassId ? Number(req.query.subClassId) : undefined,
+            min_overpayment: req.query.minOverpayment ? Number(req.query.minOverpayment) : undefined,
+            page: req.query.page ? Number(req.query.page) : undefined,
+            limit: req.query.limit ? Number(req.query.limit) : undefined,
+        });
+        return res.json({ success: true, ...result });
+    } catch (err: any) {
+        console.error('Error listing overpaid students:', err);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+export const exportOverpaid = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { buffer, filename } = await feeRefundService.exportOverpaidExcel({
+            academic_year_id: req.query.academicYearId ? Number(req.query.academicYearId) : undefined,
+            class_id: req.query.classId ? Number(req.query.classId) : undefined,
+            sub_class_id: req.query.subClassId ? Number(req.query.subClassId) : undefined,
+            min_overpayment: req.query.minOverpayment ? Number(req.query.minOverpayment) : undefined,
+        });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(buffer);
+    } catch (err: any) {
+        console.error('Error exporting overpaid students:', err);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+export const recordRefund = async (req: any, res: Response): Promise<any> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const result = await feeRefundService.recordRefund({
+            enrollment_id: Number(req.body.enrollmentId ?? req.body.enrollment_id),
+            amount: Number(req.body.amount),
+            refund_date: req.body.refundDate ?? req.body.refund_date,
+            refund_method: req.body.refundMethod ?? req.body.refund_method,
+            reason: req.body.reason,
+            notes: req.body.notes,
+            recorded_by_id: userId,
+        });
+        return res.status(201).json({ success: true, data: result });
+    } catch (err: any) {
+        console.error('Error recording refund:', err);
+        return res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+export const listRefunds = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const result = await feeRefundService.listRefunds({
+            student_id: req.query.studentId ? Number(req.query.studentId) : undefined,
+            enrollment_id: req.query.enrollmentId ? Number(req.query.enrollmentId) : undefined,
+            academic_year_id: req.query.academicYearId ? Number(req.query.academicYearId) : undefined,
+            from: req.query.from as string | undefined,
+            to: req.query.to as string | undefined,
+            page: req.query.page ? Number(req.query.page) : undefined,
+            limit: req.query.limit ? Number(req.query.limit) : undefined,
+        });
+        return res.json({ success: true, ...result });
+    } catch (err: any) {
+        console.error('Error listing refunds:', err);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+export const getRefundById = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ success: false, error: 'Invalid id' });
+        const refund = await feeRefundService.getRefundById(id);
+        if (!refund) return res.status(404).json({ success: false, error: 'Refund not found' });
+        return res.json({ success: true, data: refund });
+    } catch (err: any) {
+        console.error('Error fetching refund:', err);
+        return res.status(500).json({ success: false, error: err.message });
     }
 };

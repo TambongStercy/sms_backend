@@ -5,107 +5,112 @@ import * as disciplineMasterController from '../controllers/disciplineMasterCont
 
 const router = express.Router();
 
+const DM_AND_SENIORS = ['DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_OF_DISCIPLINE', 'PRINCIPAL', 'VICE_PRINCIPAL'];
+const DM_DASHBOARD_ROLES = ['DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_OF_DISCIPLINE'];
+const STUDENT_PROFILE_ROLES = [...DM_AND_SENIORS, 'TEACHER'];
+const REPORTS_ROLES = ['DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_OF_DISCIPLINE', 'PRINCIPAL'];
+
 // Apply authentication to all routes
 router.use(authenticate);
 
 /**
  * @route GET /api/v1/discipline-master/dashboard
- * @desc Get enhanced Discipline Master dashboard with behavioral analytics
- * @access Private (DISCIPLINE_MASTER only)
+ * @desc Get enhanced Discipline Master / SDM / Dean dashboard with behavioral analytics
+ * @access Private (DISCIPLINE_MASTER, SENIOR_DISCIPLINE_MASTER, DEAN_OF_DISCIPLINE)
  */
 router.get('/dashboard',
-    authorize(['DISCIPLINE_MASTER']),
+    authorize(DM_DASHBOARD_ROLES),
     disciplineMasterController.getDMDashboard
 );
 
 /**
  * @route GET /api/v1/discipline-master/behavioral-analytics
  * @desc Get comprehensive behavioral analytics and trends
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL)
+ * @access Private (DM, SDM, Dean, Principal, VP)
  */
 router.get('/behavioral-analytics',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
+    authorize(DM_AND_SENIORS),
     disciplineMasterController.getBehavioralAnalyticsData
 );
 
 /**
  * @route GET /api/v1/discipline-master/student-profile/:studentId
  * @desc Get detailed student behavior profile and intervention history
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL, TEACHER)
+ * @access Private (DM, SDM, Dean, Principal, VP, Teacher)
  */
 router.get('/student-profile/:studentId',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER']),
+    authorize(STUDENT_PROFILE_ROLES),
     disciplineMasterController.getStudentBehaviorProfileData
 );
 
 /**
  * @route GET /api/v1/discipline-master/early-warning
  * @desc Get early warning system data for at-risk students
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL)
+ * @access Private (DM, SDM, Dean, Principal, VP)
  */
 router.get('/early-warning',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
+    authorize(DM_AND_SENIORS),
     disciplineMasterController.getEarlyWarningSystemData
 );
 
 /**
  * @route GET /api/v1/discipline-master/statistics
  * @desc Get discipline statistics and trends with filtering options
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL)
+ * @access Private (DM, SDM, Dean, Principal, VP)
  */
 router.get('/statistics',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
+    authorize(DM_AND_SENIORS),
     disciplineMasterController.getDisciplineStatistics
 );
 
 /**
  * @route GET /api/v1/discipline-master/interventions
  * @desc Get intervention tracking data
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL)
+ * @access Private (DM, SDM, Dean, Principal, VP)
  */
 router.get('/interventions',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
+    authorize(DM_AND_SENIORS),
     disciplineMasterController.getInterventionTracking
 );
 
 /**
  * @route POST /api/v1/discipline-master/interventions
  * @desc Create new intervention plan for a student
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL)
+ * @access Private (DM, SDM, Dean, Principal, VP)
  */
 router.post('/interventions',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
+    authorize(DM_AND_SENIORS),
     disciplineMasterController.createIntervention
 );
 
 /**
  * @route PUT /api/v1/discipline-master/interventions/:interventionId
  * @desc Update intervention status and add notes
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL)
+ * @access Private (DM, SDM, Dean, Principal, VP)
  */
 router.put('/interventions/:interventionId',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
+    authorize(DM_AND_SENIORS),
     disciplineMasterController.updateInterventionStatus
 );
 
 /**
  * @route GET /api/v1/discipline-master/risk-assessment
  * @desc Get comprehensive risk assessment for all students
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL, VICE_PRINCIPAL)
+ * @access Private (DM, SDM, Dean, Principal, VP)
  */
 router.get('/risk-assessment',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL', 'VICE_PRINCIPAL']),
+    authorize(DM_AND_SENIORS),
     disciplineMasterController.getRiskAssessment
 );
 
 /**
  * @route GET /api/v1/discipline-master/reports
  * @desc Generate comprehensive discipline reports
- * @access Private (DISCIPLINE_MASTER, PRINCIPAL)
+ * @access Private (DM, SDM, Dean, Principal)
  */
 router.get('/reports',
-    authorize(['DISCIPLINE_MASTER', 'PRINCIPAL']),
+    authorize(REPORTS_ROLES),
     disciplineMasterController.generateDisciplineReport
 );
 
-export default router; 
+export default router;

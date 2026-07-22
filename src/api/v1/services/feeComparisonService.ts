@@ -10,7 +10,7 @@ export interface FeeDiscrepancy {
     studentMatricule: string;
     className?: string;
     subClassName?: string;
-    discrepancyType: 'MISSING_PRIMARY' | 'MISSING_CONTROL' | 'AMOUNT_MISMATCH' | 'PAYMENT_MISMATCH';
+    discrepancyType: 'MISSING_PRIMARY' | 'MISSING_CONTROL' | 'PAYMENT_MISMATCH';
     primaryFee?: {
         id: number;
         amountExpected: number;
@@ -23,7 +23,6 @@ export interface FeeDiscrepancy {
         amountPaid: number;
         dueDate: string;
     };
-    expectedAmountDifference?: number;
     paidAmountDifference?: number;
     variancePercentage?: number;
 }
@@ -38,11 +37,9 @@ export interface ComparisonSummary {
     discrepancyTypes: {
         missingPrimary: number;
         missingControl: number;
-        amountMismatch: number;
         paymentMismatch: number;
     };
     averageVariancePercentage: number;
-    totalExpectedAmountDifference: number;
     totalPaidAmountDifference: number;
 }
 
@@ -150,22 +147,20 @@ export async function getFeeDiscrepancies(
             });
         }
 
-        // Case 3: Both fees exist - check for mismatches
+        // Case 3: Both sides exist — only the paid totals matter. Controllers don't
+        // enter expected amounts, so amount_expected mismatches are not meaningful here.
         else if (primaryFee && controlFee) {
-            const expectedDifference = primaryFee.amount_expected - controlFee.amount_expected;
             const paidDifference = primaryFee.amount_paid - controlFee.amount_paid;
-
-            const hasAmountMismatch = Math.abs(expectedDifference) > 0.01; // Allow for small floating point differences
             const hasPaymentMismatch = Math.abs(paidDifference) > 0.01;
 
-            if (hasAmountMismatch || hasPaymentMismatch) {
-                const variancePercentage = primaryFee.amount_expected > 0
-                    ? Math.abs(expectedDifference / primaryFee.amount_expected) * 100
+            if (hasPaymentMismatch) {
+                const variancePercentage = primaryFee.amount_paid > 0
+                    ? Math.abs(paidDifference / primaryFee.amount_paid) * 100
                     : 0;
 
                 discrepancies.push({
                     ...baseDiscrepancy,
-                    discrepancyType: hasAmountMismatch ? 'AMOUNT_MISMATCH' : 'PAYMENT_MISMATCH',
+                    discrepancyType: 'PAYMENT_MISMATCH',
                     primaryFee: {
                         id: primaryFee.id,
                         amountExpected: primaryFee.amount_expected,
@@ -178,7 +173,6 @@ export async function getFeeDiscrepancies(
                         amountPaid: controlFee.amount_paid,
                         dueDate: controlFee.due_date.toISOString().split('T')[0]
                     },
-                    expectedAmountDifference: expectedDifference,
                     paidAmountDifference: paidDifference,
                     variancePercentage: parseFloat(variancePercentage.toFixed(2))
                 });
@@ -230,11 +224,9 @@ export async function getComparisonSummary(academicYearId?: number): Promise<Com
         discrepancyTypes: {
             missingPrimary: 0,
             missingControl: 0,
-            amountMismatch: 0,
             paymentMismatch: 0
         },
         averageVariancePercentage: 0,
-        totalExpectedAmountDifference: 0,
         totalPaidAmountDifference: 0
     };
 
@@ -251,28 +243,16 @@ export async function getComparisonSummary(academicYearId?: number): Promise<Com
             const primaryFee = enrollment.school_fees[0];
             const controlFee = enrollment.control_school_fees[0];
 
-            const expectedDifference = primaryFee.amount_expected - controlFee.amount_expected;
             const paidDifference = primaryFee.amount_paid - controlFee.amount_paid;
-
-            const hasAmountMismatch = Math.abs(expectedDifference) > 0.01;
             const hasPaymentMismatch = Math.abs(paidDifference) > 0.01;
 
-            if (hasAmountMismatch || hasPaymentMismatch) {
+            if (hasPaymentMismatch) {
                 summary.totalDiscrepancies++;
+                summary.discrepancyTypes.paymentMismatch++;
+                summary.totalPaidAmountDifference += Math.abs(paidDifference);
 
-                if (hasAmountMismatch) {
-                    summary.discrepancyTypes.amountMismatch++;
-                    summary.totalExpectedAmountDifference += Math.abs(expectedDifference);
-                }
-
-                if (hasPaymentMismatch) {
-                    summary.discrepancyTypes.paymentMismatch++;
-                    summary.totalPaidAmountDifference += Math.abs(paidDifference);
-                }
-
-                // Calculate variance percentage
-                if (primaryFee.amount_expected > 0) {
-                    const variance = Math.abs(expectedDifference / primaryFee.amount_expected) * 100;
+                if (primaryFee.amount_paid > 0) {
+                    const variance = Math.abs(paidDifference / primaryFee.amount_paid) * 100;
                     totalVariance += variance;
                     varianceCount++;
                 }
@@ -388,6 +368,176 @@ export async function getStudentFeeComparison(studentId: number, academicYearId?
     };
 }
 
+// Full roster view for the admin audit screen — every student enrolled in the
+// academic year with their primary + control totals side-by-side, regardless of
+// whether either side recorded anything. Paginated.
+export interface EnrolledStudentFeeRow {
+    studentId: number;
+    studentName: string;
+    studentMatricule: string;
+    className: string | null;
+    subClassName: string | null;
+    enrollmentId: number;
+    studentStatus: 'NEW' | 'OLD' | 'REPEATER'; // NEW = first year in school, REPEATER = repeating same class
+    primary: {
+        amountExpected: number;
+        amountPaid: number;
+        paymentsCount: number;
+    };
+    control: {
+        amountPaid: number;
+        paymentsCount: number;
+    };
+    paidAmountDifference: number; // primary.amountPaid - control.amountPaid
+    status: 'MATCHED' | 'PAYMENT_MISMATCH' | 'MISSING_PRIMARY' | 'MISSING_CONTROL' | 'NO_RECORDS';
+}
+
+export async function getEnrolledStudentsFeeStatus(
+    academicYearId: number | undefined,
+    options: {
+        page?: number;
+        limit?: number;
+        classId?: number;
+        subClassId?: number;
+        search?: string; // name or matricule
+        status?: 'MATCHED' | 'PAYMENT_MISMATCH' | 'MISSING_PRIMARY' | 'MISSING_CONTROL' | 'NO_RECORDS';
+        studentStatus?: 'NEW' | 'OLD' | 'REPEATER';
+    } = {}
+): Promise<{ data: EnrolledStudentFeeRow[]; meta: { total: number; totalPages: number; page: number; limit: number; academicYearId: number } }> {
+    const yearId = await getAcademicYearId(academicYearId);
+    if (!yearId) {
+        throw new Error('Academic year ID is required to list enrolled students.');
+    }
+
+    const page = options.page && options.page > 0 ? options.page : 1;
+    const limit = options.limit && options.limit > 0 ? options.limit : 25;
+
+    const where: any = { academic_year_id: yearId };
+    if (options.subClassId) where.sub_class_id = options.subClassId;
+    if (options.classId) where.sub_class = { class_id: options.classId };
+    if (options.search) {
+        where.student = {
+            OR: [
+                { name: { contains: options.search, mode: 'insensitive' } },
+                { matricule: { contains: options.search, mode: 'insensitive' } }
+            ]
+        };
+    }
+
+    // studentStatus = NEW can be pushed to the DB via first_enrollment_year_id.
+    // OLD / REPEATER and the derived payment status need post-fetch filtering.
+    if (options.studentStatus === 'NEW') {
+        where.student = { ...(where.student || {}), first_enrollment_year_id: yearId };
+    }
+
+    // Without derived filters we can paginate at the DB. Otherwise materialise first.
+    const needsPostFilter =
+        !!options.status ||
+        options.studentStatus === 'OLD' ||
+        options.studentStatus === 'REPEATER';
+
+    const baseQuery = {
+        where,
+        include: {
+            // Pull all enrollments (just the year id) so we can derive NEW/OLD even
+            // when student.first_enrollment_year_id wasn't set at enrollment time.
+            student: {
+                include: {
+                    enrollments: { select: { academic_year_id: true } }
+                }
+            },
+            sub_class: { include: { class: true } },
+            school_fees: {
+                where: { academic_year_id: yearId },
+                include: { payment_transactions: true }
+            },
+            control_school_fees: {
+                where: { academic_year_id: yearId },
+                include: { control_payment_transactions: true }
+            }
+        },
+        orderBy: [
+            { sub_class: { class: { name: 'asc' as const } } },
+            { sub_class: { name: 'asc' as const } },
+            { student: { name: 'asc' as const } }
+        ]
+    };
+
+    const enrollments = needsPostFilter
+        ? await prisma.enrollment.findMany(baseQuery)
+        : await prisma.enrollment.findMany({ ...baseQuery, skip: (page - 1) * limit, take: limit });
+
+    const totalUnfiltered = needsPostFilter ? 0 : await prisma.enrollment.count({ where });
+
+    const rows: EnrolledStudentFeeRow[] = enrollments.map(e => {
+        const primary = e.school_fees[0];
+        const control = e.control_school_fees[0];
+
+        const primaryBlock = {
+            amountExpected: primary?.amount_expected ?? 0,
+            amountPaid: primary?.amount_paid ?? 0,
+            paymentsCount: primary?.payment_transactions.length ?? 0,
+        };
+        const controlBlock = {
+            amountPaid: control?.amount_paid ?? 0,
+            paymentsCount: control?.control_payment_transactions.length ?? 0,
+        };
+        const paidAmountDifference = primaryBlock.amountPaid - controlBlock.amountPaid;
+
+        let status: EnrolledStudentFeeRow['status'];
+        if (!primary && !control) status = 'NO_RECORDS';
+        else if (primary && !control) status = 'MISSING_CONTROL';
+        else if (!primary && control) status = 'MISSING_PRIMARY';
+        else if (Math.abs(paidAmountDifference) > 0.01) status = 'PAYMENT_MISMATCH';
+        else status = 'MATCHED';
+
+        let studentStatus: EnrolledStudentFeeRow['studentStatus'];
+        if (e.repeater) {
+            studentStatus = 'REPEATER';
+        } else if (e.student.first_enrollment_year_id != null) {
+            // Authoritative field when it's populated
+            studentStatus = e.student.first_enrollment_year_id === yearId ? 'NEW' : 'OLD';
+        } else {
+            // Fallback: NEW iff the student has no enrollments in prior years
+            const hasPriorEnrollment = (e.student as any).enrollments
+                .some((en: { academic_year_id: number }) => en.academic_year_id < yearId);
+            studentStatus = hasPriorEnrollment ? 'OLD' : 'NEW';
+        }
+
+        return {
+            studentId: e.student_id,
+            studentName: e.student.name,
+            studentMatricule: e.student.matricule,
+            className: e.sub_class?.class?.name ?? null,
+            subClassName: e.sub_class?.name ?? null,
+            enrollmentId: e.id,
+            studentStatus,
+            primary: primaryBlock,
+            control: controlBlock,
+            paidAmountDifference,
+            status,
+        };
+    });
+
+    if (needsPostFilter) {
+        const filtered = rows.filter(r =>
+            (!options.status || r.status === options.status) &&
+            (!options.studentStatus || r.studentStatus === options.studentStatus)
+        );
+        const total = filtered.length;
+        const start = (page - 1) * limit;
+        return {
+            data: filtered.slice(start, start + limit),
+            meta: { total, totalPages: Math.ceil(total / limit), page, limit, academicYearId: yearId }
+        };
+    }
+
+    return {
+        data: rows,
+        meta: { total: totalUnfiltered, totalPages: Math.ceil(totalUnfiltered / limit), page, limit, academicYearId: yearId }
+    };
+}
+
 /**
  * Export fee discrepancy reports
  * @param academicYearId Optional academic year ID
@@ -413,11 +563,8 @@ export async function exportDiscrepancyReports(
         className: discrepancy.className || 'N/A',
         subClassName: discrepancy.subClassName || 'N/A',
         discrepancyType: discrepancy.discrepancyType,
-        primaryExpected: discrepancy.primaryFee?.amountExpected || 0,
         primaryPaid: discrepancy.primaryFee?.amountPaid || 0,
-        controlExpected: discrepancy.controlFee?.amountExpected || 0,
         controlPaid: discrepancy.controlFee?.amountPaid || 0,
-        expectedDifference: discrepancy.expectedAmountDifference || 0,
         paidDifference: discrepancy.paidAmountDifference || 0,
         variancePercentage: discrepancy.variancePercentage || 0
     }));
@@ -433,11 +580,8 @@ export async function exportDiscrepancyReports(
             { label: 'Class', value: 'className' },
             { label: 'Subclass', value: 'subClassName' },
             { label: 'Discrepancy Type', value: 'discrepancyType' },
-            { label: 'Primary Expected (FCFA)', value: 'primaryExpected' },
             { label: 'Primary Paid (FCFA)', value: 'primaryPaid' },
-            { label: 'Control Expected (FCFA)', value: 'controlExpected' },
             { label: 'Control Paid (FCFA)', value: 'controlPaid' },
-            { label: 'Expected Difference (FCFA)', value: 'expectedDifference' },
             { label: 'Paid Difference (FCFA)', value: 'paidDifference' },
             { label: 'Variance %', value: 'variancePercentage' }
         ];
@@ -451,15 +595,13 @@ export async function exportDiscrepancyReports(
         const workbook = XLSX.utils.book_new();
         const worksheet = XLSX.utils.json_to_sheet(reportData, {
             header: ['studentName', 'studentMatricule', 'className', 'subClassName', 'discrepancyType',
-                    'primaryExpected', 'primaryPaid', 'controlExpected', 'controlPaid',
-                    'expectedDifference', 'paidDifference', 'variancePercentage']
+                    'primaryPaid', 'controlPaid', 'paidDifference', 'variancePercentage']
         });
 
         // Set column headers
         const headers = [
             'Student Name', 'Matricule', 'Class', 'Subclass', 'Discrepancy Type',
-            'Primary Expected (FCFA)', 'Primary Paid (FCFA)', 'Control Expected (FCFA)', 'Control Paid (FCFA)',
-            'Expected Difference (FCFA)', 'Paid Difference (FCFA)', 'Variance %'
+            'Primary Paid (FCFA)', 'Control Paid (FCFA)', 'Paid Difference (FCFA)', 'Variance %'
         ];
 
         headers.forEach((header, index) => {

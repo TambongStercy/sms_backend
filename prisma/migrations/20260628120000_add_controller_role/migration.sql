@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "Role" ADD VALUE 'CONTROLLER';
+
+-- AlterEnum
+ALTER TYPE "AssignmentRole" ADD VALUE 'CONTROLLER';

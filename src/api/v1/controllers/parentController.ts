@@ -5,8 +5,44 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
 import * as quizService from '../services/quizService';
 import * as examService from '../services/examService';
+import * as parentDirectoryService from '../services/parentDirectoryService';
+import * as chatService from '../services/chatService';
 
 const prisma = new PrismaClient();
+
+/**
+ * GET /parents/me/contacts — curated staff directory for parents
+ * (fixed executives + child teachers + all HODs by subject)
+ */
+export const getMyContacts = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const parentId = (req as AuthenticatedRequest).user?.id;
+        if (!parentId) { res.status(401).json({ success: false, error: 'Unauthorized' }); return; }
+        const data = await parentDirectoryService.getParentContacts(parentId);
+        res.json({ success: true, data });
+    } catch (err: any) {
+        console.error('getMyContacts error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+/**
+ * POST /parents/me/contact/:userId — open (or reuse) a DM with a staff member
+ * Returns the channelId that the frontend can then post to via /chat/channels/:id/messages.
+ */
+export const openStaffDirectMessage = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const parentId = (req as AuthenticatedRequest).user?.id;
+        if (!parentId) { res.status(401).json({ success: false, error: 'Unauthorized' }); return; }
+        const staffId = Number(req.params.userId);
+        if (Number.isNaN(staffId)) { res.status(400).json({ success: false, error: 'Invalid userId' }); return; }
+        const channel = await chatService.openDirectMessage(parentId, [staffId]);
+        res.status(200).json({ success: true, data: channel });
+    } catch (err: any) {
+        const status = err.statusCode || 500;
+        res.status(status).json({ success: false, error: err.message });
+    }
+};
 
 /**
  * Get parent dashboard data
@@ -24,7 +60,7 @@ export const getParentDashboard = async (req: Request, res: Response): Promise<v
             return;
         }
 
-        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const dashboardData = await parentService.getParentDashboard(parentId, academicYearId);
 
@@ -66,7 +102,7 @@ export const getChildDetails = async (req: Request, res: Response): Promise<void
             return;
         }
 
-        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const childDetails = await parentService.getChildDetails(parentId, studentId, academicYearId);
 
@@ -196,7 +232,7 @@ export const getChildrenQuizResults = async (req: Request, res: Response): Promi
             return;
         }
 
-        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const quizResults = await parentService.getChildrenQuizResults(parentId, academicYearId);
 
@@ -229,7 +265,7 @@ export const getChildQuizResults = async (req: Request, res: Response): Promise<
         }
 
         const studentId = parseInt(req.params.studentId);
-        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         if (isNaN(studentId)) {
             return res.status(400).json({
@@ -318,7 +354,7 @@ export const getChildAnalytics = async (req: Request, res: Response): Promise<an
         }
 
         const studentId = parseInt(req.params.studentId);
-        const academicYearId = req.query.academic_year_id ? parseInt(req.query.academic_year_id as string) : undefined;
+        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
 
         const analytics = await parentService.getChildAnalytics(parentId, studentId, academicYearId);
 

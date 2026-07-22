@@ -9,28 +9,40 @@ const POSITION_CODES = {
     SUPER_MANAGER: 'CEO',
     MANAGER: 'SA',
     PRINCIPAL: 'SA',
-    VICE_PRINCIPAL: 'SA', 
+    VICE_PRINCIPAL: 'SA',
     BURSAR: 'SA',
+    DEAN_OF_STUDIES: 'SA',
+    DEAN_OF_DISCIPLINE: 'SA',
+    SENIOR_DISCIPLINE_MASTER: 'SA',
+    FEE_AUDITOR: 'SA',
+    SECRETARY: 'SA',
     TEACHER: 'ST',
     HOD: 'ST',
     DISCIPLINE_MASTER: 'SO',
     GUIDANCE_COUNSELOR: 'SO',
+    NURSE: 'SO',
     PARENT: 'SO'
 };
 
 // Defines the hierarchy for determining the matricule position code.
 // Highest role in this list that the user has will determine the code.
 const MATRICULE_ROLE_PRIORITY: Role[] = [
-    Role.SUPER_MANAGER,       // CEO prefix
-    Role.MANAGER,             // SA prefix  
-    Role.PRINCIPAL,           // SA prefix
-    Role.VICE_PRINCIPAL,      // SA prefix
-    Role.BURSAR,              // SA prefix
-    Role.TEACHER,             // ST prefix
-    Role.HOD,                 // ST prefix (Head of Department is teacher role)
-    Role.DISCIPLINE_MASTER,   // SO prefix
-    Role.GUIDANCE_COUNSELOR,  // SO prefix
-    Role.PARENT               // SO prefix
+    Role.SUPER_MANAGER,            // CEO prefix
+    Role.MANAGER,                  // SA prefix
+    Role.PRINCIPAL,                // SA prefix
+    Role.VICE_PRINCIPAL,           // SA prefix
+    Role.DEAN_OF_STUDIES,          // SA prefix
+    Role.DEAN_OF_DISCIPLINE,       // SA prefix
+    Role.SENIOR_DISCIPLINE_MASTER, // SA prefix
+    Role.BURSAR,                   // SA prefix
+    Role.FEE_AUDITOR,              // SA prefix
+    Role.SECRETARY,                // SA prefix
+    Role.TEACHER,                  // ST prefix
+    Role.HOD,                      // ST prefix (Head of Department is teacher role)
+    Role.DISCIPLINE_MASTER,        // SO prefix
+    Role.GUIDANCE_COUNSELOR,       // SO prefix
+    Role.NURSE,                    // SO prefix
+    Role.PARENT                    // SO prefix
 ];
 
 /**
@@ -56,6 +68,16 @@ export function getPositionCodeForRoles(roles: Role[] | undefined | null): strin
                     return POSITION_CODES.VICE_PRINCIPAL;
                 case Role.BURSAR:
                     return POSITION_CODES.BURSAR;
+                case Role.DEAN_OF_STUDIES:
+                    return POSITION_CODES.DEAN_OF_STUDIES;
+                case Role.DEAN_OF_DISCIPLINE:
+                    return POSITION_CODES.DEAN_OF_DISCIPLINE;
+                case Role.SENIOR_DISCIPLINE_MASTER:
+                    return POSITION_CODES.SENIOR_DISCIPLINE_MASTER;
+                case Role.FEE_AUDITOR:
+                    return POSITION_CODES.FEE_AUDITOR;
+                case Role.SECRETARY:
+                    return POSITION_CODES.SECRETARY;
                 case Role.TEACHER:
                     return POSITION_CODES.TEACHER;
                 case Role.HOD:
@@ -64,6 +86,8 @@ export function getPositionCodeForRoles(roles: Role[] | undefined | null): strin
                     return POSITION_CODES.DISCIPLINE_MASTER;
                 case Role.GUIDANCE_COUNSELOR:
                     return POSITION_CODES.GUIDANCE_COUNSELOR;
+                case Role.NURSE:
+                    return POSITION_CODES.NURSE;
                 case Role.PARENT:
                     return POSITION_CODES.PARENT;
             }

@@ -9,6 +9,8 @@ export const registerStudentToClass = async (req: Request, res: Response): Promi
     try {
         const {
             name,
+            nom,
+            prenom,
             date_of_birth,
             place_of_birth,
             gender,
@@ -16,20 +18,33 @@ export const registerStudentToClass = async (req: Request, res: Response): Promi
             former_school,
             class_id,
             academic_year_id,
-            is_new_student
+            is_new_student,
+            ream_of_paper_collected
         } = req.body;
 
-        // Validate required fields
-        if (!name || !date_of_birth || !place_of_birth || !gender || !residence || !class_id) {
+        const hasSplitName = !!(nom && prenom);
+        const hasLegacyName = !!name;
+        if (!hasSplitName && !hasLegacyName) {
             res.status(400).json({
                 success: false,
-                error: 'Missing required fields: name, date_of_birth, place_of_birth, gender, residence, class_id'
+                error: 'Provide both nom (family name) and prenom (given name).'
+            });
+            return;
+        }
+
+        // Validate required fields
+        if (!date_of_birth || !place_of_birth || !gender || !residence || !class_id) {
+            res.status(400).json({
+                success: false,
+                error: 'Missing required fields: date_of_birth, place_of_birth, gender, residence, class_id'
             });
             return;
         }
 
         const result = await enrollmentService.registerStudentToClass({
             name,
+            nom,
+            prenom,
             date_of_birth,
             place_of_birth,
             gender,
@@ -37,7 +52,8 @@ export const registerStudentToClass = async (req: Request, res: Response): Promi
             former_school,
             class_id: parseInt(class_id),
             academic_year_id: academic_year_id ? parseInt(academic_year_id) : undefined,
-            is_new_student: is_new_student ?? true
+            is_new_student: is_new_student ?? true,
+            ream_of_paper_collected: ream_of_paper_collected !== undefined ? Boolean(ream_of_paper_collected) : undefined
         });
 
         res.status(201).json({

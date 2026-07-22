@@ -15,6 +15,8 @@ import {
     removeVicePrincipal,
     assignDisciplineMaster,
     removeDisciplineMaster,
+    assignTeacherSubject,
+    removeTeacherSubject,
     getAllTeachers,
     getCurrentUserProfile,
     getStudentsForParent,
@@ -26,11 +28,11 @@ const router = Router();
 
 // Registration endpoint (public or specific roles)
 router.post('/register-with-roles', registerAndAssignRoles);
-router.post('/create-with-role', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), createUserWithRole);
+router.post('/create-with-role', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'SECRETARY']), createUserWithRole);
 
 // User CRUD operations (requires authentication, some require specific roles)
-router.get('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR']), getAllUsers);
-router.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR']), createUser);
+router.get('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR', 'SECRETARY']), getAllUsers);
+router.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR', 'SECRETARY']), createUser);
 
 // Get all teachers (optionally filtered by subject)
 // Important: This route must be defined BEFORE the /:id route to avoid conflicts
@@ -48,8 +50,8 @@ router.get('/me/dashboard', authenticate, getDashboardForRole);
 router.get('/:parentId/students', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), getStudentsForParent);
 // Note: Add logic in controller/service to ensure PARENT can only access their own students if parentId matches req.user.id
 
-router.get('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), getUserById);
-router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), updateUser);
+router.get('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'SECRETARY']), getUserById);
+router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'SECRETARY']), updateUser);
 router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), deleteUser); // Only SUPER_MANAGER can delete
 
 // Role management
@@ -65,8 +67,15 @@ router.post('/:userId/assignments/vice-principal', authenticate, authorize(['SUP
 router.delete('/:userId/assignments/vice-principal/:subClassId', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), removeVicePrincipal);
 
 // Assign DM to Subclass (Defaults to current year if academicYearId is omitted in body)
-router.post('/:userId/assignments/discipline-master', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), assignDisciplineMaster);
+// SDM and Dean of Discipline are included per the discipline reporting chain
+// (DM → SDM → Dean of Discipline → VP/Principal).
+router.post('/:userId/assignments/discipline-master', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DEAN_OF_DISCIPLINE', 'SENIOR_DISCIPLINE_MASTER']), assignDisciplineMaster);
 // Remove DM from Subclass (Requires subClassId in path. Defaults to current year if academicYearId query param omitted)
-router.delete('/:userId/assignments/discipline-master/:subClassId', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), removeDisciplineMaster);
+router.delete('/:userId/assignments/discipline-master/:subClassId', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DEAN_OF_DISCIPLINE', 'SENIOR_DISCIPLINE_MASTER']), removeDisciplineMaster);
+
+// Assign Teacher to Subject
+router.post('/:userId/assignments/TEACHER', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), assignTeacherSubject);
+// Remove Teacher from Subject
+router.delete('/:userId/assignments/TEACHER/:subjectId', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), removeTeacherSubject);
 
 export default router;

@@ -42,6 +42,34 @@ router.patch(
     examController.updateExamSequenceStatusController
 );
 
+// PATCH /exams/:id/deadline - Set or clear submission deadline
+router.patch(
+    '/:id/deadline',
+    authenticate,
+    authorize([Role.SUPER_MANAGER, Role.PRINCIPAL, Role.VICE_PRINCIPAL]),
+    examController.setSubmissionDeadline
+);
+
+// GET /exams/:id/submission-tracking - Mark submission progress per class/subject
+router.get(
+    '/:id/submission-tracking',
+    authenticate,
+    authorize([Role.SUPER_MANAGER, Role.PRINCIPAL, Role.VICE_PRINCIPAL]),
+    examController.getMarkSubmissionTracking
+);
+
+// GET /exams/:id/pending-teachers - Teachers who haven't completed mark submission
+router.get(
+    '/:id/pending-teachers',
+    authenticate,
+    authorize([Role.SUPER_MANAGER, Role.PRINCIPAL, Role.VICE_PRINCIPAL]),
+    examController.getPendingTeachers
+);
+
+// PUT /exams/:id - Update an exam sequence
+// Only SUPER_MANAGER, PRINCIPAL, VICE_PRINCIPAL can update exam sequences
+router.put('/:id', authenticate, authorize([Role.SUPER_MANAGER, Role.PRINCIPAL, Role.VICE_PRINCIPAL]), examController.updateExam);
+
 // DELETE /exams/:id - Delete an exam
 // Only SUPER_MANAGER, PRINCIPAL can delete exams
 router.delete('/:id', authenticate, authorize([Role.SUPER_MANAGER, Role.PRINCIPAL]), examController.deleteExam);

@@ -139,4 +139,50 @@ export const getFullSchoolTimetable = async (req: Request, res: Response): Promi
             error: error.message || 'Internal server error fetching full school timetable.'
         });
     }
-}; 
+};
+
+/**
+ * Export timetable for a specific subclass as Excel
+ * @route GET /timetables/subclass/:subclassId/export
+ */
+export const exportSubclassTimetable = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const subclassId = parseInt(req.params.subclassId);
+        if (isNaN(subclassId)) {
+            res.status(400).json({ success: false, error: 'Invalid subclassId format' });
+            return;
+        }
+
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+
+        const { buffer, filename } = await timetableService.exportSubclassTimetableExcel(subclassId, academicYearId);
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting subclass timetable:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Export full school timetable as Excel (one sheet per subclass)
+ * @route GET /timetables/full-school/export
+ */
+export const exportFullSchoolTimetable = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+
+        const { buffer, filename } = await timetableService.exportFullTimetableExcel(academicYearId);
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting full school timetable:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
