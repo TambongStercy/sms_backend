@@ -26,6 +26,7 @@ export interface ParentDashboardData {
 export interface ChildOverview {
     id: number;
     name: string;
+    matricule?: string;
     class_name?: string;
     subclass_name?: string;
     enrollment_status: string;
@@ -199,6 +200,7 @@ export async function getParentDashboard(parentId: number, academicYearId?: numb
             const childOverview: ChildOverview = {
                 id: student.id,
                 name: student.name,
+                matricule: student.matricule || undefined,
                 class_name: currentEnrollment?.sub_class?.class?.name,
                 subclass_name: currentEnrollment?.sub_class?.name,
                 enrollment_status: student.status,
@@ -1179,4 +1181,343 @@ function getAttendanceStatus(rate: number): string {
 function getMonthName(month: number): string {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month];
-} 
+}
+
+/**
+ * Resolve a student by matricule and verify the caller is a linked parent.
+ * Throws with a specific message if not found or not authorized.
+ */
+export async function resolveOwnChildByMatricule(parentId: number, matricule: string): Promise<Student> {
+    const student = await prisma.student.findUnique({ where: { matricule } });
+    if (!student) {
+        const err: any = new Error('Student not found for the provided matricule');
+        err.statusCode = 404;
+        throw err;
+    }
+
+    const link = await prisma.parentStudent.findFirst({
+        where: { parent_id: parentId, student_id: student.id }
+    });
+    if (!link) {
+        const err: any = new Error('Parent-student relationship not found');
+        err.statusCode = 403;
+        throw err;
+    }
+    return student;
+}
+
+/**
+ * Combined snapshot for a parent about a specific child looked up by matricule:
+ * profile, current enrollment, academic performance (marks by sequence),
+ * discipline issues, and health profile.
+ */
+export async function getChildOverviewByMatricule(
+    parentId: number,
+    matricule: string,
+    academicYearId?: number
+) {
+    const student = await resolveOwnChildByMatricule(parentId, matricule);
+    const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
+
+    const enrollment = await prisma.enrollment.findFirst({
+        where: {
+            student_id: student.id,
+            ...(yearId ? { academic_year_id: yearId } : {})
+        },
+        include: {
+            academic_year: { select: { id: true, name: true } },
+            class: { select: { id: true, name: true } },
+            sub_class: {
+                select: {
+                    id: true,
+                    name: true,
+                    class: { select: { id: true, name: true } },
+                    class_master: { select: { id: true, name: true, matricule: true } }
+                }
+            }
+        }
+    });
+
+    const profile = {
+        id: student.id,
+        matricule: student.matricule,
+        name: student.name,
+        dateOfBirth: student.date_of_birth,
+        gender: student.gender,
+        status: student.status,
+        healthConditions: student.health_conditions,
+        medicalNotes: student.medical_notes
+    };
+
+    const classInfo = enrollment
+        ? {
+            academicYearId: enrollment.academic_year_id,
+            academicYearName: enrollment.academic_year?.name,
+            className: enrollment.class?.name,
+            subclassId: enrollment.sub_class?.id ?? null,
+            subclassName: enrollment.sub_class?.name ?? null,
+            classMaster: enrollment.sub_class?.class_master?.name ?? null
+        }
+        : null;
+
+    const [academic, discipline, health] = await Promise.all([
+        getChildAcademicResultsCore(student.id, enrollment?.id, enrollment?.academic_year_id ?? yearId),
+        getChildDisciplineRecordsCore(enrollment?.id),
+        getChildHealthProfileCore(student.id, enrollment?.id, enrollment?.academic_year_id ?? yearId)
+    ]);
+
+    return {
+        student: profile,
+        enrollment: classInfo,
+        academic,
+        discipline,
+        health
+    };
+}
+
+async function getChildAcademicResultsCore(
+    studentId: number,
+    enrollmentId: number | undefined,
+    academicYearId: number | undefined
+) {
+    if (!enrollmentId) {
+        return {
+            hasEnrollment: false,
+            sequences: [] as any[],
+            overallAverage: 0,
+            totalAssessments: 0
+        };
+    }
+
+    const marks = await prisma.mark.findMany({
+        where: { enrollment_id: enrollmentId },
+        include: {
+            sub_class_subject: {
+                include: {
+                    subject: { select: { id: true, name: true, category: true } }
+                }
+            },
+            exam_sequence: {
+                select: {
+                    id: true,
+                    sequence_number: true,
+                    term: { select: { id: true, name: true } }
+                }
+            },
+            teacher: { select: { id: true, name: true } }
+        },
+        orderBy: [
+            { exam_sequence_id: 'asc' },
+            { created_at: 'asc' }
+        ]
+    });
+
+    const sequenceMap = new Map<number, any>();
+    for (const mark of marks) {
+        const seqId = mark.exam_sequence_id;
+        if (!sequenceMap.has(seqId)) {
+            sequenceMap.set(seqId, {
+                examSequenceId: seqId,
+                sequenceNumber: mark.exam_sequence?.sequence_number,
+                termName: mark.exam_sequence?.term?.name,
+                termId: mark.exam_sequence?.term?.id,
+                subjects: [] as any[],
+                average: 0
+            });
+        }
+        sequenceMap.get(seqId).subjects.push({
+            subjectId: mark.sub_class_subject?.subject?.id,
+            subjectName: mark.sub_class_subject?.subject?.name,
+            category: mark.sub_class_subject?.subject?.category,
+            coefficient: mark.sub_class_subject?.coefficient,
+            teacher: mark.teacher?.name,
+            score: mark.score,
+            recordedAt: mark.created_at
+        });
+    }
+
+    const sequences = Array.from(sequenceMap.values()).map(seq => {
+        const validScores = seq.subjects
+            .map((s: any) => s.score)
+            .filter((v: number | null | undefined): v is number => typeof v === 'number');
+        const avg = validScores.length > 0
+            ? validScores.reduce((a: number, b: number) => a + b, 0) / validScores.length
+            : 0;
+        seq.average = Number(avg.toFixed(2));
+        return seq;
+    });
+
+    const allScores = marks
+        .map(m => m.score)
+        .filter((v): v is number => typeof v === 'number');
+    const overall = allScores.length > 0
+        ? Number((allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(2))
+        : 0;
+
+    let sequenceAverages: any[] = [];
+    if (academicYearId) {
+        sequenceAverages = await prisma.studentSequenceAverage.findMany({
+            where: { enrollment_id: enrollmentId },
+            include: {
+                exam_sequence: {
+                    select: {
+                        sequence_number: true,
+                        term: { select: { name: true } }
+                    }
+                }
+            },
+            orderBy: { exam_sequence_id: 'asc' }
+        });
+    }
+
+    return {
+        hasEnrollment: true,
+        totalAssessments: marks.length,
+        overallAverage: overall,
+        sequences,
+        sequenceAverages: sequenceAverages.map(sa => ({
+            examSequenceId: sa.exam_sequence_id,
+            sequenceNumber: sa.exam_sequence?.sequence_number,
+            termName: sa.exam_sequence?.term?.name,
+            average: sa.average,
+            rank: sa.rank,
+            totalStudents: sa.total_students,
+            decision: sa.decision
+        }))
+    };
+}
+
+async function getChildDisciplineRecordsCore(enrollmentId: number | undefined) {
+    if (!enrollmentId) {
+        return { totalIssues: 0, issues: [] as any[] };
+    }
+    const issues = await prisma.disciplineIssue.findMany({
+        where: { enrollment_id: enrollmentId },
+        include: {
+            assigned_by: { select: { id: true, name: true } },
+            reviewed_by: { select: { id: true, name: true } }
+        },
+        orderBy: { created_at: 'desc' }
+    });
+    return {
+        totalIssues: issues.length,
+        issues: issues.map(i => ({
+            id: i.id,
+            issueType: i.issue_type,
+            description: i.description,
+            notes: i.notes,
+            actionTaken: i.action_taken,
+            assignedBy: i.assigned_by?.name,
+            reviewedBy: i.reviewed_by?.name,
+            createdAt: i.created_at
+        }))
+    };
+}
+
+async function getChildHealthProfileCore(
+    studentId: number,
+    enrollmentId: number | undefined,
+    academicYearId: number | undefined
+) {
+    const student = await prisma.student.findUnique({
+        where: { id: studentId },
+        select: {
+            health_conditions: true,
+            medical_notes: true
+        }
+    });
+
+    if (!enrollmentId) {
+        return {
+            healthConditions: student?.health_conditions ?? [],
+            medicalNotes: student?.medical_notes ?? null,
+            totalVisits: 0,
+            recentVisits: [] as any[]
+        };
+    }
+
+    const visits = await prisma.nurseVisitLog.findMany({
+        where: {
+            enrollment: {
+                student_id: studentId,
+                ...(academicYearId ? { academic_year_id: academicYearId } : {})
+            }
+        },
+        include: {
+            logged_by: { select: { id: true, name: true } },
+            period: { select: { id: true, day_of_week: true, start_time: true, end_time: true } }
+        },
+        orderBy: { visit_date: 'desc' },
+        take: 20
+    });
+
+    return {
+        healthConditions: student?.health_conditions ?? [],
+        medicalNotes: student?.medical_notes ?? null,
+        totalVisits: visits.length,
+        recentVisits: visits.map(v => ({
+            id: v.id,
+            visitDate: v.visit_date,
+            reason: v.reason,
+            treatmentGiven: v.treatment_given,
+            medicationGiven: v.medication_given,
+            notes: v.notes,
+            sentHome: v.sent_home,
+            loggedBy: v.logged_by?.name,
+            period: v.period
+                ? { dayOfWeek: v.period.day_of_week, startTime: v.period.start_time, endTime: v.period.end_time }
+                : null
+        }))
+    };
+}
+
+/**
+ * Report cards available for a child (by matricule). Lists finalized/completed
+ * report records the parent can attempt to download.
+ */
+export async function listChildReportCardsByMatricule(
+    parentId: number,
+    matricule: string,
+    academicYearId?: number
+) {
+    const student = await resolveOwnChildByMatricule(parentId, matricule);
+    const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
+
+    const reports = await prisma.generatedReport.findMany({
+        where: {
+            student_id: student.id,
+            report_type: 'SINGLE_STUDENT' as any,
+            ...(yearId ? { academic_year_id: yearId } : {})
+        },
+        include: {
+            academic_year: { select: { id: true, name: true } },
+            exam_sequence: {
+                select: {
+                    id: true,
+                    sequence_number: true,
+                    term: { select: { id: true, name: true } }
+                }
+            }
+        },
+        orderBy: { created_at: 'desc' }
+    });
+
+    return {
+        student: {
+            id: student.id,
+            matricule: student.matricule,
+            name: student.name
+        },
+        reports: reports.map(r => ({
+            id: r.id,
+            examSequenceId: r.exam_sequence_id,
+            sequenceNumber: r.exam_sequence?.sequence_number,
+            termName: r.exam_sequence?.term?.name,
+            academicYearId: r.academic_year_id,
+            academicYearName: r.academic_year?.name,
+            status: r.status,
+            generatedAt: r.updated_at,
+            errorMessage: r.error_message
+        }))
+    };
+}
