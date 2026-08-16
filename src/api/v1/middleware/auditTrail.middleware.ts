@@ -192,7 +192,7 @@ export function roleChangeAuditMiddleware(req: Request, res: Response, next: Nex
       const userId = req.user?.id;
 
       if (userId) {
-        const targetUserId = parseInt(req.params.userId || req.body.userId);
+        const targetUserId = parseInt(req.params.userId || req.params.id || req.body.userId || 0);
 
         autoLog(
           userId,

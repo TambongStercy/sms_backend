@@ -3,6 +3,19 @@ import prisma, { SchoolFees, ControlSchoolFees, PaymentTransaction, ControlPayme
 import { getAcademicYearId, getStudentSubclassByStudentAndYear } from '../../../utils/academicYear';
 import { shouldPayNewStudentFees } from '../../../utils/studentStatus';
 
+export class DuplicatePaymentError extends Error {
+    public readonly existingPaymentId: number;
+    public readonly secondsAgo: number;
+    constructor(message: string, existingPaymentId: number, secondsAgo: number) {
+        super(message);
+        this.name = 'DuplicatePaymentError';
+        this.existingPaymentId = existingPaymentId;
+        this.secondsAgo = secondsAgo;
+    }
+}
+
+export const DUPLICATE_PAYMENT_WINDOW_SECONDS = 60;
+
 /**
  * Normalizes payment method string to an enum value
  */
@@ -123,6 +136,25 @@ export async function recordPrimaryPaymentWithFee(data: {
         feeCreated = true;
     }
 
+    const primaryWindowStart = new Date(Date.now() - DUPLICATE_PAYMENT_WINDOW_SECONDS * 1000);
+    const recentPrimaryDuplicate = await prisma.paymentTransaction.findFirst({
+        where: {
+            enrollment_id: data.enrollment_id,
+            amount: data.amount,
+            payment_method: normalizedPaymentMethod,
+            created_at: { gte: primaryWindowStart },
+        },
+        orderBy: { created_at: 'desc' },
+    });
+    if (recentPrimaryDuplicate) {
+        const secondsAgo = Math.round((Date.now() - recentPrimaryDuplicate.created_at.getTime()) / 1000);
+        throw new DuplicatePaymentError(
+            `Duplicate payment detected — a payment of ${data.amount} via ${normalizedPaymentMethod} for this student was recorded ${secondsAgo} second(s) ago. If this is intentional, wait ${DUPLICATE_PAYMENT_WINDOW_SECONDS} seconds and retry.`,
+            recentPrimaryDuplicate.id,
+            secondsAgo,
+        );
+    }
+
     // Create payment transaction
     const createData: any = {
         fee_id: fee.id,
@@ -222,6 +254,25 @@ export async function recordControlPaymentWithFee(data: {
             }
         });
         feeCreated = true;
+    }
+
+    const controlWindowStart = new Date(Date.now() - DUPLICATE_PAYMENT_WINDOW_SECONDS * 1000);
+    const recentControlDuplicate = await prisma.controlPaymentTransaction.findFirst({
+        where: {
+            enrollment_id: data.enrollment_id,
+            amount: data.amount,
+            payment_method: normalizedPaymentMethod,
+            created_at: { gte: controlWindowStart },
+        },
+        orderBy: { created_at: 'desc' },
+    });
+    if (recentControlDuplicate) {
+        const secondsAgo = Math.round((Date.now() - recentControlDuplicate.created_at.getTime()) / 1000);
+        throw new DuplicatePaymentError(
+            `Duplicate control payment detected — a payment of ${data.amount} via ${normalizedPaymentMethod} for this student was recorded ${secondsAgo} second(s) ago. If this is intentional, wait ${DUPLICATE_PAYMENT_WINDOW_SECONDS} seconds and retry.`,
+            recentControlDuplicate.id,
+            secondsAgo,
+        );
     }
 
     // Create control payment transaction

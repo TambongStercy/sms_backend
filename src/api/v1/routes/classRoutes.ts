@@ -31,6 +31,14 @@ router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIP
 // Only SUPER_MANAGER, PRINCIPAL can delete classes
 router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), classController.deleteClass);
 
+// PUT /classes/:id/period-set - Switch the class's bell schedule
+// Only SUPER_MANAGER, PRINCIPAL, DEAN_OF_STUDIES can change bell schedules
+router.put('/:id/period-set',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'DEAN_OF_STUDIES']),
+    classController.assignClassPeriodSet
+);
+
 // POST /classes/:id/sub-classes - Add a new sub-class to a class
 // Only SUPER_MANAGER, PRINCIPAL can add sub-classes
 router.post('/:id/sub-classes', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']), classController.addSubClass);

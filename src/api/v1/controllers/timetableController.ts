@@ -27,6 +27,8 @@ export const getSubclassTimetable = async (req: Request, res: Response): Promise
             success: true,
             data: result.sub_class,
             academicYearId: result.academicYearId,
+            periodSet: result.periodSet,
+            periods: result.periods,
             slots: result.slots
         });
     } catch (error: any) {
@@ -80,15 +82,23 @@ export const bulkUpdateTimetable = async (req: Request, res: Response): Promise<
 
         const result = await timetableService.bulkUpdateTimetable(subclassId, slots, academicYearId, assignedById);
 
-        res.status(result.errors.length > 0 ? 207 : 200).json({
-            success: result.errors.length === 0,
+        const hasErrors = result.errors.length > 0;
+        const hasWarnings = result.warnings.length > 0;
+        let message = 'Timetable updated successfully.';
+        if (hasErrors && hasWarnings) message = 'Saved with warnings and some slots failed.';
+        else if (hasErrors) message = 'Partial success with errors.';
+        else if (hasWarnings) message = 'Timetable saved with warnings (teacher clashes detected).';
+
+        res.status(hasErrors ? 207 : 200).json({
+            success: !hasErrors,
             data: {
                 updated: result.updated,
                 created: result.created,
                 deleted: result.deleted,
             },
             errors: result.errors,
-            message: result.errors.length > 0 ? 'Partial success with errors.' : 'Timetable updated successfully.'
+            warnings: result.warnings,
+            message
         });
 
     } catch (error: any) {
@@ -183,6 +193,78 @@ export const exportFullSchoolTimetable = async (req: Request, res: Response): Pr
         res.send(buffer);
     } catch (error: any) {
         console.error('Error exporting full school timetable:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Export timetable for a specific subclass as PDF
+ * @route GET /timetables/subclass/:subclassId/export/pdf
+ */
+export const exportSubclassTimetablePdf = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const subclassId = parseInt(req.params.subclassId);
+        if (isNaN(subclassId)) {
+            res.status(400).json({ success: false, error: 'Invalid subclassId format' });
+            return;
+        }
+
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+
+        const { buffer, filename } = await timetableService.exportSubclassTimetablePdf(subclassId, academicYearId);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting subclass timetable PDF:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Export full school timetable as PDF (one page per subclass)
+ * @route GET /timetables/full-school/export/pdf
+ */
+export const exportFullSchoolTimetablePdf = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+
+        const { buffer, filename } = await timetableService.exportFullTimetablePdf(academicYearId);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting full school timetable PDF:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Export a specific teacher's timetable as PDF (admin-facing).
+ * @route GET /timetables/teacher/:teacherId/export/pdf
+ */
+export const exportTeacherTimetablePdf = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const teacherId = parseInt(req.params.teacherId);
+        if (isNaN(teacherId)) {
+            res.status(400).json({ success: false, error: 'Invalid teacherId format' });
+            return;
+        }
+
+        const academicYearId = req.finalQuery.academic_year_id
+            ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+
+        const { buffer, filename } = await timetableService.exportTeacherTimetablePdf(teacherId, academicYearId);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting teacher timetable PDF:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 };

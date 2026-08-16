@@ -351,9 +351,18 @@ export async function postMessage(channelId: number, senderId: number, input: Po
                     const mentioned = mentionSet.has(r.user_id);
                     await sendNotification({
                         user_id: r.user_id,
+                        title: mentioned
+                            ? `@${senderName} mentioned you in #${channel.name}`
+                            : `#${channel.name}`,
                         message: mentioned
                             ? `@ ${senderName} mentioned you in #${channel.name}: ${preview}`
                             : `#${channel.name}: ${senderName}: ${preview}`,
+                        // Mentions surface as a popup; regular channel activity stays NORMAL
+                        // so busy channels don't spam every member with modals.
+                        priority: mentioned ? 'HIGH' : 'NORMAL',
+                        entity_type: 'ChatMessage',
+                        entity_id: message.id,
+                        action_url: `/chat/${channelId}`,
                     });
                 } catch (e) {
                     // notification failure should not break posting

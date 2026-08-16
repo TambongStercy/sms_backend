@@ -5,6 +5,7 @@
 
 import prisma from '../../../config/db';
 import { getCurrentAcademicYear } from '../../../utils/academicYear';
+import { getClassMaxStudents } from '../../../utils/capacity';
 
 // -------- helpers --------
 
@@ -986,12 +987,13 @@ export async function getEnrollmentOverview(academicYearId?: number) {
 
     const classUtilization = classes.map(cls => {
         const current = cls.sub_classes.reduce((s, sc) => s + sc.enrollments.length, 0);
+        const maxStudents = getClassMaxStudents(cls.sub_classes.length);
         return {
             classId: cls.id,
             className: cls.name,
-            maxStudents: cls.max_students,
+            maxStudents,
             currentStudents: current,
-            utilizationRate: toPct(current, cls.max_students),
+            utilizationRate: toPct(current, maxStudents),
         };
     });
 

@@ -41,7 +41,7 @@
  *                   success: true
  *                   data:
  *                     token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjE1MjQ1NTY1LCJleHAiOjE2MTUzMzE5NjV9.8tUTQM6q7J_5oxlAb-mGjNPNBg9T5WvEYW8RSBvKAiQ
- *                     expiresIn: "24h"
+ *                     expiresIn: "120d"
  *                     user:
  *                       id: 1
  *                       name: John Doe

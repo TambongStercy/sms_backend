@@ -1,19 +1,27 @@
 import { Request, Response } from 'express';
 import * as svc from '../services/financeRequestService';
 import { FinanceRequestType, FinanceRequestStatus, Role } from '../../../config/db';
+import { convertToCamelCase } from '../../../utils/caseConversion';
 
 export const createFinanceRequest = async (req: any, res: Response): Promise<any> => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
+        // The global convertCamelToSnakeCase middleware recursively snake_cases nested keys,
+        // but `payload` is an opaque JSON column whose inner keys the service (and stored
+        // records) expect in camelCase (recipientUserId, enrollmentId, paymentDate, ...).
+        // Re-camelCase the payload keys here so the service sees what the client sent.
+        const payload = convertToCamelCase(req.body.payload ?? {});
+
         const created = await svc.createFinanceRequest({
             type: req.body.type as FinanceRequestType,
             amount: req.body.amount !== undefined ? Number(req.body.amount) : null,
             reason: req.body.reason,
             notes: req.body.notes,
-            payload: req.body.payload ?? {},
+            payload,
             requested_by_id: userId,
+            requested_by_roles: (req.user?.role ?? []) as Role[],
         });
 
         return res.status(201).json({ success: true, data: created });

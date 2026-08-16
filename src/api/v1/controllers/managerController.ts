@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import * as managerService from '../services/managerService';
+import * as taskService from '../services/taskService';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 /**
  * Get manager enhanced dashboard
@@ -297,26 +299,34 @@ export async function createTaskAssignment(req: Request, res: Response) {
             });
         }
 
-        const taskData = {
-            title: title.trim(),
-            description: description.trim(),
-            assignedTo,
-            priority: priority || 'MEDIUM',
-            dueDate,
-            category: category || 'GENERAL'
-        };
+        const authReq = req as AuthenticatedRequest;
+        const callerId = authReq.user?.id;
+        if (!callerId) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
 
-        const result = await managerService.delegateTask({
-            title,
-            description,
-            assignedTo: assignedTo[0], // Take first user from array
-            assignedBy: req.user?.id || 1,
-            priority: priority || 'MEDIUM',
-            deadline: dueDate,
-            category: category || 'GENERAL'
+        // Fan out — persist one Task per assignee. Each auto-fires a TASK_ASSIGNED notification.
+        const created = await Promise.all(
+            assignedTo.map((id: any) =>
+                taskService.createTask(
+                    {
+                        title,
+                        description,
+                        assigned_to_id: parseInt(id),
+                        priority: priority || 'MEDIUM',
+                        category: category || 'GENERAL',
+                        deadline: dueDate,
+                    },
+                    { id: callerId }
+                )
+            )
+        );
+
+        res.status(201).json({
+            success: true,
+            message: `Task assigned to ${created.length} user(s).`,
+            data: created,
         });
-
-        res.status(201).json(result);
     } catch (error) {
         console.error('Error creating task assignment:', error);
         res.status(500).json({

@@ -1,5 +1,6 @@
 import prisma from '../../../config/db';
 import { getCurrentAcademicYear } from '../../../utils/academicYear';
+import { SUBCLASS_MAX_STUDENTS } from '../../../utils/capacity';
 
 // Types for Vice Principal operations
 export interface VicePrincipalDashboard {
@@ -249,7 +250,7 @@ export async function getVicePrincipalDashboard(academicYearId?: number): Promis
         // Process subclass capacity utilization
         const subclassCapacityUtilization = subclassCapacity.map(subclass => {
             const currentCapacity = subclass.enrollments.length;
-            const maxCapacity = 30; // Default capacity (no capacity field in schema)
+            const maxCapacity = SUBCLASS_MAX_STUDENTS;
             const utilizationRate = (currentCapacity / maxCapacity) * 100;
 
             return {
@@ -555,7 +556,7 @@ export async function getSubclassOptimization(academicYearId?: number): Promise<
         const optimizationData: SubclassOptimization[] = classes.map(classData => {
             const subclasses = classData.sub_classes.map(subclass => {
                 const currentEnrollment = subclass.enrollments.length;
-                const maxCapacity = 30; // Default capacity (no capacity field in schema)
+                const maxCapacity = SUBCLASS_MAX_STUDENTS;
                 const utilizationRate = (currentEnrollment / maxCapacity) * 100;
                 const availableSpots = Math.max(0, maxCapacity - currentEnrollment);
 

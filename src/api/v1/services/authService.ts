@@ -31,7 +31,7 @@ if (!JWT_SECRET) {
     throw new Error('JWT_SECRET environment variable is required');
 }
 
-const TOKEN_EXPIRY = '24h';
+const TOKEN_EXPIRY = '120d';
 
 /**
  * Logs a user in.
@@ -72,12 +72,22 @@ export const login = async (credentials: LoginCredentials): Promise<any> => {
 
     // Get unique roles only (user might have same role across multiple academic years)
     const userActiveRoles = [...new Set(user.user_roles.map(ur => ur.role))];
+
+    // Matricule login is restricted to parent accounts. Every parent has their
+    // own matricule and their own notification channel, so we keep matricule
+    // as the parent-only sign-in path. Staff/students must sign in by email.
+    if (matricule && !email) {
+        if (!userActiveRoles.includes(Role.PARENT)) {
+            throw new Error('Matricule login is only available for parent accounts. Please sign in with your email instead.');
+        }
+    }
+
     const token = generateToken({ id: user.id, roles: userActiveRoles });
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...userWithoutPassword } = user;
 
-    return { token, expiresIn: '24h', user: userWithoutPassword };
+    return { token, expiresIn: '120d', user: userWithoutPassword };
 };
 
 /**
@@ -166,6 +176,37 @@ export const register = async (userData: UserRegistrationData): Promise<User> =>
     });
 
     return createdUser;
+};
+
+/**
+ * Change the password of an authenticated user.
+ * Requires the current password to prevent hijacked-session hijinks.
+ */
+export const changePassword = async (
+    userId: number,
+    currentPassword: string,
+    newPassword: string
+): Promise<void> => {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    const passwordMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!passwordMatch) {
+        throw new Error('Current password is incorrect');
+    }
+
+    const sameAsCurrent = await bcrypt.compare(newPassword, user.password);
+    if (sameAsCurrent) {
+        throw new Error('New password must be different from the current password');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+    });
 };
 
 /**

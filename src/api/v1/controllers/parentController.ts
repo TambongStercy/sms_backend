@@ -1,439 +1,376 @@
 // src/api/v1/controllers/parentController.ts
+//
+// The parent portal is UNAUTHENTICATED. Every endpoint identifies the child
+// (and, when needed, the parent) via the matricule in the URL path. Knowing
+// the child's matricule is treated as sufficient to view that child's data.
 import { Request, Response } from 'express';
 import * as parentService from '../services/parentService';
-import { AuthenticatedRequest } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
-import * as quizService from '../services/quizService';
-import * as examService from '../services/examService';
 import * as parentDirectoryService from '../services/parentDirectoryService';
 import * as chatService from '../services/chatService';
+import * as notificationService from '../services/notificationService';
+import * as examController from './examController';
+import { extractPaginationAndFilters } from '../../../utils/pagination';
 
-const prisma = new PrismaClient();
+const readMatricule = (req: Request): string => String(req.params.matricule || '').trim();
+
+const readAcademicYearId = (req: Request): number | undefined => {
+    const raw = req.finalQuery?.academic_year_id ?? req.query?.academic_year_id;
+    return raw ? parseInt(raw as string) : undefined;
+};
+
+const sendError = (res: Response, err: any, fallback = 'Internal server error'): void => {
+    const status = err?.statusCode || 500;
+    res.status(status).json({ success: false, error: err?.message || fallback });
+};
 
 /**
- * GET /parents/me/contacts — curated staff directory for parents
- * (fixed executives + child teachers + all HODs by subject)
+ * GET /parents/:matricule/dashboard
+ * Single-child dashboard summary for the given matricule.
  */
-export const getMyContacts = async (req: Request, res: Response): Promise<void> => {
+export const getChildDashboard = async (req: Request, res: Response): Promise<void> => {
     try {
-        const parentId = (req as AuthenticatedRequest).user?.id;
-        if (!parentId) { res.status(401).json({ success: false, error: 'Unauthorized' }); return; }
-        const data = await parentDirectoryService.getParentContacts(parentId);
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildDashboardByMatricule(matricule, readAcademicYearId(req));
         res.json({ success: true, data });
-    } catch (err: any) {
-        console.error('getMyContacts error:', err);
-        res.status(500).json({ success: false, error: err.message });
-    }
+    } catch (err) { sendError(res, err, 'Failed to fetch dashboard'); }
 };
 
 /**
- * POST /parents/me/contact/:userId — open (or reuse) a DM with a staff member
- * Returns the channelId that the frontend can then post to via /chat/channels/:id/messages.
- */
-export const openStaffDirectMessage = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const parentId = (req as AuthenticatedRequest).user?.id;
-        if (!parentId) { res.status(401).json({ success: false, error: 'Unauthorized' }); return; }
-        const staffId = Number(req.params.userId);
-        if (Number.isNaN(staffId)) { res.status(400).json({ success: false, error: 'Invalid userId' }); return; }
-        const channel = await chatService.openDirectMessage(parentId, [staffId]);
-        res.status(200).json({ success: true, data: channel });
-    } catch (err: any) {
-        const status = err.statusCode || 500;
-        res.status(status).json({ success: false, error: err.message });
-    }
-};
-
-/**
- * Get parent dashboard data
- */
-export const getParentDashboard = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const authReq = req as AuthenticatedRequest;
-        const parentId = authReq.user?.id;
-
-        if (!parentId) {
-            res.status(401).json({
-                success: false,
-                error: 'Unauthorized'
-            });
-            return;
-        }
-
-        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
-
-        const dashboardData = await parentService.getParentDashboard(parentId, academicYearId);
-
-        res.json({
-            success: true,
-            data: dashboardData
-        });
-    } catch (error: any) {
-        console.error('Error fetching parent dashboard:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-};
-
-/**
- * Get detailed information about a specific child
+ * GET /parents/:matricule/details
+ * Full detailed profile for a child (academic + fees + discipline + reports).
  */
 export const getChildDetails = async (req: Request, res: Response): Promise<void> => {
     try {
-        const authReq = req as AuthenticatedRequest;
-        const parentId = authReq.user?.id;
-
-        if (!parentId) {
-            res.status(401).json({
-                success: false,
-                error: 'Unauthorized'
-            });
-            return;
-        }
-
-        const studentId = parseInt(req.params.studentId);
-        if (isNaN(studentId)) {
-            res.status(400).json({
-                success: false,
-                error: 'Invalid student ID'
-            });
-            return;
-        }
-
-        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
-
-        const childDetails = await parentService.getChildDetails(parentId, studentId, academicYearId);
-
-        res.json({
-            success: true,
-            data: childDetails
-        });
-    } catch (error: any) {
-        console.error('Error fetching child details:', error);
-        if (error.message.includes('relationship not found')) {
-            res.status(403).json({
-                success: false,
-                error: 'Access denied: Not your child or relationship not found'
-            });
-            return;
-        }
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildDetailsByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch child details'); }
 };
 
 /**
- * Send message to school staff
+ * GET /parents/:matricule/overview
+ * Combined snapshot: profile + enrollment + academic + discipline + health.
+ */
+export const getChildOverview = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildOverviewByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch child overview'); }
+};
+
+/**
+ * GET /parents/:matricule/quiz-results
+ */
+export const getChildQuizResults = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildQuizResultsByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch quiz results'); }
+};
+
+/**
+ * GET /parents/:matricule/analytics
+ */
+export const getChildAnalytics = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildAnalyticsByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch analytics'); }
+};
+
+/**
+ * GET /parents/:matricule/report-cards
+ * List available generated report cards for the child.
+ */
+export const listChildReportCards = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.listChildReportCardsByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch report cards'); }
+};
+
+/**
+ * GET /parents/:matricule/report-card?academicYearId&examSequenceId
+ * Download a report card PDF for the child.
+ */
+export const downloadChildReportCard = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const student = await parentService.resolveStudentByMatricule(matricule);
+        // examController.generateStudentReportCard reads req.params.studentId
+        // and finalQuery.{academic_year_id, exam_sequence_id} and streams the PDF.
+        req.params.studentId = String(student.id);
+        return examController.generateStudentReportCard(req, res);
+    } catch (err) { sendError(res, err, 'Failed to download report card'); }
+};
+
+/**
+ * GET /parents/:matricule/report-card/availability
+ */
+export const checkChildReportCardAvailability = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+
+        const academicYearId = parseInt(
+            (req.finalQuery?.academicYearId ?? req.finalQuery?.academic_year_id) as string
+        );
+        const examSequenceId = parseInt(
+            (req.finalQuery?.examSequenceId ?? req.finalQuery?.exam_sequence_id) as string
+        );
+
+        if (isNaN(academicYearId) || isNaN(examSequenceId)) {
+            res.status(400).json({
+                success: false,
+                error: 'Valid academicYearId and examSequenceId query params are required'
+            });
+            return;
+        }
+
+        const student = await parentService.resolveStudentByMatricule(matricule);
+        const examService = await import('../services/examService');
+        const result = await examService.checkStudentReportCardAvailability(
+            student.id,
+            academicYearId,
+            examSequenceId
+        );
+        res.json({ success: true, data: result });
+    } catch (err) { sendError(res, err, 'Failed to check report card availability'); }
+};
+
+/**
+ * GET /parents/:matricule/contacts
+ * Curated staff directory for the child's linked parent.
+ */
+export const getContacts = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const parentId = await parentService.resolveLinkedParentIdByMatricule(matricule);
+        const data = await parentDirectoryService.getParentContacts(parentId);
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch contacts'); }
+};
+
+/**
+ * POST /parents/:matricule/message-staff
+ * Body: { recipientId, subject, message, priority? }
  */
 export const sendMessageToStaff = async (req: Request, res: Response): Promise<void> => {
     try {
-        const authReq = req as AuthenticatedRequest;
-        const parentId = authReq.user?.id;
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
 
-        if (!parentId) {
-            res.status(401).json({
-                success: false,
-                error: 'Unauthorized'
-            });
-            return;
-        }
-
-        const { recipient_id, subject, message, priority, student_id } = req.body;
-
-        // Validate required fields
+        const { recipient_id, subject, message, priority } = req.body;
         if (!recipient_id || !subject || !message) {
             res.status(400).json({
                 success: false,
-                error: 'Missing required fields: recipient_id, subject, and message are required'
+                error: 'Missing required fields: recipientId, subject and message are required'
             });
             return;
         }
 
-        // Validate recipient_id
         const parsedRecipientId = parseInt(recipient_id);
         if (isNaN(parsedRecipientId)) {
-            res.status(400).json({
-                success: false,
-                error: 'Invalid recipient ID'
-            });
+            res.status(400).json({ success: false, error: 'Invalid recipientId' });
             return;
         }
 
-        // Validate priority if provided
         if (priority && !['LOW', 'MEDIUM', 'HIGH'].includes(priority)) {
-            res.status(400).json({
-                success: false,
-                error: 'Invalid priority. Must be LOW, MEDIUM, or HIGH'
-            });
+            res.status(400).json({ success: false, error: 'Invalid priority. Must be LOW, MEDIUM, or HIGH' });
             return;
         }
 
-        // Validate student_id if provided
-        let parsedStudentId = undefined;
-        if (student_id) {
-            parsedStudentId = parseInt(student_id);
-            if (isNaN(parsedStudentId)) {
-                res.status(400).json({
-                    success: false,
-                    error: 'Invalid student ID'
-                });
-                return;
-            }
-        }
-
-        const notification = await parentService.sendMessageToStaff(parentId, {
+        const created = await parentService.sendMessageToStaffFromMatricule(matricule, {
             recipient_id: parsedRecipientId,
             subject,
             message,
-            priority,
-            student_id: parsedStudentId
+            priority
         });
 
         res.status(201).json({
             success: true,
-            data: {
-                message: 'Message sent successfully',
-                notification
-            }
+            data: { message: 'Message sent successfully', notification: created }
         });
-    } catch (error: any) {
-        console.error('Error sending message to staff:', error);
-        if (error.message.includes('relationship not found')) {
-            res.status(403).json({
-                success: false,
-                error: 'Access denied: Not your child or relationship not found'
-            });
-            return;
-        }
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
+    } catch (err) { sendError(res, err, 'Failed to send message'); }
 };
 
 /**
- * Get quiz results for parent's children
+ * POST /parents/:matricule/contact/:userId
+ * Open (or reuse) a DM channel between the child's linked parent and a staff user.
  */
-export const getChildrenQuizResults = async (req: Request, res: Response): Promise<void> => {
+export const openStaffDirectMessage = async (req: Request, res: Response): Promise<void> => {
     try {
-        const authReq = req as AuthenticatedRequest;
-        const parentId = authReq.user?.id;
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
 
-        if (!parentId) {
-            res.status(401).json({
-                success: false,
-                error: 'Unauthorized'
-            });
+        const staffId = Number(req.params.userId);
+        if (Number.isNaN(staffId)) {
+            res.status(400).json({ success: false, error: 'Invalid userId' });
             return;
         }
 
-        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
-
-        const quizResults = await parentService.getChildrenQuizResults(parentId, academicYearId);
-
-        res.json({
-            success: true,
-            data: quizResults
-        });
-    } catch (error: any) {
-        console.error('Error fetching quiz results:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
+        const parentId = await parentService.resolveLinkedParentIdByMatricule(matricule);
+        const channel = await chatService.openDirectMessage(parentId, [staffId]);
+        res.status(200).json({ success: true, data: channel });
+    } catch (err) { sendError(res, err, 'Failed to open direct message'); }
 };
 
 /**
- * Get quiz results for a specific child
+ * GET /parents/:matricule/notifications
+ * Paginated list of notifications for the linked parent user.
+ * Supports the same query params as GET /notifications/me:
+ *   page, limit, sortBy, sortOrder, status, category, entity_type, unreadOnly.
  */
-export const getChildQuizResults = async (req: Request, res: Response): Promise<any> => {
+export const getParentNotifications = async (req: Request, res: Response): Promise<void> => {
     try {
-        const authReq = req as AuthenticatedRequest;
-        const parentId = authReq.user?.id;
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const parentId = await parentService.resolveLinkedParentIdByMatricule(matricule);
 
-        if (!parentId) {
-            return res.status(401).json({
-                success: false,
-                error: 'User not authenticated'
-            });
-        }
+        const { paginationOptions, filterOptions } = extractPaginationAndFilters(
+            req.query,
+            ['status', 'category', 'entity_type']
+        );
+        const unreadOnly = req.query.unreadOnly === 'true' || req.query.unread_only === 'true';
 
-        const studentId = parseInt(req.params.studentId);
-        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
+        const result = await notificationService.getUserNotifications(parentId, paginationOptions, {
+            ...filterOptions,
+            unread_only: unreadOnly,
+        });
+        res.json({ success: true, data: result.data, meta: result.meta });
+    } catch (err) { sendError(res, err, 'Failed to fetch notifications'); }
+};
 
-        if (isNaN(studentId)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid student ID'
-            });
-        }
+/**
+ * GET /parents/:matricule/notifications/unread-count
+ */
+export const getParentUnreadNotificationCount = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const parentId = await parentService.resolveLinkedParentIdByMatricule(matricule);
+        const count = await notificationService.getUnreadNotificationCount(parentId);
+        res.json({ success: true, data: { unread_count: count } });
+    } catch (err) { sendError(res, err, 'Failed to fetch unread count'); }
+};
 
-        // Get quiz results for this specific child
-        const results = await parentService.getChildQuizResults(parentId, studentId, academicYearId);
+/**
+ * GET /parents/:matricule/notifications/unread-breakdown
+ * Grouped unread counts per category — for section badges in the parent app.
+ */
+export const getParentUnreadBreakdown = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const parentId = await parentService.resolveLinkedParentIdByMatricule(matricule);
+        const data = await notificationService.getUnreadBreakdown(parentId);
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch unread breakdown'); }
+};
 
-        res.json({
+/**
+ * PUT /parents/:matricule/notifications/mark-all-read
+ */
+export const markAllParentNotificationsAsRead = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const parentId = await parentService.resolveLinkedParentIdByMatricule(matricule);
+        const result = await notificationService.markAllNotificationsAsRead(parentId);
+        res.status(200).json({
             success: true,
-            data: results
+            data: { markedCount: result.count, message: 'All notifications marked as read' },
         });
-    } catch (error: any) {
-        console.error('Error fetching child quiz results:', error);
+    } catch (err) { sendError(res, err, 'Failed to mark notifications as read'); }
+};
 
-        let statusCode = 500;
-        if (error.message.includes('relationship not found')) {
-            statusCode = 403;
+/**
+ * PUT /parents/:matricule/notifications/:id/read
+ * Service-level ownership check ensures the id belongs to the linked parent.
+ */
+export const markParentNotificationAsRead = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const notificationId = parseInt(req.params.id);
+        if (isNaN(notificationId)) {
+            res.status(400).json({ success: false, error: 'Invalid notification ID' });
+            return;
         }
-
-        res.status(statusCode).json({
-            success: false,
-            error: error.message
-        });
+        const parentId = await parentService.resolveLinkedParentIdByMatricule(matricule);
+        const notification = await notificationService.markNotificationAsRead(notificationId, parentId);
+        res.json({ success: true, data: notification, message: 'Notification marked as read' });
+    } catch (err: any) {
+        const msg = err?.message || 'Failed to mark notification as read';
+        const status = err?.statusCode || (/forbidden/i.test(msg) ? 403 : /not found/i.test(msg) ? 404 : 500);
+        res.status(status).json({ success: false, error: msg });
     }
 };
 
 /**
- * Get school announcements for parents
+ * DELETE /parents/:matricule/notifications/:id
+ */
+export const deleteParentNotification = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const notificationId = parseInt(req.params.id);
+        if (isNaN(notificationId)) {
+            res.status(400).json({ success: false, error: 'Invalid notification ID' });
+            return;
+        }
+        const parentId = await parentService.resolveLinkedParentIdByMatricule(matricule);
+        const result = await notificationService.deleteNotificationForUser(notificationId, parentId);
+        if (!result.success) {
+            const statusCode = result.statusCode || 404;
+            res.status(statusCode).json(result);
+            return;
+        }
+        res.status(200).json(result);
+    } catch (err) { sendError(res, err, 'Failed to delete notification'); }
+};
+
+/**
+ * GET /parents/announcements
+ * School-wide announcements aimed at parents. Requires no matricule.
  */
 export const getSchoolAnnouncements = async (req: Request, res: Response): Promise<void> => {
     try {
-        const authReq = req as AuthenticatedRequest;
-        const parentId = authReq.user?.id;
-
-        if (!parentId) {
-            res.status(401).json({
-                success: false,
-                error: 'Unauthorized'
-            });
-            return;
-        }
-
         const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-
-        // Validate limit
         if (limit < 1 || limit > 50) {
-            res.status(400).json({
-                success: false,
-                error: 'Limit must be between 1 and 50'
-            });
+            res.status(400).json({ success: false, error: 'Limit must be between 1 and 50' });
             return;
         }
 
-        const announcements = await parentService.getSchoolAnnouncements(parentId, limit);
+        const prisma = (await import('../../../config/db')).default;
+        const announcements = await prisma.announcement.findMany({
+            where: { audience: { in: ['BOTH', 'EXTERNAL'] } },
+            orderBy: { created_at: 'desc' },
+            take: limit,
+            include: { created_by: { select: { name: true, matricule: true } } }
+        });
 
         res.json({
             success: true,
-            data: announcements
+            data: announcements.map(a => ({
+                id: a.id,
+                title: a.title,
+                content: a.message,
+                author: a.created_by?.name || 'Anonymous',
+                created_at: a.created_at
+            }))
         });
-    } catch (error: any) {
-        console.error('Error fetching announcements:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-};
-
-/**
- * Get comprehensive analytics for a child's performance
- */
-export const getChildAnalytics = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const authReq = req as AuthenticatedRequest;
-        const parentId = authReq.user?.id;
-
-        if (!parentId) {
-            return res.status(401).json({
-                success: false,
-                error: 'User not authenticated'
-            });
-        }
-
-        const studentId = parseInt(req.params.studentId);
-        const academicYearId = req.finalQuery.academic_year_id ? parseInt(req.finalQuery.academic_year_id as string) : undefined;
-
-        const analytics = await parentService.getChildAnalytics(parentId, studentId, academicYearId);
-
-        res.json({
-            success: true,
-            data: analytics
-        });
-    } catch (error: any) {
-        console.error('Error fetching child analytics:', error);
-
-        let statusCode = 500;
-        if (error.message.includes('not found')) statusCode = 404;
-        if (error.message.includes('not enrolled')) statusCode = 404;
-
-        res.status(statusCode).json({
-            success: false,
-            error: error.message
-        });
-    }
-};
-/**
- * Check if a child's report card is available (for parents)
- */
-export const checkChildReportCardAvailability = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const authReq = req as AuthenticatedRequest;
-        const parentId = authReq.user?.id;
-
-        if (!parentId) {
-            res.status(401).json({
-                success: false,
-                error: 'Unauthorized'
-            });
-            return;
-        }
-
-        const studentId = parseInt(req.params.studentId);
-        const academicYearId = parseInt(req.finalQuery.academicYearId as string) || parseInt(req.finalQuery.academic_year_id as string);
-        const examSequenceId = parseInt(req.finalQuery.examSequenceId as string) || parseInt(req.finalQuery.exam_sequence_id as string);
-
-        if (isNaN(studentId) || isNaN(academicYearId) || isNaN(examSequenceId)) {
-            res.status(400).json({
-                success: false,
-                error: 'Valid studentId, academicYearId, and examSequenceId must be provided'
-            });
-            return;
-        }
-
-        // Verify that the parent is linked to this student
-        const parentStudent = await prisma.parentStudent.findFirst({
-            where: {
-                parent_id: parentId,
-                student_id: studentId
-            }
-        });
-
-        if (!parentStudent) {
-            res.status(403).json({
-                success: false,
-                error: 'You do not have permission to access this student\'s report card'
-            });
-            return;
-        }
-
-        const result = await examService.checkStudentReportCardAvailability(
-            studentId,
-            academicYearId,
-            examSequenceId
-        );
-
-        res.json({
-            success: true,
-            data: result
-        });
-    } catch (error: any) {
-        console.error('Error checking child report card availability:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message || 'Internal server error while checking report card availability'
-        });
-    }
+    } catch (err) { sendError(res, err, 'Failed to fetch announcements'); }
 };

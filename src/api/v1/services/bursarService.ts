@@ -566,4 +566,197 @@ export async function getBursarDashboard(academicYearId?: number): Promise<any> 
         console.error('Error fetching bursar dashboard:', error);
         throw error;
     }
-} 
+}
+
+/**
+ * Defaulters (owing-fees) report.
+ *
+ * Aggregates outstanding SchoolFees rows for the given academic year, grouping
+ * by class and by amount range. A student is a "defaulter" when the sum of
+ * (amount_expected - amount_paid) across their SchoolFees rows for the year
+ * is strictly greater than 0 (and, when minimumAmount is set, ≥ minimumAmount).
+ */
+export interface DefaultersReportOptions {
+    academicYearId?: number;
+    minimumAmount?: number;
+    classId?: number;
+    subClassId?: number;
+    includeDetails?: boolean;
+}
+
+export async function getDefaultersReport(options: DefaultersReportOptions = {}): Promise<any> {
+    const yearId = options.academicYearId || (await getCurrentAcademicYear())?.id;
+    if (!yearId) {
+        throw new Error('No current academic year found and none provided.');
+    }
+
+    const enrollmentFilter: any = {};
+    if (options.classId) enrollmentFilter.class_id = options.classId;
+    if (options.subClassId) enrollmentFilter.sub_class_id = options.subClassId;
+
+    const feeRows = await prisma.schoolFees.findMany({
+        where: {
+            academic_year_id: yearId,
+            ...(Object.keys(enrollmentFilter).length > 0
+                ? { enrollment: { is: enrollmentFilter } }
+                : {})
+        },
+        select: {
+            enrollment_id: true,
+            amount_expected: true,
+            amount_paid: true,
+            due_date: true,
+            enrollment: {
+                select: {
+                    id: true,
+                    class_id: true,
+                    sub_class_id: true,
+                    class: { select: { id: true, name: true } },
+                    sub_class: { select: { id: true, name: true } },
+                    student: {
+                        select: {
+                            id: true,
+                            name: true,
+                            matricule: true,
+                            parents: {
+                                select: {
+                                    parent: {
+                                        select: { name: true, phone: true, whatsapp_number: true }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Aggregate per enrollment (unique constraint guarantees one row per
+    // enrollment/year, but iterate defensively in case that ever changes).
+    interface DefaulterAgg {
+        enrollmentId: number;
+        classId: number | null;
+        className: string;
+        subClassId: number | null;
+        subClassName: string;
+        studentId: number;
+        studentName: string;
+        matricule: string;
+        outstanding: number;
+        oldestDueDate: Date | null;
+        parentPhone?: string;
+    }
+
+    const perEnrollment = new Map<number, DefaulterAgg>();
+
+    for (const row of feeRows) {
+        const balance = (row.amount_expected || 0) - (row.amount_paid || 0);
+        if (balance <= 0) continue;
+
+        const existing = perEnrollment.get(row.enrollment_id);
+        if (existing) {
+            existing.outstanding += balance;
+            if (row.due_date && (!existing.oldestDueDate || row.due_date < existing.oldestDueDate)) {
+                existing.oldestDueDate = row.due_date;
+            }
+            continue;
+        }
+
+        const enrollment = row.enrollment;
+        const student = enrollment?.student;
+        const firstParent = student?.parents?.[0]?.parent;
+        perEnrollment.set(row.enrollment_id, {
+            enrollmentId: row.enrollment_id,
+            classId: enrollment?.class?.id ?? enrollment?.class_id ?? null,
+            className: enrollment?.class?.name || 'Unassigned',
+            subClassId: enrollment?.sub_class?.id ?? enrollment?.sub_class_id ?? null,
+            subClassName: enrollment?.sub_class?.name || 'Unassigned',
+            studentId: student?.id ?? 0,
+            studentName: student?.name || 'Unknown',
+            matricule: student?.matricule || '',
+            outstanding: balance,
+            oldestDueDate: row.due_date ?? null,
+            parentPhone: firstParent?.whatsapp_number || firstParent?.phone || undefined
+        });
+    }
+
+    const minAmount = typeof options.minimumAmount === 'number' && !Number.isNaN(options.minimumAmount)
+        ? options.minimumAmount
+        : 0;
+
+    const defaulters = Array.from(perEnrollment.values()).filter(d => d.outstanding >= minAmount && d.outstanding > 0);
+
+    // Group by class
+    const byClassMap = new Map<string, {
+        classId: number | null;
+        className: string;
+        defaultersCount: number;
+        outstandingAmount: number;
+    }>();
+    for (const d of defaulters) {
+        const key = String(d.classId ?? `name:${d.className}`);
+        const bucket = byClassMap.get(key) || {
+            classId: d.classId,
+            className: d.className,
+            defaultersCount: 0,
+            outstandingAmount: 0
+        };
+        bucket.defaultersCount += 1;
+        bucket.outstandingAmount += d.outstanding;
+        byClassMap.set(key, bucket);
+    }
+    const byClass = Array.from(byClassMap.values()).sort((a, b) => b.outstandingAmount - a.outstandingAmount);
+
+    // Group by amount range
+    const ranges: Array<{ range: string; min: number; max: number | null }> = [
+        { range: '0-10000', min: 0, max: 10000 },
+        { range: '10001-50000', min: 10001, max: 50000 },
+        { range: '50001-100000', min: 50001, max: 100000 },
+        { range: '100000+', min: 100001, max: null }
+    ];
+    const byAmountRange = ranges.map(r => {
+        const inBucket = defaulters.filter(d =>
+            d.outstanding >= r.min && (r.max === null || d.outstanding <= r.max)
+        );
+        return {
+            range: r.range,
+            count: inBucket.length,
+            totalAmount: inBucket.reduce((s, d) => s + d.outstanding, 0)
+        };
+    });
+
+    const now = Date.now();
+    const DAY_MS = 1000 * 60 * 60 * 24;
+
+    const students = defaulters
+        .sort((a, b) => b.outstanding - a.outstanding)
+        .map(d => {
+            const base: any = {
+                studentId: d.studentId,
+                studentName: d.studentName,
+                matricule: d.matricule,
+                className: d.className,
+                subClassName: d.subClassName,
+                outstandingAmount: d.outstanding,
+                dueDate: d.oldestDueDate ? d.oldestDueDate.toISOString() : null,
+                daysOverdue: d.oldestDueDate
+                    ? Math.max(0, Math.floor((now - d.oldestDueDate.getTime()) / DAY_MS))
+                    : 0
+            };
+            if (options.includeDetails && d.parentPhone) {
+                base.contactParentPhone = d.parentPhone;
+            }
+            return base;
+        });
+
+    const totalOutstanding = defaulters.reduce((s, d) => s + d.outstanding, 0);
+
+    return {
+        totalDefaulters: defaulters.length,
+        totalOutstanding,
+        byClass,
+        byAmountRange,
+        students
+    };
+}

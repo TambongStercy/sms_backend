@@ -1,6 +1,7 @@
 // Enhanced Dashboard Service for Advanced Role-Specific Features
 import prisma from '../../../config/db';
 import { getCurrentAcademicYear } from '../../../utils/academicYear';
+import { SUBCLASS_MAX_STUDENTS, getClassMaxStudents } from '../../../utils/capacity';
 
 /**
  * Enhanced Super Manager Dashboard with comprehensive analytics
@@ -11,6 +12,7 @@ export async function getEnhancedSuperManagerDashboard(academicYearId?: number):
 
         const [
             schoolOverview,
+            schoolFees,
             teacherAnalytics,
             reportAnalytics,
             formManagement,
@@ -18,6 +20,7 @@ export async function getEnhancedSuperManagerDashboard(academicYearId?: number):
             systemStatistics
         ] = await Promise.all([
             getSchoolOverview(yearId),
+            getSchoolFeesBreakdown(yearId),
             getTeacherAnalytics(yearId),
             getReportAnalytics(yearId),
             getFormManagementStats(),
@@ -27,6 +30,7 @@ export async function getEnhancedSuperManagerDashboard(academicYearId?: number):
 
         return {
             schoolOverview,
+            schoolFees,
             teacherAnalytics,
             reportAnalytics,
             formManagement,
@@ -94,6 +98,88 @@ async function getSchoolOverview(yearId?: number) {
             averageSubjectsPerTeacher: teacherData.length > 0 ?
                 teacherData.reduce((sum, t) => sum + t.subject_teachers.length, 0) / teacherData.length : 0
         }
+    };
+}
+
+/**
+ * School Fees Breakdown - Total plus per-installment (3 terms) with waterfall attribution.
+ * Waterfall: a student's amount_paid fills first-term bucket, then second, then third.
+ * First-term expected also absorbs miscellaneous_fee + new_or_old student_fee (billed upfront).
+ */
+async function getSchoolFeesBreakdown(yearId?: number) {
+    const fees = await prisma.schoolFees.findMany({
+        where: yearId ? { academic_year_id: yearId } : undefined,
+        select: {
+            amount_expected: true,
+            amount_paid: true,
+            is_new_student: true,
+            enrollment: {
+                select: {
+                    class: {
+                        select: {
+                            first_term_fee: true,
+                            second_term_fee: true,
+                            third_term_fee: true,
+                            miscellaneous_fee: true,
+                            new_student_fee: true,
+                            old_student_fee: true
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    let totalExpected = 0;
+    let totalCollected = 0;
+    let firstExpected = 0;
+    let firstCollected = 0;
+    let secondExpected = 0;
+    let secondCollected = 0;
+    let thirdExpected = 0;
+    let thirdCollected = 0;
+
+    for (const fee of fees) {
+        const cls = fee.enrollment?.class;
+        if (!cls) continue;
+
+        const upfrontExtras =
+            cls.miscellaneous_fee +
+            (fee.is_new_student ? cls.new_student_fee : cls.old_student_fee);
+
+        const firstBucket = cls.first_term_fee + upfrontExtras;
+        const secondBucket = cls.second_term_fee;
+        const thirdBucket = cls.third_term_fee;
+
+        let remainingPaid = fee.amount_paid;
+        const paidFirst = Math.min(remainingPaid, firstBucket);
+        remainingPaid -= paidFirst;
+        const paidSecond = Math.min(remainingPaid, secondBucket);
+        remainingPaid -= paidSecond;
+        const paidThird = Math.min(remainingPaid, thirdBucket);
+
+        totalExpected += fee.amount_expected;
+        totalCollected += fee.amount_paid;
+        firstExpected += firstBucket;
+        firstCollected += paidFirst;
+        secondExpected += secondBucket;
+        secondCollected += paidSecond;
+        thirdExpected += thirdBucket;
+        thirdCollected += paidThird;
+    }
+
+    const bucket = (expected: number, collected: number) => ({
+        expected,
+        collected,
+        remaining: Math.max(expected - collected, 0),
+        collectionRate: expected > 0 ? (collected / expected) * 100 : 0
+    });
+
+    return {
+        total: bucket(totalExpected, totalCollected),
+        firstTerm: bucket(firstExpected, firstCollected),
+        secondTerm: bucket(secondExpected, secondCollected),
+        thirdTerm: bucket(thirdExpected, thirdCollected)
     };
 }
 
@@ -291,17 +377,19 @@ async function getSystemStatistics(yearId?: number) {
         count: stat._count.user_id
     }));
 
-    const classUtilization = classStats.map(cls => ({
-        id: cls.id,
-        name: cls.name,
-        maxStudents: cls.max_students,
-        currentStudents: cls.sub_classes.reduce(
+    const classUtilization = classStats.map(cls => {
+        const currentStudents = cls.sub_classes.reduce(
             (sum, sc) => sum + sc.enrollments.length, 0
-        ),
-        utilizationRate: (cls.sub_classes.reduce(
-            (sum, sc) => sum + sc.enrollments.length, 0
-        ) / cls.max_students) * 100
-    }));
+        );
+        const maxStudents = getClassMaxStudents(cls.sub_classes.length);
+        return {
+            id: cls.id,
+            name: cls.name,
+            maxStudents,
+            currentStudents,
+            utilizationRate: maxStudents > 0 ? (currentStudents / maxStudents) * 100 : 0
+        };
+    });
 
     return {
         usersByRole,
@@ -555,12 +643,16 @@ async function getVPStudentManagement(yearId?: number) {
         totalEnrollments,
         assignmentRate: totalEnrollments > 0 ?
             ((totalEnrollments - unassignedStudents.length) / totalEnrollments) * 100 : 0,
-        classCapacityStatus: classCapacity.map(cls => ({
-            className: cls.name,
-            maxCapacity: cls.max_students,
-            currentEnrollment: cls.sub_classes.reduce((sum, sc) => sum + sc.enrollments.length, 0),
-            availableSpaces: cls.max_students - cls.sub_classes.reduce((sum, sc) => sum + sc.enrollments.length, 0)
-        }))
+        classCapacityStatus: classCapacity.map(cls => {
+            const currentEnrollment = cls.sub_classes.reduce((sum, sc) => sum + sc.enrollments.length, 0);
+            const maxCapacity = getClassMaxStudents(cls.sub_classes.length);
+            return {
+                className: cls.name,
+                maxCapacity,
+                currentEnrollment,
+                availableSpaces: Math.max(0, maxCapacity - currentEnrollment)
+            };
+        })
     };
 }
 

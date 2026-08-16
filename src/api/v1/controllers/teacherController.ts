@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
 import * as teacherService from '../services/teacherService';
+import * as timetableService from '../services/timetableService';
 
 interface AuthenticatedRequest extends Request {
     user?: {
@@ -489,4 +490,30 @@ export const getMyTimetable = async (req: AuthenticatedRequest, res: Response): 
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }
-}; 
+};
+
+/**
+ * GET /teachers/me/timetable/export/pdf
+ * Download the authenticated teacher's weekly timetable as a PDF.
+ */
+export const exportMyTimetablePdf = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const teacherId = req.user?.id;
+        if (!teacherId) {
+            res.status(401).json({ success: false, error: 'User not authenticated' });
+            return;
+        }
+
+        const academicYearId = req.query.academicYearId ? parseInt(req.query.academicYearId as string) : undefined;
+        const { buffer, filename } = await timetableService.exportTeacherTimetablePdf(teacherId, academicYearId);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('Error exporting teacher timetable PDF:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+ 

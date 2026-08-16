@@ -83,12 +83,19 @@ export async function sendDirectMessage(data: CreateMessageData) {
             }
         });
 
-        // Send in-app notification to recipient
+        // Send in-app notification to recipient (popup — direct messages are urgent).
         const notificationMessage = `New message from ${sender.name}: ${data.subject}`;
 
         await sendNotification({
             user_id: data.receiverId,
-            message: notificationMessage
+            title: `New message from ${sender.name}`,
+            message: notificationMessage,
+            sender_id: data.senderId,
+            category: 'GENERAL',
+            priority: 'HIGH',
+            entity_type: 'Message',
+            entity_id: message.id,
+            action_url: `/messages/${message.id}`,
         });
 
         console.log(`✅ Message sent and notification delivered to ${receiver.name}`);
@@ -143,10 +150,17 @@ export async function sendSimpleMessage(data: {
             }
         });
 
-        // Send notification to receiver
+        // Send notification to receiver (popup — direct messages are urgent).
         await sendNotification({
             user_id: data.receiverId,
-            message: `New ${data.category} message from ${sender.name}: ${data.subject}`
+            title: `New ${data.category.toLowerCase()} message from ${sender.name}`,
+            message: `New ${data.category} message from ${sender.name}: ${data.subject}`,
+            sender_id: data.senderId,
+            category: 'GENERAL',
+            priority: 'HIGH',
+            entity_type: 'Message',
+            entity_id: message.id,
+            action_url: `/messages/${message.id}`,
         });
 
         return {

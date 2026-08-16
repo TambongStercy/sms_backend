@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { authorize } from '../middleware/auth.middleware';
 import * as disciplineMasterController from '../controllers/disciplineMasterController';
+import * as teacherPeriodAttendanceController from '../controllers/teacherPeriodAttendanceController';
 
 const router = express.Router();
 
@@ -9,6 +10,10 @@ const DM_AND_SENIORS = ['DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_O
 const DM_DASHBOARD_ROLES = ['DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_OF_DISCIPLINE'];
 const STUDENT_PROFILE_ROLES = [...DM_AND_SENIORS, 'TEACHER'];
 const REPORTS_ROLES = ['DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_OF_DISCIPLINE', 'PRINCIPAL'];
+const TEACHER_ATTENDANCE_ROLES = [
+    'DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_OF_DISCIPLINE',
+    'PRINCIPAL', 'VICE_PRINCIPAL', 'MANAGER',
+];
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -111,6 +116,33 @@ router.get('/risk-assessment',
 router.get('/reports',
     authorize(REPORTS_ROLES),
     disciplineMasterController.generateDisciplineReport
+);
+
+/**
+ * Teacher-period attendance (DM marks teacher presence + evaluation checkboxes
+ * — well_dressed, class_management, punctuality, assiduity — for each timetable
+ * period). DMs are further gated inside the controller to their assigned
+ * sub-classes via RoleAssignment; SDM / Dean / VP / Principal / Manager bypass.
+ */
+router.get('/teacher-attendance',
+    authorize(TEACHER_ATTENDANCE_ROLES),
+    teacherPeriodAttendanceController.listDay
+);
+router.post('/teacher-attendance',
+    authorize(TEACHER_ATTENDANCE_ROLES),
+    teacherPeriodAttendanceController.upsert
+);
+router.get('/teacher-attendance/:id',
+    authorize(TEACHER_ATTENDANCE_ROLES),
+    teacherPeriodAttendanceController.getById
+);
+router.put('/teacher-attendance/:id',
+    authorize(TEACHER_ATTENDANCE_ROLES),
+    teacherPeriodAttendanceController.update
+);
+router.delete('/teacher-attendance/:id',
+    authorize(TEACHER_ATTENDANCE_ROLES),
+    teacherPeriodAttendanceController.remove
 );
 
 export default router;

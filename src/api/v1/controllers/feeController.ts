@@ -273,7 +273,7 @@ export const getSubclassUnpaidStudents = async (req: Request, res: Response): Pr
     }
 };
 
-export const recordPayment = async (req: Request, res: Response) => {
+export const recordPayment = async (req: Request, res: Response): Promise<any> => {
     try {
         const feeId = parseInt(req.params.feeId);
 
@@ -291,6 +291,17 @@ export const recordPayment = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         console.error('Error recording payment:', error);
+
+        if (error instanceof feeService.DuplicatePaymentError) {
+            return res.status(409).json({
+                success: false,
+                error: error.message,
+                code: 'DUPLICATE_PAYMENT',
+                existingPaymentId: error.existingPaymentId,
+                secondsAgo: error.secondsAgo,
+            });
+        }
+
         res.status(500).json({
             success: false,
             error: error.message

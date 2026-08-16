@@ -1,10 +1,14 @@
 import { Router } from 'express';
 import {
     getAllUsers,
+    searchPersonnel,
+    searchTeachers,
     createUser,
     getUserById,
     updateUser,
     updateCurrentUserProfile,
+    getCurrentUserSettings,
+    updateCurrentUserSettings,
     deleteUser,
     assignRole,
     removeRole,
@@ -23,24 +27,41 @@ import {
     getDashboardForRole
 } from '../controllers/userController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { auditTrailMiddleware, roleChangeAuditMiddleware } from '../middleware/auditTrail.middleware';
 
 const router = Router();
 
 // Registration endpoint (public or specific roles)
 router.post('/register-with-roles', registerAndAssignRoles);
-router.post('/create-with-role', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'SECRETARY']), createUserWithRole);
+router.post('/create-with-role', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'SECRETARY']), auditTrailMiddleware('User', 'CREATE_USER'), createUserWithRole);
 
 // User CRUD operations (requires authentication, some require specific roles)
 router.get('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR', 'SECRETARY']), getAllUsers);
-router.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR', 'SECRETARY']), createUser);
+router.post('/', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'DISCIPLINE_MASTER', 'BURSAR', 'SECRETARY']), auditTrailMiddleware('User', 'CREATE_USER'), createUser);
 
 // Get all teachers (optionally filtered by subject)
 // Important: This route must be defined BEFORE the /:id route to avoid conflicts
 router.get('/teachers', authenticate, getAllTeachers);
 
+// Teacher management search with pagination + rich filters. Must be BEFORE /:id.
+router.get('/teachers/search', authenticate, authorize([
+    'SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL',
+    'BURSAR', 'SECRETARY', 'DEAN_OF_STUDIES', 'HOD'
+]), searchTeachers);
+
+// Personnel search with pagination + filters. Must be BEFORE /:id.
+router.get('/personnel/search', authenticate, authorize([
+    'SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL',
+    'BURSAR', 'SECRETARY', 'DEAN_OF_STUDIES', 'DEAN_OF_DISCIPLINE', 'HOD'
+]), searchPersonnel);
+
 // Route for the current user's profile - MUST be before /:id
 router.get('/me', authenticate, getCurrentUserProfile);
 router.put('/me', authenticate, updateCurrentUserProfile); // Allow users to update their own profile
+
+// Current user's app/notification preferences
+router.get('/me/settings', authenticate, getCurrentUserSettings);
+router.put('/me/settings', authenticate, updateCurrentUserSettings);
 
 // Route for the current user's dashboard by role
 router.get('/me/dashboard', authenticate, getDashboardForRole);
@@ -51,14 +72,14 @@ router.get('/:parentId/students', authenticate, authorize(['SUPER_MANAGER', 'PRI
 // Note: Add logic in controller/service to ensure PARENT can only access their own students if parentId matches req.user.id
 
 router.get('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'SECRETARY']), getUserById);
-router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'SECRETARY']), updateUser);
-router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), deleteUser); // Only SUPER_MANAGER can delete
+router.put('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'SECRETARY']), auditTrailMiddleware('User', 'UPDATE_USER'), updateUser);
+router.delete('/:id', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), auditTrailMiddleware('User', 'DELETE_USER'), deleteUser); // Only SUPER_MANAGER can delete
 
 // Role management
-router.post('/:id/roles', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), assignRole); // Single role assignment
-router.delete('/:id/roles', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), removeRole); // Remove role (specify role in body)
-router.put('/:id/roles/academic-year', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), setUserRolesForCurrentAcademicYear); // New route for setting roles
-router.delete('/:id/roles/:roleId', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), removeRole); // RoleId here is the UserRole record ID
+router.post('/:id/roles', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), roleChangeAuditMiddleware, assignRole); // Single role assignment
+router.delete('/:id/roles', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), roleChangeAuditMiddleware, removeRole); // Remove role (specify role in body)
+router.put('/:id/roles/academic-year', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), roleChangeAuditMiddleware, setUserRolesForCurrentAcademicYear); // New route for setting roles
+router.delete('/:id/roles/:roleId', authenticate, authorize(['SUPER_MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR']), roleChangeAuditMiddleware, removeRole); // RoleId here is the UserRole record ID
 
 // Specific Assignments (Vice Principal, Discipline Master)
 // Assign VP to Subclass (Defaults to current year if academicYearId is omitted in body)

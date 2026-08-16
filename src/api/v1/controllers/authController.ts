@@ -101,8 +101,61 @@ export const getProfile = async (req: Request, res: Response) => {
 };
 
 /**
+ * Change the authenticated user's password.
+ * Body: { currentPassword, newPassword }
+ */
+export const changePassword = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthenticatedRequest;
+        const userId = authReq.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+
+        const { current_password, new_password } = req.body as {
+            current_password?: string;
+            new_password?: string;
+        };
+
+        if (!current_password || !new_password) {
+            return res.status(400).json({
+                success: false,
+                error: 'currentPassword and newPassword are required',
+            });
+        }
+
+        if (typeof new_password !== 'string' || new_password.length < 8) {
+            return res.status(400).json({
+                success: false,
+                error: 'newPassword must be at least 8 characters long',
+            });
+        }
+
+        await authService.changePassword(userId, current_password, new_password);
+
+        // Invalidate the current token so the user must sign in again with the new password.
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Bearer ')) {
+            blacklistToken(authHeader.split(' ')[1]);
+        }
+
+        res.json({
+            success: true,
+            message: 'Password changed successfully. Please sign in again.',
+        });
+    } catch (error: any) {
+        console.error('Change password error:', error);
+        const status =
+            error.message === 'Current password is incorrect' ? 400 :
+            error.message === 'New password must be different from the current password' ? 400 :
+            error.message === 'User not found' ? 404 : 500;
+        res.status(status).json({ success: false, error: error.message });
+    }
+};
+
+/**
  * Handle user logout - invalidates the current token
- * 
+ *
  * @param req - Express request object with authenticated user info
  * @param res - Express response object
  */

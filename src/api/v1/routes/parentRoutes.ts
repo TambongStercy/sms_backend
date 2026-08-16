@@ -1,89 +1,61 @@
 // src/api/v1/routes/parentRoutes.ts
+//
+// PARENT PORTAL — all endpoints are UNAUTHENTICATED. Access is gated only
+// by knowledge of the child's matricule (path param). Do not add authenticate
+// / authorize middleware to these routes.
 import express from 'express';
 import {
-    getParentDashboard,
+    getChildDashboard,
     getChildDetails,
-    sendMessageToStaff,
-    getChildrenQuizResults,
-    getSchoolAnnouncements,
+    getChildOverview,
     getChildQuizResults,
     getChildAnalytics,
+    listChildReportCards,
+    downloadChildReportCard,
     checkChildReportCardAvailability,
-    getMyContacts,
-    openStaffDirectMessage
+    getContacts,
+    sendMessageToStaff,
+    openStaffDirectMessage,
+    getSchoolAnnouncements,
+    getParentNotifications,
+    getParentUnreadNotificationCount,
+    getParentUnreadBreakdown,
+    markAllParentNotificationsAsRead,
+    markParentNotificationAsRead,
+    deleteParentNotification
 } from '../controllers/parentController';
-import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = express.Router();
 
-// Parent dashboard
-router.get('/dashboard',
-    authenticate,
-    authorize(['PARENT']),
-    getParentDashboard
-);
+// School-wide announcements (no matricule needed).
+router.get('/announcements', getSchoolAnnouncements);
 
-// Get detailed information about a specific child
-router.get('/children/:studentId',
-    authenticate,
-    authorize(['PARENT']),
-    getChildDetails
-);
+// Child dashboard / details / overview by matricule.
+router.get('/:matricule/dashboard', getChildDashboard);
+router.get('/:matricule/details', getChildDetails);
+router.get('/:matricule/overview', getChildOverview);
 
-// Send message to school staff
-router.post('/message-staff',
-    authenticate,
-    authorize(['PARENT']),
-    sendMessageToStaff
-);
+// Academic data.
+router.get('/:matricule/quiz-results', getChildQuizResults);
+router.get('/:matricule/analytics', getChildAnalytics);
 
-// GET /parents/children/:studentId/quiz-results - Get quiz results for a specific child
-router.get('/children/:studentId/quiz-results',
-    authenticate,
-    authorize(['PARENT']),
-    getChildQuizResults
-);
+// Report cards.
+router.get('/:matricule/report-cards', listChildReportCards);
+router.get('/:matricule/report-card/availability', checkChildReportCardAvailability);
+router.get('/:matricule/report-card', downloadChildReportCard);
 
-// GET /parents/children/:studentId/analytics - Get comprehensive analytics for a child
-router.get('/children/:studentId/analytics',
-    authenticate,
-    authorize(['PARENT']),
-    getChildAnalytics
-);
+// Messaging / directory (sender identity is resolved from ParentStudent link).
+router.get('/:matricule/contacts', getContacts);
+router.post('/:matricule/message-staff', sendMessageToStaff);
+router.post('/:matricule/contact/:userId', openStaffDirectMessage);
 
-// GET /parents/children/:studentId/report-card/availability - Check if child's report card is available
-router.get('/children/:studentId/report-card/availability',
-    authenticate,
-    authorize(['PARENT']),
-    checkChildReportCardAvailability
-);
-
-// Get quiz results for all children
-router.get('/children/quiz-results',
-    authenticate,
-    authorize(['PARENT']),
-    getChildrenQuizResults
-);
-
-// Get school announcements
-router.get('/announcements',
-    authenticate,
-    authorize(['PARENT']),
-    getSchoolAnnouncements
-);
-
-// Curated staff directory (executives + child teachers + all HODs by subject)
-router.get('/me/contacts',
-    authenticate,
-    authorize(['PARENT']),
-    getMyContacts
-);
-
-// Open (or reuse) a DM with a staff member; returns the chat channel
-router.post('/me/contact/:userId',
-    authenticate,
-    authorize(['PARENT']),
-    openStaffDirectMessage
-);
+// Notifications — mirrors /notifications/* but gated by matricule instead of JWT.
+// Parent identity is resolved via ParentStudent link on the matricule's student.
+router.get('/:matricule/notifications', getParentNotifications);
+router.get('/:matricule/notifications/unread-count', getParentUnreadNotificationCount);
+router.get('/:matricule/notifications/unread-breakdown', getParentUnreadBreakdown);
+router.put('/:matricule/notifications/mark-all-read', markAllParentNotificationsAsRead);
+router.put('/:matricule/notifications/:id/read', markParentNotificationAsRead);
+router.delete('/:matricule/notifications/:id', deleteParentNotification);
 
 export default router;

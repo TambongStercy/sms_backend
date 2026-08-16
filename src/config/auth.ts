@@ -5,7 +5,7 @@ if (!JWT_SECRET) {
     throw new Error('JWT_SECRET environment variable is required');
 }
 
-const TOKEN_EXPIRY = '24h';
+const TOKEN_EXPIRY = '120d';
 
 interface TokenPayload {
     id: number;

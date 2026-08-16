@@ -15,11 +15,13 @@ router.get('/export', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRIN
 
 // --- Overpayments & Refunds (must be registered before /:id to avoid param capture) ---
 const VIEW_REFUNDS = ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR', 'SECRETARY', 'FEE_AUDITOR'];
-const RECORD_REFUNDS = ['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR'];
+// Direct refund recording is a SUPER_MANAGER-only override. The standard flow is:
+// Bursar creates a REFUND FinanceRequest → SUPER_MANAGER approves → the refund is recorded automatically.
+const RECORD_REFUNDS_DIRECT = ['SUPER_MANAGER'];
 
 router.get('/overpaid', authenticate, authorize(VIEW_REFUNDS), feeController.listOverpaid);
 router.get('/overpaid/export', authenticate, authorize(VIEW_REFUNDS), feeController.exportOverpaid);
-router.post('/refunds', authenticate, authorize(RECORD_REFUNDS), feeController.recordRefund);
+router.post('/refunds', authenticate, authorize(RECORD_REFUNDS_DIRECT), feeController.recordRefund);
 router.get('/refunds', authenticate, authorize(VIEW_REFUNDS), feeController.listRefunds);
 router.get('/refunds/:id', authenticate, authorize(VIEW_REFUNDS), feeController.getRefundById);
 
@@ -61,8 +63,11 @@ router.get('/subclass/:subClassId/status', authenticate, feeController.getSubcla
 // GET /fees/:feeId/payments - List all payments for a fee
 router.get('/:feeId/payments', authenticate, feeController.getFeePayments);
 
-// POST /fees/:feeId/payments - Record a payment for a specific fee
-// Only SUPER_MANAGER, PRINCIPAL, BURSAR can record payments
+// POST /fees/:feeId/payments - Record a payment for a specific fee (direct/legacy).
+// Preferred flow: Parent (or Bursar+) submits a PAYMENT_CLAIM FinanceRequest at
+// POST /finance-requests → Bursar validates via /finance-requests/:id/approve →
+// a PaymentTransaction is created automatically. This endpoint remains for
+// walk-in cash payments that the Bursar records directly at the desk.
 router.post('/:feeId/payments', authenticate, authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'BURSAR']), feeController.recordPayment);
 
 export default router;

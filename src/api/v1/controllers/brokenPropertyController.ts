@@ -4,12 +4,17 @@ import * as svc from '../services/brokenPropertyService';
 export const createBrokenProperty = async (req: any, res: Response): Promise<any> => {
     try {
         if (!req.user?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const rawCost = req.body.estimated_cost;
+        const estimated_cost = rawCost === undefined || rawCost === null || rawCost === '' ? 0 : Number(rawCost);
+        if (Number.isNaN(estimated_cost)) {
+            return res.status(400).json({ success: false, error: 'estimated_cost must be a number' });
+        }
         const created = await svc.createBrokenProperty({
             student_id: Number(req.body.student_id),
             academic_year_id: req.body.academic_year_id ? Number(req.body.academic_year_id) : undefined,
             item_name: req.body.item_name,
             description: req.body.description,
-            estimated_cost: Number(req.body.estimated_cost),
+            estimated_cost,
             action_taken: req.body.action_taken,
             reported_by_id: req.user.id,
         });
@@ -55,10 +60,18 @@ export const updateBrokenProperty = async (req: Request, res: Response): Promise
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ success: false, error: 'Invalid id' });
+        let estimated_cost: number | undefined;
+        if (req.body.estimated_cost !== undefined) {
+            const rawCost = req.body.estimated_cost;
+            estimated_cost = rawCost === null || rawCost === '' ? 0 : Number(rawCost);
+            if (Number.isNaN(estimated_cost)) {
+                return res.status(400).json({ success: false, error: 'estimated_cost must be a number' });
+            }
+        }
         const updated = await svc.updateBrokenProperty(id, {
             item_name: req.body.item_name,
             description: req.body.description,
-            estimated_cost: req.body.estimated_cost !== undefined ? Number(req.body.estimated_cost) : undefined,
+            estimated_cost,
             action_taken: req.body.action_taken,
         });
         return res.json({ success: true, data: updated });

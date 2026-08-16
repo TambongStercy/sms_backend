@@ -5,31 +5,54 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// GET /periods - List all periods
+// ---------- Period Sets (bell schedules) ----------
+// Mounted first so /period-sets/:id doesn't collide with /:id below.
+
+router.get('/period-sets', authenticate, periodController.listPeriodSets);
+
+router.post('/period-sets',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'DEAN_OF_STUDIES']),
+    periodController.createPeriodSet
+);
+
+router.get('/period-sets/:id', authenticate, periodController.getPeriodSetById);
+
+router.put('/period-sets/:id',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'DEAN_OF_STUDIES']),
+    periodController.updatePeriodSet
+);
+
+router.delete('/period-sets/:id',
+    authenticate,
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'DEAN_OF_STUDIES']),
+    periodController.deletePeriodSet
+);
+
+// ---------- Individual periods ----------
+
+// GET /periods - accepts ?periodSetId= | ?subClassId= | ?classId= to scope
 router.get('/', authenticate, periodController.getAllPeriods);
 
-// POST /periods - Create a new period
 router.post('/',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']),
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'DEAN_OF_STUDIES']),
     periodController.createPeriod
 );
 
-// GET /periods/:id - Get a specific period
 router.get('/:id', authenticate, periodController.getPeriodById);
 
-// PUT /periods/:id - Update a period
 router.put('/:id',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']),
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'DEAN_OF_STUDIES']),
     periodController.updatePeriod
 );
 
-// DELETE /periods/:id - Delete a period
 router.delete('/:id',
     authenticate,
-    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL']),
+    authorize(['SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'DEAN_OF_STUDIES']),
     periodController.deletePeriod
 );
 
-export default router; 
+export default router;

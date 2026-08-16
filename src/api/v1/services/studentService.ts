@@ -1386,6 +1386,22 @@ function sanitizeForPdf(text: string): string {
         .replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
 }
 
+function formatParentsContact(parents?: any[]): string {
+    if (!Array.isArray(parents) || parents.length === 0) return '';
+    return parents
+        .map(link => {
+            const p = link?.parent || {};
+            const phone = p.phone || p.whatsapp_number || '';
+            if (!phone) return '';
+            const label = link?.relationship
+                ? String(link.relationship).charAt(0) + String(link.relationship).slice(1).toLowerCase()
+                : (p.name ? String(p.name).split(' ')[0] : 'Parent');
+            return `${label}: ${phone}`;
+        })
+        .filter(Boolean)
+        .join(' | ');
+}
+
 function drawClassListHeader(
     page: PDFPage,
     boldFont: PDFFont,
@@ -1435,17 +1451,18 @@ async function buildClassListPdfBuffer(
     const fontSize = 8;
 
     const columns = [
-        { key: '#', width: 24 },
-        { key: 'Matricule', width: 80 },
-        { key: 'Nom', width: 110 },
-        { key: 'Prenom', width: 110 },
-        { key: 'Gender', width: 50 },
-        { key: 'DOB', width: 70 },
-        { key: 'Place of Birth', width: 95 },
-        { key: 'Residence', width: 90 },
-        { key: 'New/Old', width: 50 },
-        { key: 'Repeater', width: 50 },
-        { key: 'Ream', width: 40 },
+        { key: '#', width: 20 },
+        { key: 'Matricule', width: 65 },
+        { key: 'Nom', width: 85 },
+        { key: 'Prenom', width: 85 },
+        { key: 'Gender', width: 30 },
+        { key: 'DOB', width: 55 },
+        { key: 'Place of Birth', width: 65 },
+        { key: 'Residence', width: 60 },
+        { key: 'New/Old', width: 32 },
+        { key: 'Repeater', width: 32 },
+        { key: 'Ream', width: 30 },
+        { key: 'Parents Contact', width: 200 },
     ];
 
     const drawRow = (page: PDFPage, y: number, values: string[], opts: { bold?: boolean; fill?: boolean }) => {
@@ -1561,6 +1578,7 @@ async function buildClassListPdfBuffer(
                 s.is_new_student ? 'NEW' : 'OLD',
                 e.repeater ? 'YES' : 'NO',
                 e.ream_of_paper_collected ? 'YES' : 'NO',
+                formatParentsContact(s.parents),
             ], { bold: false });
             y = rowY;
         });
@@ -1594,7 +1612,17 @@ export async function exportSubclassStudentListPdf(
 
     const enrollments = await prisma.enrollment.findMany({
         where: { sub_class_id: subClassId, academic_year_id: yearId },
-        include: { student: true }
+        include: {
+            student: {
+                include: {
+                    parents: {
+                        include: {
+                            parent: { select: { name: true, phone: true, whatsapp_number: true } }
+                        }
+                    }
+                }
+            }
+        }
     });
 
     const year = await prisma.academicYear.findUnique({ where: { id: yearId }, select: { name: true } });
@@ -1630,7 +1658,17 @@ export async function exportClassStudentListPdf(
                 include: {
                     enrollments: {
                         where: { academic_year_id: yearId },
-                        include: { student: true }
+                        include: {
+                            student: {
+                                include: {
+                                    parents: {
+                                        include: {
+                                            parent: { select: { name: true, phone: true, whatsapp_number: true } }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

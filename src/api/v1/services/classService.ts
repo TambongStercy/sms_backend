@@ -13,6 +13,7 @@ interface ClassData {
     first_term_fee?: number;
     second_term_fee?: number;
     third_term_fee?: number;
+    period_set_id?: number | null;
 }
 
 export async function getAllClasses(
@@ -23,7 +24,7 @@ export async function getAllClasses(
         prisma.class,
         paginationOptions,
         filterOptions,
-        { sub_classes: true }
+        { sub_classes: true, period_set: true }
     );
 
     // Get current academic year
@@ -128,6 +129,7 @@ export async function getAllSubclasses(
 export async function getAllClassesWithSubclasses(): Promise<any[]> {
     const classes = await prisma.class.findMany({
         include: {
+            period_set: true,
             sub_classes: {
                 include: {
                     sub_class_subjects: {
@@ -189,6 +191,7 @@ export async function createClass(data: ClassData): Promise<Class> {
             first_term_fee: data.first_term_fee,
             second_term_fee: data.second_term_fee,
             third_term_fee: data.third_term_fee,
+            period_set_id: data.period_set_id ?? null,
         },
     });
 }
@@ -197,6 +200,7 @@ export async function getClassById(id: number): Promise<any> {
     const classData = await prisma.class.findUnique({
         where: { id },
         include: {
+            period_set: true,
             sub_classes: {
                 include: {
                     class_master: true // Include class master information
@@ -252,6 +256,7 @@ export async function updateClass(id: number, data: Partial<ClassData>): Promise
             first_term_fee: data.first_term_fee,
             second_term_fee: data.second_term_fee,
             third_term_fee: data.third_term_fee,
+            ...(data.period_set_id !== undefined && { period_set_id: data.period_set_id }),
         },
     });
 }
@@ -278,6 +283,23 @@ export async function deleteClass(id: number): Promise<Class> {
     // If no associated records, proceed with deletion
     return prisma.class.delete({
         where: { id },
+    });
+}
+
+/**
+ * Bind a class to a bell schedule. Pass null to detach.
+ * Rejects if the period set belongs to a different academic year than the
+ * caller's current context.
+ */
+export async function assignPeriodSet(classId: number, periodSetId: number | null): Promise<Class> {
+    if (periodSetId !== null) {
+        const set = await prisma.periodSet.findUnique({ where: { id: periodSetId } });
+        if (!set) throw new Error('PERIOD_SET_NOT_FOUND');
+    }
+    return prisma.class.update({
+        where: { id: classId },
+        data: { period_set_id: periodSetId },
+        include: { period_set: true }
     });
 }
 

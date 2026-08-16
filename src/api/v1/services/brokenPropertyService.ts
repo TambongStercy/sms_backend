@@ -19,7 +19,7 @@ export interface CreateBrokenPropertyInput {
 export async function createBrokenProperty(input: CreateBrokenPropertyInput): Promise<BrokenProperty> {
     if (!input.item_name?.trim()) throw new Error('item_name is required');
     if (!input.description?.trim()) throw new Error('description is required');
-    if (input.estimated_cost <= 0) throw new Error('estimated_cost must be greater than 0');
+    if (input.estimated_cost < 0) throw new Error('estimated_cost cannot be negative');
 
     const yearId = input.academic_year_id ?? await getAcademicYearId();
     if (!yearId) throw new Error('No academic year found');
@@ -136,6 +136,9 @@ export interface UpdateBrokenPropertyInput {
 export async function updateBrokenProperty(id: number, data: UpdateBrokenPropertyInput): Promise<BrokenProperty> {
     const existing = await prisma.brokenProperty.findUnique({ where: { id } });
     if (!existing) throw new Error(`BrokenProperty ${id} not found`);
+    if (data.estimated_cost !== undefined && data.estimated_cost < 0) {
+        throw new Error('estimated_cost cannot be negative');
+    }
 
     return prisma.$transaction(async (tx) => {
         const updated = await tx.brokenProperty.update({

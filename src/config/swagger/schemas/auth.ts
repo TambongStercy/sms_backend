@@ -35,7 +35,7 @@
  *             expiresIn:
  *               type: string
  *               description: Token expiration time
- *               example: "24h"
+ *               example: "120d"
  *             user:
  *               $ref: '#/components/schemas/User'
  * 

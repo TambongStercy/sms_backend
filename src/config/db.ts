@@ -14,7 +14,13 @@ import {
     DisciplinaryAction, DisciplinaryActionType, DisciplinaryActionStatus,
     ReportRequest, ReportRequestStatus,
     StudentPreviousSchool, StudentWarning, ParentSummons, DMRollCall, DMRollCallEntry,
-    HealthCondition, MakeupStatus, SummonsTrigger, SummonsStatus, RollCallSlot, DMRollCallStatus, WarningReason
+    HealthCondition, MakeupStatus, SummonsTrigger, SummonsStatus, RollCallSlot, DMRollCallStatus, WarningReason,
+    NurseVisitLog, TeacherPeriodAttendance, TeacherPeriodAttendanceStatus,
+    SalaryProfile, SalaryChangeRequest, SalaryAllowance, PayPeriod, SalaryPayment, SalaryWithholding, BursarCashInjection,
+    SalaryType, SalaryProfileStatus, SalaryAllowanceType, SalaryApprovalStatus, PayPeriodStatus, SalaryPaymentStatus, WithholdingScope, BursarCashInjectionSource,
+    ReamStockLedger, ReamStockEntryType,
+    Task, TaskPriority, TaskStatus, NotificationCategory, NotificationPriority,
+    UserSettings, Theme
 } from '@prisma/client';
 import * as dotenv from 'dotenv';
 
@@ -48,7 +54,13 @@ export {
     DisciplinaryAction, DisciplinaryActionType, DisciplinaryActionStatus,
     ReportRequest, ReportRequestStatus,
     StudentPreviousSchool, StudentWarning, ParentSummons, DMRollCall, DMRollCallEntry,
-    HealthCondition, MakeupStatus, SummonsTrigger, SummonsStatus, RollCallSlot, DMRollCallStatus, WarningReason
+    HealthCondition, MakeupStatus, SummonsTrigger, SummonsStatus, RollCallSlot, DMRollCallStatus, WarningReason,
+    NurseVisitLog, TeacherPeriodAttendance, TeacherPeriodAttendanceStatus,
+    SalaryProfile, SalaryChangeRequest, SalaryAllowance, PayPeriod, SalaryPayment, SalaryWithholding, BursarCashInjection,
+    SalaryType, SalaryProfileStatus, SalaryAllowanceType, SalaryApprovalStatus, PayPeriodStatus, SalaryPaymentStatus, WithholdingScope, BursarCashInjectionSource,
+    ReamStockLedger, ReamStockEntryType,
+    Task, TaskPriority, TaskStatus, NotificationCategory, NotificationPriority,
+    UserSettings, Theme
 };
 
 export default prisma; 

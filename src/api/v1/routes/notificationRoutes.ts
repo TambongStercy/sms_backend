@@ -7,7 +7,10 @@ import {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     getUnreadNotificationCount,
-    deleteNotification
+    getUnreadBreakdown,
+    deleteNotification,
+    getPushStatus,
+    sendTestPush,
 } from '../controllers/notificationController';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -23,6 +26,12 @@ router.get('/me',
 router.get('/me/unread-count',
     authenticate,
     getUnreadNotificationCount
+);
+
+// Grouped unread breakdown by category (badges per section)
+router.get('/me/unread-breakdown',
+    authenticate,
+    getUnreadBreakdown
 );
 
 // Mark all of a user's notifications as read
@@ -59,4 +68,18 @@ router.post('/send-bulk',
     sendBulkNotifications
 );
 
-export default router; 
+// Diagnostics: verify OneSignal credentials (SUPER_MANAGER only)
+router.get('/push-status',
+    authenticate,
+    authorize(['SUPER_MANAGER']),
+    getPushStatus
+);
+
+// Send a test push (SUPER_MANAGER only). Body: { userId?, title?, message?, deliverInApp? }
+router.post('/test-push',
+    authenticate,
+    authorize(['SUPER_MANAGER']),
+    sendTestPush
+);
+
+export default router;

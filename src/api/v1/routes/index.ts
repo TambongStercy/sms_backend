@@ -44,6 +44,11 @@ import seizedItemRoutes from './seizedItemRoutes';
 import managerRoutes from './managerRoutes';
 import subjectSchemeRoutes from './subjectSchemeRoutes';
 import logbookRoutes from './logbookRoutes';
+import nurseRoutes from './nurseRoutes';
+import salaryRoutes from './salaryRoutes';
+import reamStockRoutes from './reamStockRoutes';
+import taskRoutes from './taskRoutes';
+import superManagerOverviewRoutes from './superManagerOverviewRoutes';
 import express from 'express';
 import path from 'path';
 import * as disciplineController from '../controllers/disciplineController';
@@ -176,5 +181,20 @@ router.use('/subject-schemes', subjectSchemeRoutes);
 
 // Teacher logbook (records of lessons taught against the scheme)
 router.use('/logbook', logbookRoutes);
+
+// Nurse: student health profiles + infirmary visit logs
+router.use('/nurse', nurseRoutes);
+
+// Salary management: profiles, allowances, pay periods, withholdings, bursar cash summary
+router.use('/salary', salaryRoutes);
+
+// Ream (paper) stock ledger: receipts + issuances with reason
+router.use('/reams', reamStockRoutes);
+
+// Tasks (assign + track): senior delegates, assignee updates progress
+router.use('/tasks', taskRoutes);
+
+// Super Manager read-only overview / metrics endpoints for dashboards & charts
+router.use('/super-manager/overview', superManagerOverviewRoutes);
 
 export default router;

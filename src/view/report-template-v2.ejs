@@ -1,0 +1,374 @@
+<!-- report-template-v2.ejs — preprod1 prototype -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Report v2 - ST STEPHEN'S INTERNATIONAL COLLEGE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            @page {
+                size: A3 portrait;
+                margin: 0;
+            }
+        }
+
+        .avg-circle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 4rem;
+            height: 4rem;
+            border-radius: 9999px;
+            border: 2.5px solid #dc2626;
+            color: #dc2626;
+            font-weight: 700;
+            font-size: 0.95rem;
+            line-height: 1;
+            padding: 0 2px;
+            box-sizing: border-box;
+        }
+
+        .sig-line {
+            display: inline-block;
+            border-bottom: 1px solid #4b5563;
+            width: 90%;
+            height: 1em;
+        }
+    </style>
+</head>
+
+<body class="bg-white font-sans text-xs">
+    <div class="container mx-auto p-4 max-w-4xl bg-center bg-opacity-10 relative">
+
+        <!-- Bilingual Header -->
+        <div class="flex justify-between mb-4 border-b-2 border-black pb-2">
+            <div class="text-center">
+                <p class="font-bold">REPUBLIC OF CAMEROON</p>
+                <p>MINISTRY OF SECONDARY EDUCATION</p>
+                <p>REGIONAL DELEGATION FOR CENTRE</p>
+                <p>DIVISIONAL DELEGATION OF MFOUNDI</p>
+            </div>
+            <div class="text-center w-1/2 flex justify-center">
+                <img class="w-32"
+                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSGiqMOxJRLKN518xigHT9avaGphvFOCaDwqg&s"
+                    alt="">
+            </div>
+            <div class="text-center">
+                <p class="font-bold">REPUBLIQUE DU CAMEROUN</p>
+                <p>MINISTERE DES ENSEIGNEMENTS SECONDAIRES</p>
+                <p>DELEGATION REGIONALE DU CENTRE</p>
+                <p>DELEGATION DEPARTEMENTALE DU MFOUNDI</p>
+            </div>
+        </div>
+
+        <!-- School Information -->
+        <div class="text-center mb-4">
+            <h1 class="font-bold text-4xl">ST STEPHEN'S INTERNATIONAL COLLEGE</h1>
+            <p class="italic">Excellence for Higher Heights</p>
+            <p>Yaounde Essono city Damas</p>
+            <p>Tel: (+237)680 188 080/681 630 435</p>
+        </div>
+
+        <!-- Report Card Header -->
+        <div class="text-center py-2 mb-2">
+            <h2 class="font-bold uppercase text-lg">REPORT CARD</h2>
+            <p class="font-bold"><%= classInfo.academicYear %> / Evaluation N° <%= examSequence.sequenceNumber %></p>
+        </div>
+
+        <%
+            // Level bucket: 'F1_F2' | 'F3_F5' | 'LSS_USS'
+            const levelBucket = classInfo.levelBucket;
+
+            // Pass mark by form
+            const passMark = classInfo.passMark;
+
+            // Grading meaning
+            function gradeMeaning(letter) {
+                switch (letter) {
+                    case 'A+':
+                    case 'A':  return 'Competences Very Well Acquired';
+                    case 'B+':
+                    case 'B':  return 'Competences Well Acquired';
+                    case 'C+': return 'Competences Acquired';
+                    case 'C':  return 'Competences Averagely Acquired';
+                    case 'D':  return 'Competences Non Acquired';
+                    // LSS/USS 6-tier
+                    case 'E':  return 'Weak Pass';
+                    case 'F':  return 'Fail';
+                    default:   return '';
+                }
+            }
+
+            // Grade points scheme
+            function gradePoints(letter) {
+                if (levelBucket === 'F3_F5') {
+                    if (letter === 'A+' || letter === 'A') return 3;
+                    if (letter === 'B+' || letter === 'B') return 2;
+                    if (letter === 'C+' || letter === 'C') return 1;
+                    return 0;
+                }
+                if (levelBucket === 'LSS_USS') {
+                    if (letter === 'A') return 5;
+                    if (letter === 'B') return 4;
+                    if (letter === 'C') return 3;
+                    if (letter === 'D') return 2;
+                    if (letter === 'E') return 1;
+                    return 0; // F
+                }
+                return 0;
+            }
+
+            const showGradePoints = (levelBucket === 'F3_F5' || levelBucket === 'LSS_USS');
+
+            // Aggregate grade points
+            let totalPts = 0;
+            subjects.forEach(s => { totalPts += gradePoints(s.grade); });
+        %>
+
+        <!-- Student Information -->
+        <div class="flex justify-between items-start mb-4">
+            <div class="w-2/3">
+                <span class="font-bold text-xl"><%= student.name %></span>
+                <div class="mt-2">
+                    <p>Date of birth: <span class="font-bold"><%= student.dateOfBirth %></span></p>
+                    <p>Gender: <span class="font-bold"><%= student.gender %></span></p>
+                    <p>Registration number: <span class="font-bold"><%= student.matricule %></span></p>
+                    <p>Repeater: <span class="font-bold"><%= student.repeater ? 'Yes' : 'No' %></span></p>
+                </div>
+            </div>
+
+            <div class="w-1/3 text-right pt-9">
+                <p>Class: <span class="font-bold"><%= classInfo.className %></span></p>
+                <p>Enrolled: <span class="font-bold"><%= classInfo.enrolledStudents %></span></p>
+                <p>Class Master: <span class="font-bold"><%= classInfo.classMaster %></span></p>
+            </div>
+
+            <div class="m-3">
+                <img class="w-24 h-24 object-cover rounded-lg"
+                    src="<%= photoUtils.getPhotoAsDataUri(student.photo) %>" alt="Student Photo">
+            </div>
+        </div>
+
+        <!-- Subjects Table -->
+        <div class="mb-6">
+            <% const categoriesList = [...new Set(subjects.map(s => s.category))]; %>
+            <% categoriesList.forEach((category, index) => { %>
+                <% const categorySummary = categorySummaries.find(cs => cs.category === category); %>
+                <% const catSubjects = subjects.filter(s => s.category === category); %>
+                <% let catPts = 0; catSubjects.forEach(s => { catPts += gradePoints(s.grade); }); %>
+                <table class="w-full border-collapse mb-5">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="border p-1 text-left w-2/5 uppercase"><%= category.replace(/_/g, ' ') %></th>
+                            <th class="border p-1">Mark</th>
+                            <th class="border p-1">Coef</th>
+                            <th class="border p-1">Mark×Coef</th>
+                            <th class="border p-1">Rk</th>
+                            <th class="border p-1">Grade</th>
+                            <th class="border p-1 w-1/5">Remarks</th>
+                            <% if (showGradePoints) { %><th class="border p-1">Pts</th><% } %>
+                            <th class="border p-1 w-1/6">Sig.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% catSubjects.forEach(subject => { %>
+                            <tr>
+                                <td class="border p-1">
+                                    <div class="font-bold"><%= subject.name %></div>
+                                    <div class="text-gray-600 text-[10px]"><%= subject.teacher %></div>
+                                </td>
+                                <td class="border p-1 text-center"><%= subject.mark.toFixed(2) %></td>
+                                <td class="border p-1 text-center"><%= subject.coefficient %></td>
+                                <td class="border p-1 text-center"><%= subject.weightedMark.toFixed(2) %></td>
+                                <td class="border p-1 text-center"><%= subject.rank %></td>
+                                <td class="border p-1 text-center font-semibold"><%= subject.grade %></td>
+                                <td class="border p-1 text-[10px]"><%= gradeMeaning(subject.grade) %></td>
+                                <% if (showGradePoints) { %>
+                                    <td class="border p-1 text-center font-semibold"><%= gradePoints(subject.grade) %></td>
+                                <% } %>
+                                <td class="border p-1 text-center"><span class="sig-line"></span></td>
+                            </tr>
+                        <% }) %>
+
+                        <!-- Category summary -->
+                        <tr class="bg-yellow-100">
+                            <td class="p-1 font-bold">Summary</td>
+                            <td class="border p-1 text-center"><%= categorySummary.totalMark.toFixed(2) %></td>
+                            <td class="border p-1 text-center"><%= categorySummary.totalCoef %></td>
+                            <td class="border p-1 text-center"><%= categorySummary.totalWeightedMark.toFixed(2) %></td>
+                            <td class="border p-1 text-center"><%= categorySummary.categoryRank %></td>
+                            <td class="border p-1 text-center font-semibold"><%= categorySummary.categoryGrade %></td>
+                            <td class="border p-1 text-[10px]"><%= gradeMeaning(categorySummary.categoryGrade) %></td>
+                            <% if (showGradePoints) { %>
+                                <td class="border p-1 text-center font-semibold"><%= catPts %></td>
+                            <% } %>
+                            <td class="border p-1"></td>
+                        </tr>
+
+                        <!-- Total row on last category -->
+                        <% if (categoriesList.length - 1 === index) { %>
+                            <tr class="bg-gray-200">
+                                <td class="p-1 font-bold text-center text-lg">TOTAL</td>
+                                <td class="p-1 text-center"><%= totals.totalMark.toFixed(2) %></td>
+                                <td class="p-1 text-center"><%= totals.totalCoef %></td>
+                                <td class="p-1 text-center"><%= totals.totalWeightedMark.toFixed(2) %></td>
+                                <td class="p-1 text-center"><%= statistics.rank %></td>
+                                <td class="p-1 text-center font-semibold"><%= totals.overallGrade %></td>
+                                <td class="p-1 text-[10px]"><%= gradeMeaning(totals.overallGrade) %></td>
+                                <% if (showGradePoints) { %>
+                                    <td class="p-1 text-center font-semibold"><%= totalPts %></td>
+                                <% } %>
+                                <td class="p-1 text-center text-sm">
+                                    Avg: <span class="font-bold"><%= totals.overallAverage.toFixed(2) %></span>
+                                </td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            <% }) %>
+        </div>
+
+        <!-- Grades Legend + Student Stats + Discipline/Work -->
+        <div class="flex items-start gap-2">
+            <!-- Grades Legend -->
+            <table class="w-1/4 table-auto text-center">
+                <thead>
+                    <tr>
+                        <td colspan="3"><h2 class="font-bold text-lg text-center">Grading Scale</h2></td>
+                    </tr>
+                </thead>
+                <tbody class="text-[10px]">
+                    <% if (levelBucket === 'LSS_USS') { %>
+                        <tr><td class="border">[16.0 ; 20.0]</td><td class="border text-green-600 font-semibold">A</td><td class="border text-left text-[8px]">Excellent (5 pts)</td></tr>
+                        <tr class="bg-gray-50"><td class="border">[14.0 ; 16.0[</td><td class="border text-green-500 font-semibold">B</td><td class="border text-left text-[8px]">Very Good (4 pts)</td></tr>
+                        <tr><td class="border">[12.0 ; 14.0[</td><td class="border text-yellow-500 font-semibold">C</td><td class="border text-left text-[8px]">Good (3 pts)</td></tr>
+                        <tr class="bg-gray-50"><td class="border">[10.0 ; 12.0[</td><td class="border text-yellow-400 font-semibold">D</td><td class="border text-left text-[8px]">Pass (2 pts)</td></tr>
+                        <tr><td class="border">[08.0 ; 10.0[</td><td class="border text-orange-500 font-semibold">E</td><td class="border text-left text-[8px]">Weak Pass (1 pt)</td></tr>
+                        <tr class="bg-gray-50"><td class="border">[00.0 ; 08.0[</td><td class="border text-red-500 font-semibold">F</td><td class="border text-left text-[8px]">Fail (0 pts)</td></tr>
+                    <% } else { %>
+                        <tr><td class="border">[18.0 ; 20.0]</td><td class="border text-green-600 font-semibold">A+</td><td class="border text-left text-[8px]">Competences Very Well Acquired</td></tr>
+                        <tr class="bg-gray-50"><td class="border">[16.0 ; 18.0[</td><td class="border text-green-600 font-semibold">A</td><td class="border text-left text-[8px]">Competences Very Well Acquired</td></tr>
+                        <tr><td class="border">[15.0 ; 16.0[</td><td class="border text-yellow-500 font-semibold">B+</td><td class="border text-left text-[8px]">Competences Well Acquired</td></tr>
+                        <tr class="bg-gray-50"><td class="border">[14.0 ; 15.0[</td><td class="border text-yellow-500 font-semibold">B</td><td class="border text-left text-[8px]">Competences Well Acquired</td></tr>
+                        <tr><td class="border">[12.0 ; 14.0[</td><td class="border text-yellow-400 font-semibold">C+</td><td class="border text-left text-[8px]">Competences Acquired</td></tr>
+                        <tr class="bg-gray-50"><td class="border">[10.0 ; 12.0[</td><td class="border text-red-400 font-semibold">C</td><td class="border text-left text-[8px]">Competences Averagely Acquired</td></tr>
+                        <tr><td class="border">[00.0 ; 10.0[</td><td class="border text-red-500 font-semibold">D</td><td class="border text-left text-[8px]">Competences Non Acquired</td></tr>
+                    <% } %>
+                </tbody>
+            </table>
+
+            <!-- Student Stats (encircled avg) -->
+            <div class="w-1/3">
+                <div class="border p-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-lg font-semibold">Subjects Passed</span>
+                        <span class="text-lg"><%= statistics.subjectsPassed %> / <%= subjects.length %></span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 -mt-2 mb-3">
+                        Pass mark: <%= passMark %>/20
+                    </div>
+
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-lg font-semibold">Overall Avg./20</span>
+                        <span class="avg-circle"><%= statistics.overallAverage %></span>
+                    </div>
+
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-lg font-semibold">Rank</span>
+                        <span class="text-lg font-bold"><%= statistics.rank %></span>
+                    </div>
+
+                    <% if (showGradePoints) { %>
+                        <div class="flex justify-between items-center border-t pt-2 mt-2">
+                            <span class="text-lg font-semibold">Grade Points (Total)</span>
+                            <span class="text-lg font-bold text-blue-700"><%= totalPts %></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm">GPA</span>
+                            <span class="text-sm font-bold text-blue-700">
+                                <%= totals.totalCoef > 0 ? (totalPts / subjects.length).toFixed(2) : '0.00' %>
+                            </span>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- Discipline / Work (unchanged) -->
+            <div class="w-2/5 flex gap-1">
+                <div class="w-1/2 p-1">
+                    <h2 class="font-bold text-sm mb-2 text-center">Discipline</h2>
+                    <table class="w-full table-auto text-center border-collapse text-[10px]">
+                        <tbody>
+                            <tr class="bg-white border"><td class="pl-1 text-left">Justified absences (h)</td><td>-</td></tr>
+                            <tr class="bg-gray-50 border"><td class="pl-1 text-left">Unjustified absences (h)</td><td>-</td></tr>
+                            <tr class="bg-white border"><td class="pl-1 text-left">Justified lateness (h)</td><td>-</td></tr>
+                            <tr class="bg-gray-50 border"><td class="pl-1 text-left">Unjustified lateness (h)</td><td>-</td></tr>
+                            <tr class="bg-white border"><td class="pl-1 text-left">Detention (h)</td><td>-</td></tr>
+                            <tr class="bg-gray-50 border"><td class="pl-1 text-left">Warnings</td><td>-</td></tr>
+                            <tr class="bg-white border"><td class="pl-1 text-left">Serious warnings</td><td>-</td></tr>
+                            <tr class="bg-gray-50 border"><td class="pl-1 text-left">Exclusion (d)</td><td>-</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="w-1/2 p-1">
+                    <h2 class="font-bold text-sm mb-2 text-center">Work</h2>
+                    <table class="w-full table-auto text-center border-collapse text-[10px]">
+                        <tbody>
+                            <tr class="bg-white border"><td class="pl-1 text-left">Honour roll</td><td>-</td></tr>
+                            <tr class="bg-gray-50 border"><td class="pl-1 text-left">Encouragements</td><td>-</td></tr>
+                            <tr class="bg-white border"><td class="pl-1 text-left">Congratulations</td><td>-</td></tr>
+                            <tr class="bg-gray-50 border"><td class="pl-1 text-left">Warning</td><td>-</td></tr>
+                            <tr class="bg-white border"><td class="pl-1 text-left">Serious warning</td><td>-</td></tr>
+                            <tr><td colspan="2" class="text-xl font-semibold text-red-500 h-16"><%= totals.overallGrade %></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Class Master Remarks -->
+        <div class="mt-4 border-2 border-gray-700 p-3">
+            <div class="flex justify-between mb-2">
+                <span class="font-bold text-sm uppercase">Class Master's Remarks</span>
+                <span class="text-[10px] text-gray-500">Comments on academic performance, behaviour, and progress</span>
+            </div>
+            <div style="min-height: 4.5rem;"></div>
+            <div class="flex justify-end mt-2">
+                <div class="text-xs">
+                    Signature: <span class="sig-line" style="width: 200px;"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-white p-4 border-t-2 mt-4">
+            <div class="flex justify-between">
+                <div class="text-sm font-semibold"><p>Parent</p></div>
+                <div class="text-sm font-semibold text-center"><p>Class Master</p></div>
+                <div class="text-sm font-semibold text-right">
+                    <p><%= classInfo.reportDate %></p>
+                    <p>Principal</p>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-16">
+                <div class="text-sm font-semibold">
+                    <p class="text-xs w-2/3">
+                        ST STEPHEN'S INTERNATIONAL COLLEGE / <%= classInfo.academicYear %> /
+                        <%= classInfo.className %> / Evaluation N° <%= examSequence.sequenceNumber %> /
+                        <%= student.name %>
+                    </p>
+                </div>
+                <div class="text-sm font-semibold">
+                    <p class="text-center text-xs">preprod1 · Simpala.net</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+
+</html>

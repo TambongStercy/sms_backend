@@ -29,6 +29,7 @@ model AcademicYear {
   admitted_students            Student[]                   @relation("StudentAdmissionYear")
   dm_roll_calls                DMRollCall[]
   teacher_roll_calls           TeacherRollCall[]
+  teacher_period_attendances   TeacherPeriodAttendance[]
   seized_items                 SeizedItem[]
   teacher_periods              TeacherPeriod[]
   terms                        Term[]
@@ -38,6 +39,10 @@ model AcademicYear {
   UserRole                     UserRole[]
   fee_items                    FeeItem[]
   subject_schemes              SubjectScheme[]
+  salary_profiles              SalaryProfile[]
+  pay_periods                  PayPeriod[]
+  bursar_cash_injections       BursarCashInjection[]
+  period_sets                  PeriodSet[]
 }
 
 model User {
@@ -124,12 +129,59 @@ model User {
   parent_summons_created        ParentSummons[]             @relation("SummonsCreatedBy")
   dm_roll_calls_recorded        DMRollCall[]                @relation("DMRollCallRecordedBy")
   teacher_roll_calls_recorded   TeacherRollCall[]           @relation("TeacherRollCallRecordedBy")
+  teacher_period_attendances_recorded TeacherPeriodAttendance[] @relation("TeacherPeriodAttendanceRecordedBy")
   seized_items_seized           SeizedItem[]                @relation("SeizedItemSeizedBy")
   seized_items_in_custody       SeizedItem[]                @relation("SeizedItemCustodian")
   seized_items_released_to      SeizedItem[]                @relation("SeizedItemReleasedTo")
   seized_item_transfers_sent    SeizedItemTransfer[]        @relation("SeizedItemTransferFrom")
   seized_item_transfers_received SeizedItemTransfer[]       @relation("SeizedItemTransferTo")
   seized_item_transfers_resolved SeizedItemTransfer[]       @relation("SeizedItemTransferResolvedBy")
+  // Nurse
+  nurse_visit_logs               NurseVisitLog[]             @relation("NurseVisitLoggedBy")
+  // Ream (paper) stock
+  ream_ledger_recorded           ReamStockLedger[]           @relation("ReamStockLedgerRecordedBy")
+  ream_ledger_received           ReamStockLedger[]           @relation("ReamStockLedgerRecipient")
+  // Notifications: sender side (recipient side already covered by `mobile_notifications`)
+  notifications_sent             MobileNotification[]        @relation("NotificationSender")
+  // Tasks
+  tasks_assigned_to              Task[]                      @relation("TaskAssignedTo")
+  tasks_assigned_by              Task[]                      @relation("TaskAssignedBy")
+  // Salary management
+  salary_profile                 SalaryProfile[]             @relation("SalaryProfileUser")
+  salary_profiles_created        SalaryProfile[]             @relation("SalaryProfileCreatedBy")
+  salary_profiles_approved       SalaryProfile[]             @relation("SalaryProfileApprovedBy")
+  salary_change_requests_made    SalaryChangeRequest[]       @relation("SalaryChangeRequestRequestedBy")
+  salary_change_requests_acted   SalaryChangeRequest[]       @relation("SalaryChangeRequestApprovedBy")
+  salary_allowances_requested    SalaryAllowance[]           @relation("SalaryAllowanceRequestedBy")
+  salary_allowances_approved     SalaryAllowance[]           @relation("SalaryAllowanceApprovedBy")
+  pay_periods_created            PayPeriod[]                 @relation("PayPeriodCreatedBy")
+  salary_payments                SalaryPayment[]             @relation("SalaryPaymentUser")
+  salary_payments_paid           SalaryPayment[]             @relation("SalaryPaymentPaidBy")
+  salary_withholdings_requested  SalaryWithholding[]         @relation("SalaryWithholdingRequestedBy")
+  salary_withholdings_approved   SalaryWithholding[]         @relation("SalaryWithholdingApprovedBy")
+  bursar_cash_injections         BursarCashInjection[]       @relation("BursarCashInjectedBy")
+  // Per-user preferences (theme, language, notification toggles, quiet hours)
+  settings                       UserSettings?
+}
+
+model UserSettings {
+  id                   Int                    @id @default(autoincrement())
+  user_id              Int                    @unique
+  theme                Theme                  @default(SYSTEM)
+  language             String                 @default("en")
+  timezone             String                 @default("Africa/Douala")
+  notifications_email  Boolean                @default(true)
+  notifications_sms    Boolean                @default(false)
+  notifications_push   Boolean                @default(true)
+  notifications_in_app Boolean                @default(true)
+  quiet_hours_enabled  Boolean                @default(false)
+  quiet_hours_start    String? // HH:MM 24h
+  quiet_hours_end      String? // HH:MM 24h
+  muted_categories     NotificationCategory[] @default([])
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model UserRole {
@@ -182,6 +234,10 @@ model Class {
   max_students      Int             @default(80) // Maximum 80 students per class
   pass_mark         Float           @default(10.0) // Minimum annual average to be promoted to next_class
   next_class_id     Int? // Linear progression target; null = terminal (graduates) or manual choice (e.g. FORM 5 → arts/science)
+  // Which bell schedule the class follows. Nullable so legacy classes without an
+  // assignment continue to render, but /timetables/subclass and bulk-update
+  // require it before slots can be assigned. Reassigning is one row update.
+  period_set_id     Int?
   created_at        DateTime        @default(now())
   updated_at        DateTime        @updatedAt
   // Simplified fee structure
@@ -198,6 +254,7 @@ model Class {
   previous_classes  Class[]         @relation("ClassProgression")
   fee_items         FeeItem[]
   subject_schemes   SubjectScheme[]
+  period_set        PeriodSet?      @relation(fields: [period_set_id], references: [id])
 }
 
 model SubClass {
@@ -297,6 +354,7 @@ model Enrollment {
   dm_roll_call_entries         DMRollCallEntry[]
   teacher_roll_call_entries    TeacherRollCallEntry[]
   seized_items                 SeizedItem[]
+  nurse_visit_logs             NurseVisitLog[]
 
   @@unique([student_id, academic_year_id])
   @@index([sub_class_id, academic_year_id])
@@ -497,16 +555,56 @@ model Mark {
   @@index([sub_class_subject_id, exam_sequence_id])
 }
 
-model Period {
-  id              Int             @id @default(autoincrement())
-  day_of_week     DayOfWeek
-  start_time      String
-  end_time        String
-  is_break        Boolean         @default(false)
-  name            String
-  teacher_periods TeacherPeriod[]
+// Bell schedule: a named group of periods (e.g. FIRST_CYCLE, SECOND_CYCLE) that
+// pins the exact start/end times used by classes assigned to it. Two sets can
+// coexist in the same academic year so different groups of classes run
+// different rhythms without one global period list clobbering the other.
+model PeriodSet {
+  id               Int          @id @default(autoincrement())
+  code             String       // Machine key: FIRST_CYCLE, SECOND_CYCLE, ...
+  name             String       // Human label
+  academic_year_id Int
+  description      String?
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
 
-  @@unique([day_of_week, start_time, end_time])
+  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
+  periods          Period[]
+  classes          Class[]
+
+  @@unique([code, academic_year_id])
+  @@index([academic_year_id])
+}
+
+model Period {
+  id                Int             @id @default(autoincrement())
+  day_of_week       DayOfWeek
+  start_time        String
+  end_time          String
+  // Retained for backwards compatibility; new callers should read `type`.
+  is_break          Boolean         @default(false)
+  // TEACHING = billable instructional slot; BREAK = recess (no teacher);
+  // PREP = supervised study block outside the teaching grid (e.g. 15:40–17:30).
+  // Kept as a discrete field so roll-call / attendance / clash logic can
+  // treat PREP separately from a bare break.
+  type              PeriodType      @default(TEACHING)
+  // Ordinal within the day for its own period_set (1..N). Lets the frontend
+  // grid render columns in insertion order without string-sorting names.
+  sequence          Int             @default(0)
+  name              String
+  period_set_id     Int?
+  period_set        PeriodSet?      @relation(fields: [period_set_id], references: [id])
+  teacher_periods   TeacherPeriod[]
+  nurse_visit_logs  NurseVisitLog[]
+
+  @@unique([day_of_week, start_time, end_time, period_set_id])
+  @@index([period_set_id, day_of_week, sequence])
+}
+
+enum PeriodType {
+  TEACHING
+  BREAK
+  PREP
 }
 
 model TeacherPeriod {
@@ -530,6 +628,7 @@ model TeacherPeriod {
 
   logbook_entries LogbookEntry[]
   teacher_roll_calls TeacherRollCall[]
+  teacher_period_attendances TeacherPeriodAttendance[]
 
   // Prevents a teacher from being booked in two different classes at the same time.
   @@unique([teacher_id, period_id, academic_year_id], name: "teacher_period_unique")
@@ -593,14 +692,29 @@ model Announcement {
 }
 
 model MobileNotification {
-  id         Int                @id @default(autoincrement())
-  user_id    Int
-  message    String
-  date_sent  DateTime           @default(now())
-  status     NotificationStatus @default(SENT)
-  created_at DateTime           @default(now())
-  updated_at DateTime           @updatedAt
-  user       User               @relation(fields: [user_id], references: [id])
+  id          Int                  @id @default(autoincrement())
+  user_id     Int
+  sender_id   Int? // Actor who triggered this notification, if any
+  title       String? // Short heading (e.g. "Allowance needs your approval")
+  message     String
+  category    NotificationCategory @default(GENERAL)
+  priority    NotificationPriority @default(NORMAL) // HIGH / URGENT trigger a client-side popup
+  entity_type String? // e.g. "SalaryChangeRequest", "SalaryAllowance", "Task"
+  entity_id   Int? // ID of the entity the notification refers to
+  action_url  String? // Optional deep-link the frontend can route to
+  date_sent   DateTime             @default(now())
+  read_at     DateTime? // When the user marked it read
+  status      NotificationStatus   @default(SENT)
+  created_at  DateTime             @default(now())
+  updated_at  DateTime             @updatedAt
+
+  user   User  @relation(fields: [user_id], references: [id])
+  sender User? @relation("NotificationSender", fields: [sender_id], references: [id])
+
+  @@index([user_id, status])
+  @@index([user_id, category])
+  @@index([user_id, priority])
+  @@index([entity_type, entity_id])
 }
 
 model Question {
@@ -894,9 +1008,36 @@ enum NotificationStatus {
   READ
 }
 
+enum NotificationCategory {
+  GENERAL
+  ANNOUNCEMENT
+  TASK_ASSIGNED
+  TASK_UPDATE
+  APPROVAL_NEEDED
+  APPROVAL_APPROVED
+  APPROVAL_REJECTED
+  SALARY_UPDATE
+  FEE_UPDATE
+  DISCIPLINE
+  SYSTEM
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 enum QuestionType {
   MCQ
   LONG_ANSWER
+}
+
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
 }
 
 enum Role {
@@ -1465,10 +1606,37 @@ model BrokenProperty {
   @@index([reported_by_id])
 }
 
+// Nurse-visit log: a student came to the infirmary. Only reason is required;
+// the period, treatment, medication and notes are all optional so the nurse
+// can capture a quick entry and fill in details later.
+model NurseVisitLog {
+  id                Int         @id @default(autoincrement())
+  enrollment_id     Int
+  period_id         Int?
+  visit_date        DateTime    @default(now())
+  reason            String
+  treatment_given   String?
+  medication_given  String?
+  notes             String?
+  sent_home         Boolean     @default(false)
+  logged_by_id      Int
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @updatedAt
+  enrollment        Enrollment  @relation(fields: [enrollment_id], references: [id])
+  period            Period?     @relation(fields: [period_id], references: [id])
+  logged_by         User        @relation("NurseVisitLoggedBy", fields: [logged_by_id], references: [id])
+
+  @@index([enrollment_id])
+  @@index([logged_by_id])
+  @@index([visit_date])
+}
+
 // Generic bursar-initiated request that needs an action by someone else:
 // FEE_REDUCTION (Principal approves/rejects, manual fee adjustment after),
 // PERSONNEL_DISBURSEMENT (recipient confirms receipt),
-// BANK_VERIFICATION (whoever goes to the bank marks completed once checked).
+// BANK_VERIFICATION (whoever goes to the bank marks completed once checked),
+// PAYMENT_CLAIM (parent/user submits proof of a payment; Bursar validates → creates PaymentTransaction),
+// REFUND (Bursar initiates a refund on overpayment; Super Manager approves → creates Refund).
 model FinanceRequest {
   id              Int                  @id @default(autoincrement())
   type            FinanceRequestType
@@ -1495,6 +1663,8 @@ enum FinanceRequestType {
   FEE_REDUCTION
   PERSONNEL_DISBURSEMENT
   BANK_VERIFICATION
+  PAYMENT_CLAIM
+  REFUND
 }
 
 enum FinanceRequestStatus {
@@ -1786,6 +1956,43 @@ enum TeacherRollCallStatus {
   ABSENT
 }
 
+// ---------- DM Evaluation of Teacher per Period ----------
+// The DM assigned to a sub-class (via RoleAssignment) walks the periods and
+// marks the teacher's presence plus behavioural checkboxes: well-dressed,
+// class management, punctuality, assiduity. Keyed on (teacher_period_id, date)
+// so a weekly timetable slot yields one record per calendar day.
+
+model TeacherPeriodAttendance {
+  id                Int                          @id @default(autoincrement())
+  teacher_period_id Int
+  academic_year_id  Int
+  date              DateTime
+  status            TeacherPeriodAttendanceStatus
+  well_dressed      Boolean                      @default(false)
+  class_management  Boolean                      @default(false)
+  punctuality       Boolean                      @default(false)
+  assiduity         Boolean                      @default(false)
+  reason            String?
+  notes             String?
+  recorded_by_id    Int
+  created_at        DateTime                     @default(now())
+  updated_at        DateTime                     @updatedAt
+
+  teacher_period TeacherPeriod @relation(fields: [teacher_period_id], references: [id], onDelete: Cascade)
+  academic_year  AcademicYear  @relation(fields: [academic_year_id], references: [id])
+  recorded_by    User          @relation("TeacherPeriodAttendanceRecordedBy", fields: [recorded_by_id], references: [id])
+
+  @@unique([teacher_period_id, date])
+  @@index([academic_year_id, date])
+  @@index([date])
+}
+
+enum TeacherPeriodAttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
+
 // ---------- Seized Items ----------
 // A DM (or senior discipline role) records an item taken from a student and
 // can transfer custody up the chain, typically to the Principal. Transfers
@@ -1952,4 +2159,312 @@ enum InventoryLedgerReason {
   TRANSFER_SENT
   TRANSFER_RECEIVED
   TRANSFER_REFUNDED
+}
+
+// ---------- Salary Management ----------
+// Two personnel salary types:
+//   - TEACHER_HOURLY: per-hour rate; net computed from attendance in a pay period.
+//   - ADMIN_FIXED:    flat base salary regardless of hours worked in the month.
+//
+// Workflow: Manager proposes profiles / rate changes / allowances / withholdings
+// with reasons; Super Manager validates. Super Manager may also create profiles
+// directly (auto-approved). Salaries pay on the last Friday of each month.
+
+model SalaryProfile {
+  id               Int                 @id @default(autoincrement())
+  user_id          Int
+  academic_year_id Int
+  salary_type      SalaryType
+  hourly_rate      Float? // Required when salary_type = TEACHER_HOURLY
+  base_salary      Float? // Required when salary_type = ADMIN_FIXED
+  status           SalaryProfileStatus @default(PENDING_APPROVAL)
+  notes            String?
+  created_by_id    Int
+  approved_by_id   Int?
+  approved_at      DateTime?
+  rejection_reason String?
+  created_at       DateTime            @default(now())
+  updated_at       DateTime            @updatedAt
+
+  user             User          @relation("SalaryProfileUser", fields: [user_id], references: [id])
+  academic_year    AcademicYear  @relation(fields: [academic_year_id], references: [id])
+  created_by       User          @relation("SalaryProfileCreatedBy", fields: [created_by_id], references: [id])
+  approved_by      User?         @relation("SalaryProfileApprovedBy", fields: [approved_by_id], references: [id])
+
+  change_requests  SalaryChangeRequest[]
+  allowances       SalaryAllowance[]
+  salary_payments  SalaryPayment[]
+
+  @@unique([user_id, academic_year_id])
+  @@index([status])
+  @@index([academic_year_id, status])
+}
+
+model SalaryChangeRequest {
+  id                Int                  @id @default(autoincrement())
+  salary_profile_id Int
+  old_hourly_rate   Float?
+  new_hourly_rate   Float?
+  old_base_salary   Float?
+  new_base_salary   Float?
+  reason            String
+  status            SalaryApprovalStatus @default(PENDING)
+  requested_by_id   Int
+  approved_by_id    Int?
+  approved_at       DateTime?
+  rejection_reason  String?
+  created_at        DateTime             @default(now())
+  updated_at        DateTime             @updatedAt
+
+  salary_profile SalaryProfile @relation(fields: [salary_profile_id], references: [id], onDelete: Cascade)
+  requested_by   User          @relation("SalaryChangeRequestRequestedBy", fields: [requested_by_id], references: [id])
+  approved_by    User?         @relation("SalaryChangeRequestApprovedBy", fields: [approved_by_id], references: [id])
+
+  @@index([status])
+  @@index([salary_profile_id])
+}
+
+model SalaryAllowance {
+  id                Int                  @id @default(autoincrement())
+  salary_profile_id Int
+  pay_period_id     Int? // If set, allowance applies only to that period; otherwise applies to next generated one.
+  type              SalaryAllowanceType
+  amount            Float
+  reason            String
+  status            SalaryApprovalStatus @default(PENDING)
+  requested_by_id   Int
+  approved_by_id    Int?
+  approved_at       DateTime?
+  rejection_reason  String?
+  created_at        DateTime             @default(now())
+  updated_at        DateTime             @updatedAt
+
+  salary_profile SalaryProfile @relation(fields: [salary_profile_id], references: [id], onDelete: Cascade)
+  pay_period     PayPeriod?    @relation(fields: [pay_period_id], references: [id])
+  requested_by   User          @relation("SalaryAllowanceRequestedBy", fields: [requested_by_id], references: [id])
+  approved_by    User?         @relation("SalaryAllowanceApprovedBy", fields: [approved_by_id], references: [id])
+
+  @@index([status])
+  @@index([salary_profile_id])
+  @@index([pay_period_id])
+}
+
+model PayPeriod {
+  id               Int             @id @default(autoincrement())
+  academic_year_id Int
+  year             Int
+  month            Int // 1-12 (calendar month the period represents)
+  start_date       DateTime
+  end_date         DateTime
+  pay_date         DateTime // Auto = last Friday of the calendar month
+  week_start_dates Json // Array of ISO date strings; manager-assigned weeks to include when computing teacher hours
+  status           PayPeriodStatus @default(OPEN)
+  notes            String?
+  created_by_id    Int
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+
+  academic_year   AcademicYear      @relation(fields: [academic_year_id], references: [id])
+  created_by      User              @relation("PayPeriodCreatedBy", fields: [created_by_id], references: [id])
+  salary_payments SalaryPayment[]
+  allowances      SalaryAllowance[]
+
+  @@unique([academic_year_id, year, month])
+  @@index([status])
+}
+
+model SalaryPayment {
+  id                Int                 @id @default(autoincrement())
+  salary_profile_id Int
+  pay_period_id     Int
+  user_id           Int
+  salary_type       SalaryType
+  hours_expected    Float               @default(0) // scheduled hours in period (teachers)
+  hours_taught      Float               @default(0) // PRESENT + LATE (teachers)
+  hours_absent      Float               @default(0) // ABSENT (teachers)
+  hourly_rate       Float? // snapshot at generation time
+  base_amount       Float               @default(0) // hourly_rate * hours_taught (teacher) OR base_salary (admin)
+  allowance_total   Float               @default(0) // sum of approved ALLOWANCE items
+  bonus_total       Float               @default(0) // sum of approved BONUS items
+  withheld_amount   Float               @default(0) // total approved withholdings
+  net_amount        Float               @default(0) // base + allowance + bonus - withheld
+  status            SalaryPaymentStatus @default(DRAFT)
+  paid_at           DateTime?
+  paid_by_id        Int?
+  notes             String?
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+
+  salary_profile SalaryProfile       @relation(fields: [salary_profile_id], references: [id])
+  pay_period     PayPeriod           @relation(fields: [pay_period_id], references: [id], onDelete: Cascade)
+  user           User                @relation("SalaryPaymentUser", fields: [user_id], references: [id])
+  paid_by        User?               @relation("SalaryPaymentPaidBy", fields: [paid_by_id], references: [id])
+  withholdings   SalaryWithholding[]
+
+  @@unique([pay_period_id, user_id])
+  @@index([status])
+  @@index([user_id])
+}
+
+model SalaryWithholding {
+  id                Int                  @id @default(autoincrement())
+  salary_payment_id Int
+  scope             WithholdingScope
+  amount            Float // For FULL, must equal current net_amount at request time
+  reason            String
+  status            SalaryApprovalStatus @default(PENDING)
+  requested_by_id   Int
+  approved_by_id    Int?
+  approved_at       DateTime?
+  rejection_reason  String?
+  created_at        DateTime             @default(now())
+  updated_at        DateTime             @updatedAt
+
+  salary_payment SalaryPayment @relation(fields: [salary_payment_id], references: [id], onDelete: Cascade)
+  requested_by   User          @relation("SalaryWithholdingRequestedBy", fields: [requested_by_id], references: [id])
+  approved_by    User?         @relation("SalaryWithholdingApprovedBy", fields: [approved_by_id], references: [id])
+
+  @@index([status])
+  @@index([salary_payment_id])
+}
+
+// Cash added to the bursar's account by a Manager or Super Manager
+// (e.g., cash top-up outside student fee collection). Counted in the
+// cash summary shown to the manager.
+model BursarCashInjection {
+  id               Int                       @id @default(autoincrement())
+  academic_year_id Int
+  amount           Float
+  source           BursarCashInjectionSource
+  reason           String
+  reference        String? // optional bank/transaction ref
+  injected_by_id   Int
+  created_at       DateTime                  @default(now())
+  updated_at       DateTime                  @updatedAt
+
+  academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
+  injected_by   User         @relation("BursarCashInjectedBy", fields: [injected_by_id], references: [id])
+
+  @@index([academic_year_id, created_at])
+  @@index([source])
+}
+
+enum SalaryType {
+  TEACHER_HOURLY
+  ADMIN_FIXED
+}
+
+enum SalaryProfileStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  INACTIVE
+  REJECTED
+}
+
+enum SalaryAllowanceType {
+  ALLOWANCE
+  BONUS
+}
+
+enum SalaryApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PayPeriodStatus {
+  OPEN
+  LOCKED
+  PAID
+}
+
+enum SalaryPaymentStatus {
+  DRAFT
+  PENDING_PAYMENT
+  WITHHELD
+  PAID
+}
+
+enum WithholdingScope {
+  PARTIAL
+  FULL
+}
+
+enum BursarCashInjectionSource {
+  MANAGER
+  SUPER_MANAGER
+  OTHER
+}
+
+// ---------- Ream (Paper) Stock ----------
+// Single central ledger for reams of printing paper.
+//   RECEIPT   → stock in (received/purchased) — recorded by Bursar / Manager / Super Manager.
+//   ISSUANCE  → stock out (given to a specific person with a reason) — recorded by Bursar / Secretary.
+// Current stock = SUM(RECEIPT.quantity) - SUM(ISSUANCE.quantity). Managers & Super Managers read.
+
+model ReamStockLedger {
+  id                Int                 @id @default(autoincrement())
+  type              ReamStockEntryType
+  quantity          Int                 // Number of reams; always positive
+  recipient_user_id Int?                // Required for ISSUANCE if recipient is a system user
+  recipient_name    String?             // Free text — used when recipient is external or not a system user
+  reason            String?             // Required for ISSUANCE
+  notes             String?
+  recorded_by_id    Int
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+
+  recorded_by  User  @relation("ReamStockLedgerRecordedBy", fields: [recorded_by_id], references: [id])
+  recipient    User? @relation("ReamStockLedgerRecipient",  fields: [recipient_user_id], references: [id])
+
+  @@index([type, created_at])
+  @@index([recorded_by_id])
+  @@index([recipient_user_id])
+}
+
+enum ReamStockEntryType {
+  RECEIPT
+  ISSUANCE
+}
+
+// ---------- Tasks ----------
+// Manager (or any senior) assigns a task to a staff member; the assignee
+// is auto-notified via MobileNotification. Progress is optional 0-100.
+
+model Task {
+  id               Int          @id @default(autoincrement())
+  title            String
+  description      String
+  priority         TaskPriority @default(MEDIUM)
+  status           TaskStatus   @default(PENDING)
+  category         String       @default("GENERAL") // Free-form label (e.g. MAINTENANCE, ADMIN, REPORT)
+  progress         Int          @default(0) // 0-100
+  deadline         DateTime?
+  assigned_to_id   Int
+  assigned_by_id   Int
+  notes            String?
+  completed_at     DateTime?
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  assigned_to User @relation("TaskAssignedTo", fields: [assigned_to_id], references: [id])
+  assigned_by User @relation("TaskAssignedBy", fields: [assigned_by_id], references: [id])
+
+  @@index([assigned_to_id, status])
+  @@index([assigned_by_id])
+  @@index([deadline])
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }

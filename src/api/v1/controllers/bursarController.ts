@@ -310,16 +310,27 @@ export const getPaymentTrends = async (req: Request, res: Response): Promise<voi
  */
 export const getDefaultersReport = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { academicYearId, minimumAmount, classId } = req.query;
+        const {
+            academicYearId,
+            minimumAmount,
+            classId,
+            subClassId,
+            includeDetails
+        } = req.query as Record<string, string | undefined>;
 
-        // This is a placeholder for future implementation
-        const defaulters = {
-            total_defaulters: 0,
-            total_outstanding: 0,
-            by_class: [],
-            by_amount_range: [],
-            students: []
+        const toNumber = (v: string | undefined) => {
+            if (v === undefined || v === '') return undefined;
+            const n = Number(v);
+            return Number.isNaN(n) ? undefined : n;
         };
+
+        const defaulters = await bursarService.getDefaultersReport({
+            academicYearId: toNumber(academicYearId),
+            minimumAmount: toNumber(minimumAmount),
+            classId: toNumber(classId),
+            subClassId: toNumber(subClassId),
+            includeDetails: includeDetails === 'true'
+        });
 
         res.status(200).json({
             success: true,

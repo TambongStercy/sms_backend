@@ -2222,7 +2222,7 @@ GET /api/v1/periods
 POST /api/v1/periods
 ```
 
-**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`
+**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `DEAN_OF_STUDIES`
 
 **Request Body:**
 ```typescript
@@ -2256,7 +2256,7 @@ POST /api/v1/periods
 PUT /api/v1/periods/:id
 ```
 
-**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`
+**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `DEAN_OF_STUDIES`
 
 **Path Parameters:**
 - `id` (number): Period ID
@@ -2293,7 +2293,7 @@ PUT /api/v1/periods/:id
 DELETE /api/v1/periods/:id
 ```
 
-**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`
+**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `DEAN_OF_STUDIES`
 
 **Path Parameters:**
 - `id` (number): Period ID
@@ -2403,16 +2403,30 @@ Authorization: Bearer <token>
 
 ## Parent Portal
 
-### Parent Dashboard
+> **No authentication.** The parent portal is a public interface: the parent
+> types their child's matricule and the frontend calls these endpoints
+> directly. No JWT / no login is involved. Knowledge of the matricule is
+> treated as sufficient proof of access. All endpoints below are scoped to a
+> single child via the `:matricule` path parameter (except `/announcements`,
+> which is school-wide). If a parent has multiple children, the frontend
+> lets them switch matricules — one child per matricule.
+>
+> Messaging endpoints derive the sender identity from the child's first
+> `ParentStudent` link. If the student has no linked parent user, those
+> endpoints return `404 { error: "No parent is linked to this student" }`.
+
+### Child Dashboard (single-child summary)
 ```http
-GET /api/v1/parents/dashboard
-Authorization: Bearer <token>
+GET /api/v1/parents/:matricule/dashboard
 ```
+
+**Path Parameters:**
+- `matricule` (string): Child's matricule.
 
 **Query Parameters:**
 ```typescript
 {
-  academicYearId?: number; // Optional
+  academicYearId?: number; // Defaults to current academic year
 }
 ```
 
@@ -2421,44 +2435,36 @@ Authorization: Bearer <token>
 {
   success: true;
   data: {
-    totalChildren: number;
-    childrenEnrolled: number;
-    pendingFees: number;
-    totalFeesOwed: number;
-    latestGrades: number;
-    disciplineIssues: number;
-    unreadMessages: number;
-    upcomingEvents: number;
-    children: Array<{
-      id: number;
-      name: string;
-      className?: string;
-      subclassName?: string;
-      enrollmentStatus: string;
-      photo?: string;
-      attendanceRate: number;
-      latestMarks: Array<{
-        subjectName: string;
-        latestMark: number;
-        sequence: string;
-        date: string;
-      }>;
-      pendingFees: number;
-      disciplineIssues: number;
-      recentAbsences: number;
+    id: number;
+    name: string;
+    matricule: string;
+    className?: string;
+    subclassName?: string;
+    enrollmentStatus: string;
+    photo?: string;
+    attendanceRate: number;
+    latestMarks: Array<{
+      subjectName: string;
+      latestMark: number;
+      sequence: string;
+      date: string;
     }>;
+    pendingFees: number;      // outstanding balance (expected - paid)
+    disciplineIssues: number;
+    recentAbsences: number;
+    fees: {
+      totalExpected: number;
+      totalPaid: number;
+      outstanding: number;
+    };
   };
 }
 ```
 
-### Get Child Details
+### Get Child Details (full profile)
 ```http
-GET /api/v1/parents/children/:studentId
-Authorization: Bearer <token>
+GET /api/v1/parents/:matricule/details
 ```
-
-**Path Parameters:**
-- `studentId` (number): Student ID
 
 **Query Parameters:**
 ```typescript
@@ -2491,12 +2497,7 @@ Authorization: Bearer <token>
       subjects: Array<{
         subjectName: string;
         teacherName: string;
-        marks: Array<{
-          sequence: string;
-          mark: number;
-          total: number;
-          date: string;
-        }>;
+        marks: Array<{ sequence: string; mark: number; total: number; date: string; }>;
         average: number;
       }>;
       overallAverage: number;
@@ -2540,47 +2541,51 @@ Authorization: Bearer <token>
 }
 ```
 
-### Send Message to Staff
+### Get Child Overview (combined snapshot)
 ```http
-POST /api/v1/parents/message-staff
-Authorization: Bearer <token>
+GET /api/v1/parents/:matricule/overview
 ```
 
-**Request Body:**
+Combined profile + enrollment + academic (marks grouped by sequence)
++ discipline + health (chronic conditions & nurse-visit log).
+
+**Query Parameters:**
 ```typescript
-{
-  recipientId: number;    // Required - Staff member ID
-  subject: string;         // Required
-  message: string;         // Required
-  priority?: "LOW" | "MEDIUM" | "HIGH";
-  studentId?: number;     // Optional - If message is about specific child
-}
+{ academicYearId?: number; }
 ```
 
 ### Get Child Quiz Results
 ```http
-GET /api/v1/parents/children/:studentId/quiz-results
-Authorization: Bearer <token>
+GET /api/v1/parents/:matricule/quiz-results
 ```
 
 **Query Parameters:**
 ```typescript
-{
-  academicYearId?: number;
-}
+{ academicYearId?: number; }
 ```
 
 ### Get Child Analytics
 ```http
-GET /api/v1/parents/children/:studentId/analytics
-Authorization: Bearer <token>
+GET /api/v1/parents/:matricule/analytics
 ```
 
 **Query Parameters:**
 ```typescript
-{
-  academicYearId?: number;
-}
+{ academicYearId?: number; }
+```
+
+**Response (200):** See legacy `analytics` shape (`studentInfo`,
+`performanceAnalytics`, `attendanceAnalytics`, `quizAnalytics`,
+`subjectTrends`, `comparativeAnalytics`).
+
+### List Available Report Cards
+```http
+GET /api/v1/parents/:matricule/report-cards
+```
+
+**Query Parameters:**
+```typescript
+{ academicYearId?: number; }
 ```
 
 **Response (200):**
@@ -2588,66 +2593,107 @@ Authorization: Bearer <token>
 {
   success: true;
   data: {
-    studentInfo: {
+    student: { id: number; matricule: string; name: string; };
+    reports: Array<{
       id: number;
-      name: string;
-      classInfo: object;
-    };
-    performanceAnalytics: {
-      overallAverage: number;
-      grade: string;
-      classRank?: number;
-      improvementTrend: "IMPROVING" | "DECLINING" | "STABLE";
-      subjectsAboveAverage: number;
-      subjectsBelowAverage: number;
-      recommendation: string;
-    };
-    attendanceAnalytics: {
-      totalDays: number;
-      presentDays: number;
-      absentDays: number;
-      attendanceRate: number;
+      examSequenceId: number;
+      sequenceNumber: number;
+      termName: string;
+      academicYearId: number;
+      academicYearName: string;
       status: string;
-      monthlyTrends: Array<{
-        month: string;
-        attendanceRate: number;
-      }>;
-    };
-    quizAnalytics: {
-      totalQuizzes: number;
-      completedQuizzes: number;
-      averageScore: number;
-      highestScore: number;
-      completionRate: number;
-      recentQuizzes: Array<object>;
-    };
-    subjectTrends: Array<{
-      subjectName: string;
-      currentAverage: number;
-      trend: "IMPROVING" | "DECLINING" | "STABLE";
-      bestMark: number;
-      lowestMark: number;
+      generatedAt: string;
+      errorMessage?: string;
     }>;
-    comparativeAnalytics: {
-      studentAverage: number;
-      classAverage: number;
-      aboveClassAverage: boolean;
-      percentileRank?: number;
-    };
   };
 }
 ```
 
-### Get All Children Quiz Results
+### Check Report Card Availability
 ```http
-GET /api/v1/parents/children/quiz-results
-Authorization: Bearer <token>
+GET /api/v1/parents/:matricule/report-card/availability?academicYearId=..&examSequenceId=..
+```
+
+Both query params are required.
+
+### Download Report Card PDF
+```http
+GET /api/v1/parents/:matricule/report-card?academicYearId=..&examSequenceId=..
+```
+
+Streams `application/pdf`. Fee-gate rules from the exam controller still
+apply (a report card may be blocked if fees are outstanding).
+
+### Get Contacts (staff directory)
+```http
+GET /api/v1/parents/:matricule/contacts
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    fixed_staff: Array<{ id, name, matricule, photo, user_roles }>;    // Principal, VP, Bursar, DoS
+    child_teachers: Array<{ id, name, matricule, photo, user_roles, teaches: [{ student, subject, sub_class }] }>;
+    hods_by_subject: Array<{ subject: { id, name }, hod: { id, name, matricule, photo, user_roles } }>;
+  };
+}
+```
+
+### Send Message to Staff
+```http
+POST /api/v1/parents/:matricule/message-staff
+```
+
+**Request Body:**
+```typescript
+{
+  recipientId: number;                          // staff user id
+  subject: string;
+  message: string;
+  priority?: "LOW" | "MEDIUM" | "HIGH";         // optional
+}
+```
+
+**Response (201):**
+```typescript
+{ success: true; data: { message: "Message sent successfully"; notification: {...} } }
+```
+
+### Open Direct Message Channel
+```http
+POST /api/v1/parents/:matricule/contact/:userId
+```
+
+Opens (or reuses) a DM chat channel between the child's linked parent and
+the given staff user. Frontend then posts messages via
+`POST /chat/channels/:channelId/messages` (see Chat module).
+
+**Response (200):**
+```typescript
+{ success: true; data: { id: number; ... /* channel */ } }
 ```
 
 ### Get School Announcements
 ```http
-GET /api/v1/parents/announcements
-Authorization: Bearer <token>
+GET /api/v1/parents/announcements?limit=10
+```
+
+`limit` must be between 1 and 50 (defaults to 10). No matricule required.
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: Array<{
+    id: number;
+    title: string;
+    content: string;
+    author: string;
+    created_at: string;
+  }>;
+}
 ```
 
 ---
@@ -4108,7 +4154,7 @@ Retrieves all payment transactions associated with a specific fee record.
 }
 ```
 
-### Record a Payment for a Specific Fee
+### Record a Payment for a Specific Fee (direct / legacy)
 ```http
 POST /api/v1/fees/:feeId/payments
 Authorization: Bearer <token>
@@ -4116,6 +4162,14 @@ Authorization: Bearer <token>
 
 **Description:**
 Records a new payment transaction for a specific fee record and updates the fee's paid amount.
+
+> **Preferred flow — user-driven claim + Bursar validation:**
+> Parents (or Bursar+ on their behalf) submit a `PAYMENT_CLAIM` at
+> `POST /api/v1/finance-requests`. Bursar/Principal/Manager/Super Manager
+> receive a notification, then call `POST /api/v1/finance-requests/:id/approve`.
+> The approval automatically creates the `PaymentTransaction` and updates
+> `SchoolFees.amountPaid` — no separate call to this endpoint is needed.
+> This direct endpoint remains for walk-in cash payments recorded at the desk.
 
 **Authorization:**
 - `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `BURSAR`
@@ -4206,6 +4260,234 @@ Updates an existing payment transaction. When `amount` is changed, the parent fe
 - `400`: Invalid `paymentId` or invalid `paymentMethod`.
 - `403`: Bursar attempted to edit outside the 2-day window.
 - `404`: Payment not found.
+
+---
+
+## Finance Requests (Approval Workflows)
+
+All approval-driven financial actions run through a single endpoint family. Each
+request has a `type`, a `payload` specific to that type, and a lifecycle
+`PENDING → APPROVED | REJECTED | COMPLETED`. Approving certain types
+(`PAYMENT_CLAIM`, `REFUND`) triggers the underlying financial record automatically —
+callers do **not** also hit the direct payment/refund endpoints.
+
+**Types & lifecycle:**
+
+| Type | Creator | Approver / Actor | On approve, we auto-create… |
+|---|---|---|---|
+| `PAYMENT_CLAIM` | `PARENT` or Bursar+ | Bursar+ (approve/reject) | `PaymentTransaction` + updates `SchoolFees.amountPaid` |
+| `REFUND` | Bursar+ | `SUPER_MANAGER` only (approve/reject) | `Refund` + decrements `SchoolFees.amountPaid` |
+| `FEE_REDUCTION` | Bursar+ | Principal+ (approve/reject) | — (fee adjustment made manually after approval) |
+| `PERSONNEL_DISBURSEMENT` | Bursar+ | Recipient or Principal+ (complete/reject) | — |
+| `BANK_VERIFICATION` | Bursar+ | Any finance viewer (complete/reject) | — |
+
+**Notifications fired automatically:**
+- On create: recipients relevant to the type are notified with `category = APPROVAL_NEEDED`.
+- On approve/reject: the requester is notified. On `PAYMENT_CLAIM` approve or `REFUND` approve, all linked parents of the affected student also receive a `FEE_UPDATE` notification.
+
+### Create a Finance Request
+```http
+POST /api/v1/finance-requests
+Authorization: Bearer <token>
+```
+
+**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `BURSAR`, `PARENT`
+(per-type creator role enforced in service).
+
+**Request Body:**
+```typescript
+{
+  type: "PAYMENT_CLAIM" | "REFUND" | "FEE_REDUCTION" | "PERSONNEL_DISBURSEMENT" | "BANK_VERIFICATION";
+  amount?: number | null;      // required for all except BANK_VERIFICATION
+  reason: string;              // required (used as Refund.reason when type=REFUND)
+  notes?: string;
+  payload: object;             // shape depends on type — see below
+}
+```
+
+**Payload shapes:**
+
+```typescript
+// PAYMENT_CLAIM — parent (or Bursar+) submits proof of a payment.
+// Approval creates a real PaymentTransaction.
+{
+  enrollmentId?: number;       // preferred
+  studentId?: number;          // fallback: resolves to the student's current-year enrollment
+  feeId?: number;              // optional: if omitted we pick the current-year SchoolFees row
+  paymentMethod: "EXPRESS_UNION" | "CCA" | "F3DC" | "AFRILAND_FIRST_BANK";
+  paymentDate: string;         // YYYY-MM-DD, date on the receipt
+  receiptNumber?: string;
+}
+```
+
+```typescript
+// REFUND — Bursar initiates. Approval creates a real Refund and decrements SchoolFees.amountPaid.
+{
+  enrollmentId: number;
+  refundMethod: "CASH" | "BANK_TRANSFER" | "MOBILE_MONEY" | "EXPRESS_UNION" | "CCA" | "F3DC" | "AFRILAND_FIRST_BANK";
+  refundDate: string;          // YYYY-MM-DD
+}
+```
+
+```typescript
+// FEE_REDUCTION — Principal+ approves; adjust fee manually after.
+{ enrollmentId: number; partnerName?: string; }
+```
+
+```typescript
+// PERSONNEL_DISBURSEMENT — recipient confirms receipt.
+{ recipientUserId: number; purpose: string; }
+```
+
+```typescript
+// BANK_VERIFICATION — verifier checks the slip.
+{ studentId: number; claimedAmount?: number; estimatedPaymentPeriod: string; }
+```
+
+**Response (Success - 201):**
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    type: string;
+    status: "PENDING";
+    amount: number | null;
+    reason: string;
+    notes: string | null;
+    payload: object;
+    requestedById: number;
+    actedById: number | null;
+    actedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+```
+
+**Error Responses:**
+- `400`: Missing/invalid payload fields, creator role not permitted for the type, parent not linked to the student, refund amount exceeds current overpayment, etc.
+
+### List Finance Requests
+```http
+GET /api/v1/finance-requests
+Authorization: Bearer <token>
+```
+
+**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `BURSAR`, `SECRETARY`, `FEE_AUDITOR`, `PARENT`.
+
+**Query Parameters:**
+- `type` — filter by `FinanceRequestType`
+- `status` — `PENDING | APPROVED | REJECTED | COMPLETED`
+- `requestedById` — filter by requester (parents typically pass their own id)
+- `recipientUserId` — for `PERSONNEL_DISBURSEMENT`
+- `studentId` — matches `payload.studentId`
+- `page`, `limit`
+
+### Get Finance Request by ID
+```http
+GET /api/v1/finance-requests/:id
+Authorization: Bearer <token>
+```
+
+### Approve a Finance Request
+```http
+POST /api/v1/finance-requests/:id/approve
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "notes": "optional actor notes" }
+```
+
+- `PAYMENT_CLAIM`: **Bursar+** only. On success, a `PaymentTransaction` is created and `SchoolFees.amountPaid` is incremented.
+- `REFUND`: **SUPER_MANAGER** only. On success, a `Refund` is created and `SchoolFees.amountPaid` is decremented.
+- `FEE_REDUCTION`: **Principal+** only.
+
+**Errors:**
+- `403`: role not permitted for this type; request already `APPROVED/REJECTED/COMPLETED`.
+- `400`: side-effect validation failed (e.g. refund amount now exceeds current overpayment because a concurrent record changed it).
+
+### Reject a Finance Request
+```http
+POST /api/v1/finance-requests/:id/reject
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "notes": "why rejected (optional but recommended)" }
+```
+
+Same per-type role rules as approve.
+
+### Complete a Finance Request
+```http
+POST /api/v1/finance-requests/:id/complete
+Authorization: Bearer <token>
+```
+
+Used for `PERSONNEL_DISBURSEMENT` (recipient confirms receipt) and `BANK_VERIFICATION` (verifier marks the slip verified).
+
+---
+
+## Overpayments & Refunds (Read + SM Override)
+
+The primary way to issue a refund is through a `REFUND` **finance request**
+(see above). The endpoints below cover read-only overpayment reporting and a
+`SUPER_MANAGER`-only direct-record override.
+
+### List Overpaid Students
+```http
+GET /api/v1/fees/overpaid
+Authorization: Bearer <token>
+```
+
+**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `BURSAR`, `SECRETARY`, `FEE_AUDITOR`.
+
+**Query Parameters:** `academicYearId`, `classId`, `subClassId`, `minOverpayment`, `page`, `limit`.
+
+### Export Overpaid Students (Excel)
+```http
+GET /api/v1/fees/overpaid/export
+Authorization: Bearer <token>
+```
+
+Same auth + filters as above. Returns an `.xlsx` file including parent contact info.
+
+### Record Refund (Direct — SUPER_MANAGER override)
+```http
+POST /api/v1/fees/refunds
+Authorization: Bearer <token>
+```
+
+> Prefer the `REFUND` finance-request flow. This endpoint is kept as a
+> `SUPER_MANAGER`-only override for exceptional cases.
+
+**Authorization:** `SUPER_MANAGER` only.
+
+**Request Body:**
+```typescript
+{
+  enrollmentId: number;
+  amount: number;
+  refundDate: string;   // YYYY-MM-DD
+  refundMethod: "CASH" | "BANK_TRANSFER" | "MOBILE_MONEY" | "EXPRESS_UNION" | "CCA" | "F3DC" | "AFRILAND_FIRST_BANK";
+  reason: string;
+  notes?: string;
+}
+```
+
+### List Refunds
+```http
+GET /api/v1/fees/refunds
+Authorization: Bearer <token>
+```
+
+**Query Parameters:** `studentId`, `enrollmentId`, `academicYearId`, `from`, `to`, `page`, `limit`.
+
+### Get Refund by ID
+```http
+GET /api/v1/fees/refunds/:id
+Authorization: Bearer <token>
+```
 
 ---
 
@@ -6885,7 +7167,7 @@ Authorization: Bearer <token>
 Retrieves the complete timetable for the entire school for a specific academic year.
 
 **Authorization:**
-- `SUPER_MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `MANAGER`
+- `SUPER_MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `MANAGER`, `DEAN_OF_STUDIES`
 
 **Query Parameters:**
 ```typescript
@@ -6923,6 +7205,80 @@ Retrieves the complete timetable for the entire school for a specific academic y
 }
 ```
 
+### Download Subclass Timetable (PDF)
+```http
+GET /api/v1/timetables/subclass/:subclassId/export/pdf
+Authorization: Bearer <token>
+```
+
+**Description:** Returns a landscape A4 PDF of the specified subclass timetable. Cells show `Subject` with the teacher name beneath. BREAK / PREP rows are shaded and labelled.
+
+**Authorization:** Any authenticated user.
+
+**Path Parameters:**
+- `subclassId` (number)
+
+**Query Parameters:**
+- `academicYearId` (number, optional) — defaults to the current academic year.
+
+**Response:** `Content-Type: application/pdf` — binary PDF stream. Response header includes `Content-Disposition: attachment; filename="timetable_<SubClassName>.pdf"`.
+
+---
+
+### Download Full-School Timetable (PDF)
+```http
+GET /api/v1/timetables/full-school/export/pdf
+Authorization: Bearer <token>
+```
+
+**Description:** Returns a single PDF containing one page per subclass.
+
+**Authorization:** `SUPER_MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `MANAGER`, `DEAN_OF_STUDIES`.
+
+**Query Parameters:**
+- `academicYearId` (number, optional).
+
+**Response:** `Content-Type: application/pdf` — binary PDF stream.
+
+---
+
+### Download Teacher Timetable — Self (PDF)
+```http
+GET /api/v1/teachers/me/timetable/export/pdf
+Authorization: Bearer <token>
+```
+
+**Description:** Returns a landscape A4 PDF of the currently authenticated teacher's weekly timetable. Cells show `Subject` with `Class / Sub-class` beneath. Summary chips at the top show class count, subject count, and weekly hours.
+
+**Authorization:** `TEACHER`.
+
+**Query Parameters:**
+- `academicYearId` (number, optional).
+
+**Response:** `Content-Type: application/pdf` — binary PDF stream.
+
+---
+
+### Download Teacher Timetable — Admin (PDF)
+```http
+GET /api/v1/timetables/teacher/:teacherId/export/pdf
+Authorization: Bearer <token>
+```
+
+**Description:** Admin/leadership variant of the above — download any teacher's weekly timetable as a PDF.
+
+**Authorization:** `SUPER_MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `MANAGER`, `DEAN_OF_STUDIES`.
+
+**Path Parameters:**
+- `teacherId` (number)
+
+**Query Parameters:**
+- `academicYearId` (number, optional).
+
+**Response:** `Content-Type: application/pdf` — binary PDF stream.
+
+---
+
 ### Bulk Update Timetable
 ```http
 POST /api/v1/timetables/subclass/:subclassId/bulk-update
@@ -6933,7 +7289,7 @@ Authorization: Bearer <token>
 Updates multiple timetable slots at once for a specific subclass. This allows for creating, updating, or deleting assignments for periods within a subclass for a given academic year.
 
 **Authorization:**
-- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`
+- `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `DEAN_OF_STUDIES`
 
 **Path Parameters:**
 - `subclassId` (number): The ID of the subclass for which to update the timetable.
@@ -6954,30 +7310,44 @@ Updates multiple timetable slots at once for a specific subclass. This allows fo
 ```typescript
 {
   success: true;
-  message: "Timetable updated successfully.";
+  message: "Timetable updated successfully." | "Timetable saved with warnings (teacher clashes detected).";
   data: {
     updated: number; // Number of existing slots updated.
     created: number; // Number of new slots created.
     deleted: number; // Number of slots deleted (where subjectId and teacherId were null).
   };
-  errors: []; // Empty array if no errors.
+  errors: [];       // Empty array if no errors.
+  warnings: Array<{
+    periodId: number;
+    type: "TEACHER_CLASH";
+    message: string;
+    clashWith: {
+      subClassId: number;
+      subClassName: string;
+      day: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+      periodName: string;
+    };
+  }>; // Slots that WERE SAVED but the teacher is double-booked elsewhere at that period.
 }
 ```
+
+**Note on teacher clashes:** A teacher already assigned to another subclass at the same period is no longer a hard failure. The slot **is saved** and a `TEACHER_CLASH` warning is added to `warnings[]`. The response stays `200`. Show these warnings in the UI so the scheduler can resolve the double-booking.
 
 **Response (207 - Partial Success):**
 ```typescript
 {
   success: false;
-  message: "Partial success with errors.";
+  message: "Partial success with errors." | "Saved with warnings and some slots failed.";
   data: {
     updated: number;
     created: number;
     deleted: number;
   };
-    errors: Array<{
+  errors: Array<{
     periodId: number; // The ID of the period that had an error.
-    error: string;    // Description of the error.
+    error: string;    // Description of the error (missing IDs, teacher not authorized to teach subject, etc).
   }>;
+  warnings: Array<{ periodId: number; type: "TEACHER_CLASH"; message: string; clashWith: {...} }>;
 }
 ```
 
@@ -7001,13 +7371,6 @@ Updates multiple timetable slots at once for a specific subclass. This allows fo
   {
     success: false;
     error: "No active academic year found for timetable update." | "Subclass not found" | "Period with ID X not found";
-  }
-  ```
-- `409 Conflict`:
-  ```typescript
-  {
-    success: false;
-    error: "Teacher conflict: already assigned to [subclassName] on [dayOfWeek] during period [periodName]";
   }
   ```
 - `500 Internal Server Error`:
@@ -8022,6 +8385,82 @@ Authorization: Bearer <token>
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
+```
+
+### Search Personnel
+```http
+GET /api/v1/users/personnel/search
+Authorization: Bearer <token>
+```
+
+**Authorization:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `BURSAR`, `SECRETARY`, `DEAN_OF_STUDIES`, `DEAN_OF_DISCIPLINE`, `HOD`
+
+Search staff users with pagination and multi-field filtering. **Parents are NOT personnel and are never returned by this endpoint** — use the parent-directory endpoints instead. `q` performs a case-insensitive `contains` search across `name`, `email`, `matricule`, and `phone`. Passing `role=PARENT` returns a `400`.
+
+**Query Parameters:**
+```typescript
+{
+  q?: string;                     // free-text search across name/email/matricule/phone
+  name?: string;
+  email?: string;
+  matricule?: string;
+  phone?: string;
+  role?: string;                  // single personnel role OR comma-separated list (e.g. "TEACHER,HOD")
+  roles?: string;                 // alias for `role`; comma-separated list
+  gender?: "Male" | "Female";
+  status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+  academicYearId?: number;        // scopes role match; defaults to current year
+  page?: number;                  // default 1
+  limit?: number;                 // default 20, max 100
+  sortBy?: "id" | "name" | "email" | "matricule" | "phone" | "gender" | "status" | "createdAt" | "updatedAt" | "dateOfBirth" | "lastSeenAt";
+  sortOrder?: "asc" | "desc";     // default asc
+}
+```
+
+**Allowed roles:** `SUPER_MANAGER`, `MANAGER`, `PRINCIPAL`, `VICE_PRINCIPAL`, `BURSAR`, `CONTROLLER`, `TEACHER`, `DISCIPLINE_MASTER`, `SENIOR_DISCIPLINE_MASTER`, `DEAN_OF_DISCIPLINE`, `DEAN_OF_STUDIES`, `FEE_AUDITOR`, `SECRETARY`, `NURSE`, `GUIDANCE_COUNSELOR`, `HOD`
+
+**Success Response (200):**
+```typescript
+{
+  success: true,
+  data: Array<{
+    id: number;
+    name: string;
+    email: string;
+    matricule: string | null;
+    phone: string;
+    gender: "Male" | "Female";
+    status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+    dateOfBirth: string;
+    address: string;
+    photo: string | null;
+    userRoles: Array<{ id: number; role: string; academicYearId: number | null }>;
+    subjects?: Array<{ id: number; name: string; category: string }>; // teachers only
+    createdAt: string;
+    updatedAt: string;
+  }>,
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }
+}
+```
+
+**Error Responses:**
+- `400` — invalid `page`, `limit`, `role`, `gender`, `status`, `sortBy`, `sortOrder`, or `academicYearId`
+- `401` — missing/invalid token
+- `403` — caller lacks the required role
+- `500` — unexpected server error
+
+```json
+{ "success": false, "error": "limit must be an integer between 1 and 100" }
+```
+
+**Example:**
+```
+GET /api/v1/users/personnel/search?q=john&role=TEACHER,HOD&status=ACTIVE&page=1&limit=25&sortBy=name&sortOrder=asc
 ```
 
 ### Create User
@@ -10712,8 +11151,9 @@ Authorization: Bearer <token>
 ```
 
 **Description:**
-Generates a report of students with outstanding fee balances (defaulters).
-**Note:** This endpoint currently returns placeholder data; actual implementation is pending.
+Generates a report of students with outstanding fee balances (defaulters) for the given academic year.
+
+A student is treated as a defaulter when their aggregate outstanding balance across `SchoolFees` rows for the year (`amount_expected - amount_paid`) is greater than 0 (and, when `minimumAmount` is set, is ≥ `minimumAmount`).
 
 **Authorization:**
 - `BURSAR`, `SUPER_MANAGER`, `PRINCIPAL`, `MANAGER`
@@ -10725,7 +11165,7 @@ Generates a report of students with outstanding fee balances (defaulters).
   minimumAmount?: number;  // Optional: Filter for students with outstanding balances greater than or equal to this amount.
   classId?: number;        // Optional: Filter for defaulters within a specific class.
   subClassId?: number;     // Optional: Filter for defaulters within a specific subclass.
-  includeDetails?: boolean; // Optional: If true, includes more detailed student/fee info. Defaults to false.
+  includeDetails?: boolean; // Optional: If true, each student row includes `contactParentPhone` (WhatsApp number preferred, phone fallback). Defaults to false.
 }
 ```
 
@@ -10738,26 +11178,26 @@ Generates a report of students with outstanding fee balances (defaulters).
     totalDefaulters: number;
     totalOutstanding: number;
     byClass: Array<{
-      classId: number;
+      classId: number | null;      // null if the enrollment has no class link (should not happen in normal data)
       className: string;
       defaultersCount: number;
       outstandingAmount: number;
-    }>;
+    }>; // sorted by outstandingAmount desc
     byAmountRange: Array<{
-      range: string; // e.g., "0-10000", "10001-50000", "50000+"
+      range: "0-10000" | "10001-50000" | "50001-100000" | "100000+";
       count: number;
       totalAmount: number;
     }>;
-    students: Array<{ // Detailed list of defaulters
+    students: Array<{ // Full list of defaulters, sorted by outstandingAmount desc
       studentId: number;
       studentName: string;
       matricule: string;
       className: string;
-      subClassName: string;
+      subClassName: string;         // "Unassigned" if the student has no sub_class yet
       outstandingAmount: number;
-      dueDate: string; // Of the oldest outstanding fee
-      daysOverdue: number;
-      contactParentPhone?: string;
+      dueDate: string | null;       // ISO string of the oldest outstanding fee's due date
+      daysOverdue: number;          // 0 if not yet due
+      contactParentPhone?: string;  // Only present when includeDetails=true AND a parent phone exists
     }>;
   };
 }
@@ -10995,4 +11435,733 @@ Examples of newly-valid pairs:
 - `HOD` → `TEACHER` ✓
 - `PRINCIPAL` → `BURSAR` ✓
 - `TEACHER` → `VICE_PRINCIPAL` ✗ (403 — requester does not outrank recipient)
+
+---
+
+## Salary Management (`/salary`)
+
+Two salary types:
+- `TEACHER_HOURLY` — hourly rate × hours taught (from `TeacherPeriodAttendance`) + approved allowances/bonuses − approved withholdings.
+- `ADMIN_FIXED` — flat `baseSalary` regardless of hours (constant month to month).
+
+**Workflow:** `MANAGER` proposes profiles, rate changes, allowances, and withholdings **with a reason**; `SUPER_MANAGER` validates (approve/reject). `SUPER_MANAGER` may create or edit directly (auto-approved). Pay dates are auto-computed as the **last Friday** of the target month.
+
+All requests/responses use **camelCase** (converted by middleware).
+
+### Bursar Cash Visibility
+
+#### `GET /api/v1/salary/bursar-cash/summary`
+**Authorization:** `MANAGER`, `PRINCIPAL`, `SUPER_MANAGER`
+
+**Query:** `academicYearId?: number` (defaults to current)
+
+**Response 200:**
+```typescript
+{
+  success: true,
+  data: {
+    academicYearId: number | null,
+    collected: number,   // fee + control-fee + fee-item payments + cash injections
+    spent: number,       // expenditures + refunds + paid salaries
+    balance: number,     // collected - spent
+    breakdown: {
+      feePayments: number,
+      controlFeePayments: number,
+      feeItemPayments: number,
+      cashInjections: number,
+      expenditures: number,
+      refunds: number,
+      paidSalaries: number
+    },
+    paymentsByMethod: Array<{ paymentMethod: string, amount: number }>,
+    expendituresByCategory: Array<{ category: string, amount: number }>,
+    injectionsBySource: Array<{ source: string, amount: number }>
+  }
+}
+```
+
+#### `GET /api/v1/salary/bursar-cash/injections`
+**Authorization:** `MANAGER`, `PRINCIPAL`, `SUPER_MANAGER`
+
+**Query:** `academicYearId?`, `source?` (`MANAGER` | `SUPER_MANAGER` | `OTHER`), `page?`, `limit?`
+
+**Response 200:** paginated list of `BursarCashInjection` records.
+
+#### `POST /api/v1/salary/bursar-cash/injections`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`
+
+Both roles can add cash to the bursar's account (top-ups, external cash receipts, etc). `source` is auto-set from the caller's role.
+
+**Request:**
+```typescript
+{ amount: number, reason: string, reference?: string, academicYearId?: number }
+```
+
+**Response 201:** the created injection.
+
+### Salary Profiles
+
+One profile per user per academic year.
+
+#### `POST /api/v1/salary/profiles`
+**Authorization:** `MANAGER` (creates as `PENDING_APPROVAL`), `SUPER_MANAGER` (creates as `ACTIVE`)
+
+**Request:**
+```typescript
+{
+  userId: number,
+  salaryType: 'TEACHER_HOURLY' | 'ADMIN_FIXED',
+  hourlyRate?: number,   // required if TEACHER_HOURLY
+  baseSalary?: number,   // required if ADMIN_FIXED
+  academicYearId?: number,
+  notes?: string
+}
+```
+
+**Response 201:** the created profile.
+**409** if a profile already exists for this user + year.
+
+#### `GET /api/v1/salary/profiles`
+**Authorization:** `MANAGER`, `PRINCIPAL`, `SUPER_MANAGER`
+
+**Query:** `status?` (`PENDING_APPROVAL` | `ACTIVE` | `INACTIVE` | `REJECTED`), `salaryType?`, `academicYearId?`, `userId?`, `page?`, `limit?`
+
+#### `GET /api/v1/salary/profiles/:id`
+**Authorization:** `MANAGER`, `PRINCIPAL`, `SUPER_MANAGER`
+
+#### `POST /api/v1/salary/profiles/:id/approve`
+**Authorization:** `SUPER_MANAGER` — sets status to `ACTIVE`.
+
+#### `POST /api/v1/salary/profiles/:id/reject`
+**Authorization:** `SUPER_MANAGER`
+**Request:** `{ reason: string }` — sets status to `REJECTED`.
+
+#### `PATCH /api/v1/salary/profiles/:id/status`
+**Authorization:** `SUPER_MANAGER`
+**Request:** `{ status: 'ACTIVE' | 'INACTIVE' }` — manually toggle status (e.g., deactivate on offboarding).
+
+### Salary Change Requests
+
+Change `hourlyRate` (teachers) or `baseSalary` (admins) with a reason. Manager submits → `PENDING`; Super Manager approves → applied to profile.
+
+#### `POST /api/v1/salary/change-requests`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`
+**Request:**
+```typescript
+{
+  salaryProfileId: number,
+  newHourlyRate?: number,   // required for TEACHER_HOURLY profile
+  newBaseSalary?: number,   // required for ADMIN_FIXED profile
+  reason: string
+}
+```
+
+#### `GET /api/v1/salary/change-requests`
+**Query:** `status?`, `salaryProfileId?`, `page?`, `limit?`
+
+#### `POST /api/v1/salary/change-requests/:id/approve`
+**Authorization:** `SUPER_MANAGER` — applies the new rate/base to the underlying profile.
+
+#### `POST /api/v1/salary/change-requests/:id/reject`
+**Authorization:** `SUPER_MANAGER`
+**Request:** `{ reason: string }`
+
+### Salary Allowances / Bonuses
+
+Two types: `ALLOWANCE` (recurring compensation add-on) and `BONUS`. Both need approval before they count toward a `SalaryPayment`.
+
+#### `POST /api/v1/salary/allowances`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`
+**Request:**
+```typescript
+{
+  salaryProfileId: number,
+  type: 'ALLOWANCE' | 'BONUS',
+  amount: number,
+  reason: string,
+  payPeriodId?: number   // if omitted, applies to the next generated pay period
+}
+```
+
+#### `GET /api/v1/salary/allowances`
+**Query:** `status?`, `type?`, `salaryProfileId?`, `payPeriodId?`, `page?`, `limit?`
+
+#### `POST /api/v1/salary/allowances/:id/approve`
+**Authorization:** `SUPER_MANAGER`
+
+#### `POST /api/v1/salary/allowances/:id/reject`
+**Authorization:** `SUPER_MANAGER`
+**Request:** `{ reason: string }`
+
+### Pay Periods
+
+One per (academicYearId, year, month). `payDate` is auto-computed as the last Friday of the month. Manager assigns which weeks of the month count toward teacher hours in `weekStartDates`.
+
+#### `POST /api/v1/salary/pay-periods`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`
+**Request:**
+```typescript
+{
+  year: number,
+  month: number,           // 1-12
+  weekStartDates: string[], // ISO dates, e.g. ["2026-07-06","2026-07-13","2026-07-20","2026-07-27"]
+  academicYearId?: number,
+  notes?: string
+}
+```
+
+#### `GET /api/v1/salary/pay-periods`
+**Query:** `academicYearId?`, `status?` (`OPEN` | `LOCKED` | `PAID`), `year?`, `page?`, `limit?`
+
+#### `GET /api/v1/salary/pay-periods/:id`
+
+#### `PATCH /api/v1/salary/pay-periods/:id/weeks`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`
+**Request:** `{ weekStartDates: string[] }` — cannot edit once period is `PAID`.
+
+#### `POST /api/v1/salary/pay-periods/:id/generate`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`
+
+Generates a `SalaryPayment` row per `ACTIVE` profile in the period's academic year. Teachers' hours are computed from `TeacherPeriod` schedule intersected with the assigned weeks and `TeacherPeriodAttendance`. Admins get their `baseSalary` flat. Idempotent: re-running overwrites `DRAFT`/`PENDING_PAYMENT` rows; `PAID` rows are preserved.
+
+**Response 200:**
+```typescript
+{
+  success: true,
+  data: {
+    payPeriodId: number,
+    generated: number,
+    payments: SalaryPayment[]
+  }
+}
+```
+
+#### `POST /api/v1/salary/pay-periods/:id/lock`
+**Authorization:** `MANAGER`, `SUPER_MANAGER` — status → `LOCKED` (no more edits).
+
+#### `POST /api/v1/salary/pay-periods/:id/mark-paid`
+**Authorization:** `SUPER_MANAGER`
+
+Marks the period `PAID` and flips every non-`PAID` payment in it to `PAID` (records `paidAt` and `paidById`).
+
+#### `GET /api/v1/salary/pay-periods/:id/payments`
+**Query:** `status?`, `userId?`, `page?`, `limit?`
+
+Returns the generated `SalaryPayment` rows for the period, each with:
+```typescript
+{
+  id: number,
+  userId: number,
+  salaryType: 'TEACHER_HOURLY' | 'ADMIN_FIXED',
+  hoursExpected: number,
+  hoursTaught: number,
+  hoursAbsent: number,
+  hourlyRate: number | null,
+  baseAmount: number,
+  allowanceTotal: number,
+  bonusTotal: number,
+  withheldAmount: number,
+  netAmount: number,
+  status: 'DRAFT' | 'PENDING_PAYMENT' | 'WITHHELD' | 'PAID',
+  paidAt: string | null,
+  ...user, payPeriod, salaryProfile, withholdings[]
+}
+```
+
+#### `GET /api/v1/salary/payments/:id`
+Returns a single `SalaryPayment` with related withholdings.
+
+### Salary Withholdings
+
+Withhold part or all of a payment with a reason. `scope`:
+- `PARTIAL` — deduct `amount` from `netAmount`.
+- `FULL` — deduct the entire current net (auto-filled by server).
+
+Manager submits → `PENDING`; Super Manager approves → deducted from `netAmount`. If net drops to 0, payment `status` becomes `WITHHELD`.
+
+#### `POST /api/v1/salary/withholdings`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`
+**Request:**
+```typescript
+{
+  salaryPaymentId: number,
+  scope: 'PARTIAL' | 'FULL',
+  amount?: number,   // required for PARTIAL; ignored for FULL
+  reason: string
+}
+```
+
+#### `GET /api/v1/salary/withholdings`
+**Query:** `status?`, `salaryPaymentId?`, `page?`, `limit?`
+
+#### `POST /api/v1/salary/withholdings/:id/approve`
+**Authorization:** `SUPER_MANAGER`
+
+#### `POST /api/v1/salary/withholdings/:id/reject`
+**Authorization:** `SUPER_MANAGER`
+**Request:** `{ reason: string }`
+
+---
+
+## Ream (Paper) Stock (`/reams`)
+
+Central ledger of reams (RECEIPT / ISSUANCE). Managers and Super Managers see totals; Bursar and Secretary issue reams to a specific person with a reason.
+
+### `GET /api/v1/reams/stock`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`, `PRINCIPAL`, `BURSAR`, `SECRETARY`
+
+**Response 200:**
+```typescript
+{
+  success: true,
+  data: {
+    currentStock: number,
+    totalReceived: number,
+    totalIssued: number,
+    receiptCount: number,
+    issuanceCount: number,
+    lastEntry: ReamStockLedger | null
+  }
+}
+```
+
+### `GET /api/v1/reams/ledger`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`, `PRINCIPAL`, `BURSAR`, `SECRETARY`
+
+**Query:** `type?` (`RECEIPT` | `ISSUANCE`), `recipientUserId?`, `fromDate?`, `toDate?`, `page?`, `limit?`
+
+**Response 200:** paginated list of ledger entries with `recordedBy` and `recipient`.
+
+### `POST /api/v1/reams/receipts`
+**Authorization:** `MANAGER`, `SUPER_MANAGER`, `BURSAR`
+
+Record stock coming in (purchased / delivered).
+**Request:**
+```typescript
+{ quantity: number, notes?: string }
+```
+
+### `POST /api/v1/reams/issuances`
+**Authorization:** `BURSAR`, `SECRETARY`
+
+Issue reams to a specific person with a reason.
+**Request:**
+```typescript
+{
+  quantity: number,
+  reason: string,
+  recipientUserId?: number,   // preferred — links to a system user
+  recipientName?: string,     // free-text fallback if recipient is external / not in system
+  notes?: string
+}
+```
+**409** if `quantity` exceeds `currentStock`.
+
+---
+
+## Notifications (`/notifications`)
+
+Every notification carries workflow metadata so the frontend can badge, filter, and deep-link:
+
+```typescript
+{
+  id: number,
+  userId: number,          // recipient
+  senderId: number | null, // who triggered it
+  title: string | null,
+  message: string,
+  category: 'GENERAL' | 'ANNOUNCEMENT' | 'TASK_ASSIGNED' | 'TASK_UPDATE'
+          | 'APPROVAL_NEEDED' | 'APPROVAL_APPROVED' | 'APPROVAL_REJECTED'
+          | 'SALARY_UPDATE' | 'FEE_UPDATE' | 'DISCIPLINE' | 'SYSTEM',
+  entityType: string | null,   // e.g. "SalaryAllowance", "Task", "SalaryChangeRequest"
+  entityId: number | null,     // the source record's ID
+  actionUrl: string | null,    // deep link the frontend can route to
+  dateSent: string,
+  readAt: string | null,
+  status: 'SENT' | 'DELIVERED' | 'READ'
+}
+```
+
+### `GET /api/v1/notifications/me`
+List logged-in user's notifications.
+**Query:** `?category=APPROVAL_NEEDED&entityType=SalaryAllowance&unreadOnly=true&status=SENT&page=1&limit=20`
+
+### `GET /api/v1/notifications/me/unread-count`
+```json
+{ "success": true, "data": { "unread_count": 12 } }
+```
+
+### `GET /api/v1/notifications/me/unread-breakdown`
+Grouped counts per category — for role-specific inbox badges.
+```json
+{
+  "success": true,
+  "data": {
+    "total": 12,
+    "by_category": [
+      { "category": "APPROVAL_NEEDED", "count": 5 },
+      { "category": "TASK_ASSIGNED", "count": 4 },
+      { "category": "TASK_UPDATE", "count": 2 },
+      { "category": "SYSTEM", "count": 1 }
+    ]
+  }
+}
+```
+
+### `PUT /api/v1/notifications/:id/read`
+Mark one as read (also records `read_at`). 403 if the notification belongs to a different user.
+
+### `PUT /api/v1/notifications/mark-all-read`
+Marks all of the user's notifications as read. Returns `{ markedCount }`.
+
+### `DELETE /api/v1/notifications/:id`
+Delete a single notification. 403 if not the owner.
+
+### `POST /api/v1/notifications/send`   *(SUPER_MANAGER, MANAGER, PRINCIPAL, VICE_PRINCIPAL)*
+Manual single-recipient send.
+```json
+{
+  "recipientId": 42,
+  "title": "Reminder",
+  "message": "Please submit your termly report by Friday.",
+  "category": "GENERAL",
+  "entityType": "Report",
+  "entityId": 7,
+  "actionUrl": "/reports/7"
+}
+```
+
+### `POST /api/v1/notifications/send-bulk`   *(SUPER_MANAGER, MANAGER, PRINCIPAL, VICE_PRINCIPAL)*
+```json
+{
+  "recipientIds": [42, 43, 44],
+  "title": "School closed tomorrow",
+  "message": "The school will be closed on 2026-08-01.",
+  "category": "ANNOUNCEMENT"
+}
+```
+
+### Auto-triggered notifications
+
+The salary and task workflows automatically emit notifications with populated `entityType` / `entityId` / `actionUrl`, so the UI can jump directly to the source item.
+
+| Event | Recipient(s) | Category | entityType |
+|---|---|---|---|
+| Manager creates `SalaryProfile` | all SUPER_MANAGER | APPROVAL_NEEDED | SalaryProfile |
+| SM approves/rejects profile | profile creator | APPROVAL_APPROVED / REJECTED | SalaryProfile |
+| Manager creates `SalaryChangeRequest` | all SUPER_MANAGER | APPROVAL_NEEDED | SalaryChangeRequest |
+| SM approves/rejects change | requester | APPROVAL_APPROVED / REJECTED | SalaryChangeRequest |
+| Manager creates `SalaryAllowance` | all SUPER_MANAGER | APPROVAL_NEEDED | SalaryAllowance |
+| SM approves/rejects allowance | requester | APPROVAL_APPROVED / REJECTED | SalaryAllowance |
+| Manager creates `SalaryWithholding` | all SUPER_MANAGER | APPROVAL_NEEDED | SalaryWithholding |
+| SM approves/rejects withholding | requester | APPROVAL_APPROVED / REJECTED | SalaryWithholding |
+| Task assigned | assignee | TASK_ASSIGNED | Task |
+| Assignee updates status/progress | task creator | TASK_UPDATE | Task |
+
+---
+
+## Tasks (`/tasks`)
+
+Replaces the old mocked `POST /manager/tasks`. Real persistence + automatic notifications.
+
+### `POST /api/v1/tasks`
+**Roles:** SUPER_MANAGER, MANAGER, PRINCIPAL, VICE_PRINCIPAL, DEAN_OF_STUDIES, HOD, BURSAR, SENIOR_DISCIPLINE_MASTER, DEAN_OF_DISCIPLINE
+```json
+{
+  "title": "Prepare Q3 supply audit",
+  "description": "Full audit of consumable inventory.",
+  "assignedToId": 42,
+  "priority": "HIGH",
+  "category": "ADMIN",
+  "deadline": "2026-08-05T17:00:00.000Z",
+  "notes": "Coordinate with the Bursar."
+}
+```
+> `priority`: `LOW` | `MEDIUM` | `HIGH` | `URGENT` (default MEDIUM).
+> On success the assignee receives a `TASK_ASSIGNED` notification.
+
+**Response 201:** the created `Task` with `assignedTo` / `assignedBy` populated.
+
+`POST /api/v1/manager/tasks` (from the manager namespace) also still works and now persists — supports an `assignedTo: number[]` array; one task is created per assignee.
+
+### `GET /api/v1/tasks`
+List. Any authenticated user.
+**Query:**
+| Param | Description |
+|---|---|
+| `mine=true` | Shortcut for `assignedToId = logged-in user`. |
+| `assignedToId` | Filter by assignee. |
+| `assignedById` | Filter by creator. |
+| `status` | `PENDING` \| `IN_PROGRESS` \| `COMPLETED` \| `CANCELLED` |
+| `priority` | `LOW` \| `MEDIUM` \| `HIGH` \| `URGENT` |
+| `category` | Free-text label |
+| `overdue=true` | Deadline in the past and not completed |
+| `page`, `limit` | Pagination |
+
+### `GET /api/v1/tasks/me/counters`
+Small dashboard-badge helper.
+```json
+{ "success": true, "data": { "pending": 3, "in_progress": 2, "overdue": 1 } }
+```
+
+### `GET /api/v1/tasks/:id`
+
+### `PATCH /api/v1/tasks/:id`
+Permissions enforced in service:
+- **Assignee** may update `status`, `progress` (0-100), `notes`.
+- **Creator** and SUPER_MANAGER/PRINCIPAL may update any field.
+- Setting `status = COMPLETED` auto-sets `progress = 100` and `completedAt = now()`.
+
+```json
+{ "status": "IN_PROGRESS", "progress": 60, "notes": "Half done, blocked on stock take" }
+```
+> When the assignee updates status or progress, the task creator receives a `TASK_UPDATE` notification.
+
+### `DELETE /api/v1/tasks/:id`
+Only the creator or a senior (SUPER_MANAGER / PRINCIPAL) may delete.
+
+## Super Manager Overview (`/super-manager/overview`)
+
+Read-only, chart-friendly aggregations for the SUPER_MANAGER dashboard. These endpoints do NOT expose write actions — they exist to give the SUPER_MANAGER at-a-glance oversight (counts, groupings, top-N lists) without needing to walk into each module's edit screens. Existing per-module write endpoints (fees, discipline, salary, etc.) are unchanged and remain restricted to the roles that own those workflows.
+
+**Auth**: `Authorization: Bearer <JWT>`. Read access:
+- `MANAGER`, `PRINCIPAL`, `SUPER_MANAGER` for all endpoints
+- `SUPER_MANAGER`, `MANAGER` only for `/audit`
+
+**Common query parameter** (accepted on every endpoint except `/tasks`, `/inventory`, `/ream-stock`, `/audit`):
+| Param | Description |
+|-------|-------------|
+| `academicYearId` | Optional. Defaults to the current academic year. |
+
+All responses follow: `{ "success": true, "data": { ...summary, ...breakdowns, "lastUpdated": "ISO-8601" } }`.
+
+### `GET /api/v1/super-manager/overview/snapshot`
+One-shot roll-up of every module's `summary` block. Ideal for the top-of-page KPI strip.
+```json
+{
+  "success": true,
+  "data": {
+    "academicYearId": 5,
+    "discipline":    { "totalIssues": 128, "issuesLast30Days": 22, "unexcusedLateness": 47, "unexcusedClassAbsences": 63, "activeWarnings": 9, "pendingParentSummons": 3, "pendingSaturdayPunishments": 4, "seizedItemsInCustody": 6, "rollCallsThisWeek": 84 },
+    "attendance":    { "studentAttendanceRate": 96.4, "teacherAttendanceRateThisMonth": 92.1, "rollCallsThisMonth": 348, "teacherEvaluationsThisMonth": 210, "teacherAbsencesLast30Days": 14 },
+    "academic":      { "totalExamSequences": 6, "openSequences": 1, "marksRecorded": 12894, "pendingReportCards": 32, "subjectSchemes": 55, "logbookEntriesLast7Days": 128 },
+    "financial":     { "totalExpected": 82000000, "totalCollected": 61500000, "outstanding": 20500000, "collectionRate": 75.0, "paymentsLast7Days": 41, "totalExpendituresYTD": 14200000, "totalRefunds": 250000, "refundCount": 3, "pendingFinanceRequests": 2, "activeFeeItems": 18, "controlPaymentsRecorded": 512 },
+    "staff":         { "totalUsers": 187, "totalTeachers": 62, "averageTeachingHours": 22.4, "newStaffThisMonth": 3, "teachersWithFullSchedule": 9 },
+    "communication": { "totalAnnouncements": 24, "announcementsThisMonth": 4, "unreadNotifications": 88, "messagesLast7Days": 154, "chatMessagesLast7Days": 1240 },
+    "health":        { "totalVisitsInYear": 322, "visitsThisMonth": 41, "visitsLast7Days": 12, "sentHomeThisMonth": 3, "studentsWithHealthConditions": 27 },
+    "reamStock":     { "currentStock": 148, "totalReceived": 500, "totalIssued": 352, "receiptsLast30Days": 2, "reamsReceivedLast30Days": 60, "issuancesLast30Days": 18, "reamsIssuedLast30Days": 47 },
+    "salary":        { "activeProfiles": 84, "pendingApprovalProfiles": 3, "pendingChangeRequests": 2, "pendingAllowances": 1, "pendingWithholdings": 0, "totalPayoutYear": 42000000, "totalWithheldYear": 350000, "totalPaymentsRecorded": 620, "cashInjectionsTotal": 500000, "cashInjectionsCount": 2, "latestPayPeriod": { "id": 11, "year": 2026, "month": 7, "payDate": "2026-07-31T00:00:00.000Z", "status": "OPEN" } },
+    "tasks":         { "totalTasks": 96, "overdueTasks": 7, "completionRate": 63.5, "tasksCreatedLast30Days": 21, "tasksCompletedLast30Days": 17 },
+    "inventory":     { "totalItems": 42, "activeItems": 38, "totalHoldings": 812, "distinctHoldings": 210, "pendingTransfers": 3, "ledgerEntriesLast30Days": 55 },
+    "audit":         { "totalModificationsLast30Days": 2140, "distinctActiveUsersLast30Days": 34 },
+    "enrollment":    { "totalEnrollments": 1120, "unassignedEnrollments": 4, "newEnrollmentsThisMonth": 12, "averageClassUtilization": 88.2, "assignmentRate": 99.64 },
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/discipline`
+Discipline issues, warnings, summons, punishments, disciplinary actions, seized items, roll-call activity.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalIssues": 128, "issuesLast30Days": 22, "unexcusedLateness": 47, "unexcusedClassAbsences": 63, "activeWarnings": 9, "pendingParentSummons": 3, "pendingSaturdayPunishments": 4, "seizedItemsInCustody": 6, "rollCallsThisWeek": 84 },
+    "issuesByType": [{ "type": "MORNING_LATENESS", "count": 47 }, { "type": "CLASS_ABSENCE", "count": 63 }],
+    "disciplinaryActions": {
+      "byType":   [{ "type": "SUSPENSION", "count": 4 }, { "type": "WORK_DUTY", "count": 9 }],
+      "byStatus": [{ "status": "PENDING", "count": 2 }, { "status": "ACTIVE", "count": 6 }, { "status": "COMPLETED", "count": 5 }]
+    },
+    "seizedItemsByStatus": [{ "status": "IN_CUSTODY", "count": 6 }, { "status": "RELEASED", "count": 12 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/attendance`
+Student and teacher attendance summaries (this-month bucketed for teachers; academic-year totals for student roll calls).
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "studentAttendanceRate": 96.4, "teacherAttendanceRateThisMonth": 92.1, "rollCallsThisMonth": 348, "teacherEvaluationsThisMonth": 210, "teacherAbsencesLast30Days": 14 },
+    "studentRollCallByStatus":   [{ "status": "PRESENT", "count": 9842 }, { "status": "ABSENT", "count": 340 }, { "status": "LATE", "count": 22 }],
+    "teacherAttendanceByStatus": [{ "status": "PRESENT", "count": 194 }, { "status": "LATE", "count": 12 }, { "status": "ABSENT", "count": 4 }],
+    "teacherRollCallByStatus":   [{ "status": "PRESENT", "count": 5200 }, { "status": "ABSENT", "count": 180 }, { "status": "LATE", "count": 44 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/academic`
+Exam sequences, marks, generated report cards, subject schemes, logbook activity, student sequence-average statuses.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalExamSequences": 6, "openSequences": 1, "marksRecorded": 12894, "pendingReportCards": 32, "subjectSchemes": 55, "logbookEntriesLast7Days": 128 },
+    "sequencesByStatus":         [{ "status": "OPEN", "count": 1 }, { "status": "CLOSED", "count": 4 }, { "status": "FINALIZED", "count": 1 }],
+    "reportsByStatus":           [{ "status": "PENDING", "count": 32 }, { "status": "COMPLETED", "count": 240 }],
+    "logbookByStatusLast30Days": [{ "status": "COMPLETED", "count": 610 }, { "status": "PARTIAL", "count": 18 }, { "status": "NOT_TAUGHT", "count": 5 }],
+    "studentAveragesByStatus":   [{ "status": "PENDING", "count": 100 }, { "status": "CALCULATED", "count": 2410 }, { "status": "VERIFIED", "count": 1988 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/financial`
+School-fees roll-up + expenditure/refund/finance-request/control-payment metrics.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalExpected": 82000000, "totalCollected": 61500000, "outstanding": 20500000, "collectionRate": 75.0, "paymentsLast7Days": 41, "totalExpendituresYTD": 14200000, "totalRefunds": 250000, "refundCount": 3, "pendingFinanceRequests": 2, "activeFeeItems": 18, "controlPaymentsRecorded": 512 },
+    "paymentsByMethod":           [{ "method": "EXPRESS_UNION", "transactionCount": 210, "totalAmount": 32000000, "percentage": 52.03 }],
+    "expendituresByCategoryYTD":  [{ "category": "SUPPLIES", "count": 41, "totalAmount": 4800000 }, { "category": "SALARY", "count": 6, "totalAmount": 8000000 }],
+    "financeRequestsByStatus":    [{ "status": "PENDING", "count": 2 }, { "status": "APPROVED", "count": 15 }, { "status": "REJECTED", "count": 1 }, { "status": "COMPLETED", "count": 8 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/staff`
+Users grouped by role and status, teacher hours summary, sub-class role assignments.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalUsers": 187, "totalTeachers": 62, "averageTeachingHours": 22.4, "newStaffThisMonth": 3, "teachersWithFullSchedule": 9 },
+    "usersByRole":                 [{ "role": "TEACHER", "count": 62 }, { "role": "PARENT", "count": 84 }],
+    "usersByStatus":               [{ "status": "ACTIVE", "count": 180 }, { "status": "INACTIVE", "count": 7 }],
+    "subclassAssignmentsByRole":   [{ "role": "DISCIPLINE_MASTER", "count": 18 }, { "role": "HOD", "count": 9 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/communication`
+Announcements + notification + messaging activity.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalAnnouncements": 24, "announcementsThisMonth": 4, "unreadNotifications": 88, "messagesLast7Days": 154, "chatMessagesLast7Days": 1240 },
+    "announcementsByAudience":              [{ "audience": "INTERNAL", "count": 12 }, { "audience": "EXTERNAL", "count": 5 }, { "audience": "BOTH", "count": 7 }],
+    "notificationsLast30DaysByCategory":    [{ "category": "TASK_ASSIGNED", "count": 41 }, { "category": "APPROVAL_NEEDED", "count": 22 }],
+    "notificationsLast30DaysByStatus":      [{ "status": "SENT", "count": 60 }, { "status": "READ", "count": 200 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/health`
+Nurse infirmary activity + top visit reasons.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalVisitsInYear": 322, "visitsThisMonth": 41, "visitsLast7Days": 12, "sentHomeThisMonth": 3, "studentsWithHealthConditions": 27 },
+    "topReasonsLast30Days": [{ "reason": "headache", "count": 14 }, { "reason": "stomach ache", "count": 9 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/ream-stock`
+Ream (paper) ledger snapshot. Accepts no query params.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "currentStock": 148, "totalReceived": 500, "totalIssued": 352, "receiptsLast30Days": 2, "reamsReceivedLast30Days": 60, "issuancesLast30Days": 18, "reamsIssuedLast30Days": 47 },
+    "topRecipientsLast90Days": [{ "recipientUserId": 12, "recipientName": null, "reamsIssued": 15 }, { "recipientUserId": null, "recipientName": "External print house", "reamsIssued": 8 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/salary`
+Salary profiles / change-requests / allowances / withholdings / pay-period activity + bursar cash injections.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": {
+      "activeProfiles": 84, "pendingApprovalProfiles": 3, "pendingChangeRequests": 2, "pendingAllowances": 1, "pendingWithholdings": 0,
+      "totalPayoutYear": 42000000, "totalWithheldYear": 350000, "totalPaymentsRecorded": 620,
+      "cashInjectionsTotal": 500000, "cashInjectionsCount": 2,
+      "latestPayPeriod": { "id": 11, "year": 2026, "month": 7, "payDate": "2026-07-31T00:00:00.000Z", "status": "OPEN" }
+    },
+    "profilesByStatus":      [{ "status": "ACTIVE", "count": 84 }, { "status": "PENDING_APPROVAL", "count": 3 }],
+    "profilesByType":        [{ "type": "TEACHER_HOURLY", "count": 62 }, { "type": "ADMIN_FIXED", "count": 25 }],
+    "payPeriodsByStatus":    [{ "status": "OPEN", "count": 1 }, { "status": "LOCKED", "count": 3 }, { "status": "PAID", "count": 7 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/tasks`
+Task activity across the whole school. No query params.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalTasks": 96, "overdueTasks": 7, "completionRate": 63.5, "tasksCreatedLast30Days": 21, "tasksCompletedLast30Days": 17 },
+    "tasksByStatus":   [{ "status": "PENDING", "count": 20 }, { "status": "IN_PROGRESS", "count": 15 }, { "status": "COMPLETED", "count": 61 }],
+    "tasksByPriority": [{ "priority": "LOW", "count": 30 }, { "priority": "MEDIUM", "count": 50 }, { "priority": "HIGH", "count": 12 }, { "priority": "URGENT", "count": 4 }],
+    "tasksByCategory": [{ "category": "GENERAL", "count": 45 }, { "category": "MAINTENANCE", "count": 22 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/inventory`
+Personnel inventory catalog + holdings + transfers. No query params.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalItems": 42, "activeItems": 38, "totalHoldings": 812, "distinctHoldings": 210, "pendingTransfers": 3, "ledgerEntriesLast30Days": 55 },
+    "transfersByStatus":    [{ "status": "PENDING", "count": 3 }, { "status": "ACCEPTED", "count": 44 }],
+    "topItemsByQuantity":   [{ "itemId": 5, "name": "Chalk", "unit": "box", "totalQuantity": 240 }, { "itemId": 9, "name": "A4 Paper", "unit": "ream", "totalQuantity": 148 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/audit`
+Audit log activity over the last 30 days. **SUPER_MANAGER / MANAGER only.** No query params.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalModificationsLast30Days": 2140, "distinctActiveUsersLast30Days": 34 },
+    "actionsLast30Days":         [{ "action": "CREATE", "count": 900 }, { "action": "UPDATE", "count": 1100 }, { "action": "DELETE", "count": 140 }],
+    "topTablesLast30Days":       [{ "table": "Mark", "count": 640 }, { "table": "PaymentTransaction", "count": 210 }],
+    "topActiveUsersLast30Days":  [{ "userId": 7, "name": "Alice Ngu", "matricule": "ST00007", "actions": 380 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### `GET /api/v1/super-manager/overview/enrollment`
+Enrollment counts, class utilization, gender split, students by status.
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "totalEnrollments": 1120, "unassignedEnrollments": 4, "newEnrollmentsThisMonth": 12, "averageClassUtilization": 88.2, "assignmentRate": 99.64 },
+    "classUtilization":  [{ "classId": 1, "className": "Form 1", "maxStudents": 200, "currentStudents": 184, "utilizationRate": 92.0 }],
+    "genderSplit":       [{ "gender": "Male", "count": 580 }, { "gender": "Female", "count": 540 }],
+    "studentsByStatus":  [{ "status": "ENROLLED", "count": 1120 }, { "status": "NOT_ENROLLED", "count": 6 }],
+    "lastUpdated": "2026-08-01T09:15:22.000Z"
+  }
+}
+```
+
+### Frontend integration notes
+- All endpoints are safe to call together — they are independent reads. The `snapshot` endpoint does exactly that server-side.
+- For chart widgets: use each `summary` block for KPI cards; use the array-shaped fields (`*ByStatus`, `*ByType`, `*ByCategory`, `topItemsByQuantity`, `topRecipientsLast90Days`, `topActiveUsersLast30Days`, `classUtilization`, `paymentsByMethod`, `expendituresByCategoryYTD`) as direct inputs to bar / pie / doughnut charts.
+- `lastUpdated` is always ISO-8601 UTC — use it for cache-busting or a "refreshed X seconds ago" label.
+- SUPER_MANAGER retains full write access to the underlying modules; these endpoints are additive.
 

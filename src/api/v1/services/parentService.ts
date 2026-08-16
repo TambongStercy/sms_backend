@@ -1184,26 +1184,36 @@ function getMonthName(month: number): string {
 }
 
 /**
- * Resolve a student by matricule and verify the caller is a linked parent.
- * Throws with a specific message if not found or not authorized.
+ * Resolve a student by matricule. The parent portal is unauthenticated —
+ * knowing the matricule is treated as sufficient to view a student's data.
  */
-export async function resolveOwnChildByMatricule(parentId: number, matricule: string): Promise<Student> {
+export async function resolveStudentByMatricule(matricule: string): Promise<Student> {
     const student = await prisma.student.findUnique({ where: { matricule } });
     if (!student) {
         const err: any = new Error('Student not found for the provided matricule');
         err.statusCode = 404;
         throw err;
     }
+    return student;
+}
 
+/**
+ * Find the first linked parent user id for a student (by matricule).
+ * Used when parent-side endpoints need a sender/actor identity
+ * (e.g. sending a message, opening a DM channel).
+ */
+export async function resolveLinkedParentIdByMatricule(matricule: string): Promise<number> {
+    const student = await resolveStudentByMatricule(matricule);
     const link = await prisma.parentStudent.findFirst({
-        where: { parent_id: parentId, student_id: student.id }
+        where: { student_id: student.id },
+        orderBy: { id: 'asc' }
     });
     if (!link) {
-        const err: any = new Error('Parent-student relationship not found');
-        err.statusCode = 403;
+        const err: any = new Error('No parent is linked to this student');
+        err.statusCode = 404;
         throw err;
     }
-    return student;
+    return link.parent_id;
 }
 
 /**
@@ -1212,11 +1222,10 @@ export async function resolveOwnChildByMatricule(parentId: number, matricule: st
  * discipline issues, and health profile.
  */
 export async function getChildOverviewByMatricule(
-    parentId: number,
     matricule: string,
     academicYearId?: number
 ) {
-    const student = await resolveOwnChildByMatricule(parentId, matricule);
+    const student = await resolveStudentByMatricule(matricule);
     const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
 
     const enrollment = await prisma.enrollment.findFirst({
@@ -1476,11 +1485,10 @@ async function getChildHealthProfileCore(
  * report records the parent can attempt to download.
  */
 export async function listChildReportCardsByMatricule(
-    parentId: number,
     matricule: string,
     academicYearId?: number
 ) {
-    const student = await resolveOwnChildByMatricule(parentId, matricule);
+    const student = await resolveStudentByMatricule(matricule);
     const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
 
     const reports = await prisma.generatedReport.findMany({
@@ -1520,4 +1528,382 @@ export async function listChildReportCardsByMatricule(
             errorMessage: r.error_message
         }))
     };
+}
+
+// ---------------------------------------------------------------------------
+// Matricule-scoped parent portal functions (no authentication required).
+// Each function resolves the student from the matricule and returns data
+// for that single child only.
+// ---------------------------------------------------------------------------
+
+/**
+ * Single-child dashboard summary — the matricule identifies the student.
+ * Returns the same shape as one entry in the legacy multi-child dashboard.
+ */
+export async function getChildDashboardByMatricule(
+    matricule: string,
+    academicYearId?: number
+): Promise<ChildOverview & { fees: { totalExpected: number; totalPaid: number; outstanding: number } }> {
+    const student = await resolveStudentByMatricule(matricule);
+    const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
+
+    const enrollment = await prisma.enrollment.findFirst({
+        where: {
+            student_id: student.id,
+            ...(yearId ? { academic_year_id: yearId } : {})
+        },
+        include: {
+            sub_class: { include: { class: true } },
+            marks: {
+                include: { sub_class_subject: { include: { subject: true } } },
+                orderBy: { created_at: 'desc' },
+                take: 5
+            },
+            discipline_issues: true,
+            school_fees: true,
+            absences: {
+                where: { created_at: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
+            }
+        }
+    });
+
+    const latestMarks: MarkSummary[] = enrollment?.marks?.slice(0, 3).map(m => ({
+        subject_name: m.sub_class_subject.subject.name,
+        latest_mark: (m.score ?? 0) || 0,
+        sequence: 'Recent',
+        date: m.created_at
+    })) || [];
+
+    const totalExpected = enrollment?.school_fees?.reduce((s, f) => s + f.amount_expected, 0) || 0;
+    const totalPaid = enrollment?.school_fees?.reduce((s, f) => s + f.amount_paid, 0) || 0;
+    const outstanding = totalExpected - totalPaid;
+
+    return {
+        id: student.id,
+        name: student.name,
+        matricule: student.matricule || undefined,
+        class_name: enrollment?.sub_class?.class?.name,
+        subclass_name: enrollment?.sub_class?.name,
+        enrollment_status: student.status,
+        photo: enrollment?.photo || undefined,
+        attendance_rate: 85,
+        latest_marks: latestMarks,
+        pending_fees: outstanding,
+        discipline_issues: enrollment?.discipline_issues?.length || 0,
+        recent_absences: enrollment?.absences?.length || 0,
+        fees: { totalExpected, totalPaid, outstanding }
+    };
+}
+
+/**
+ * Full child details by matricule — same shape as legacy getChildDetails
+ * but resolves the student from matricule and skips the parent-link check.
+ */
+export async function getChildDetailsByMatricule(
+    matricule: string,
+    academicYearId?: number
+): Promise<ChildDetails> {
+    const student = await resolveStudentByMatricule(matricule);
+    const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
+
+    const enrollments = await prisma.enrollment.findMany({
+        where: {
+            student_id: student.id,
+            ...(yearId ? { academic_year_id: yearId } : {})
+        },
+        include: {
+            sub_class: {
+                include: {
+                    class: true,
+                    class_master: { select: { name: true } }
+                }
+            },
+            marks: {
+                include: { sub_class_subject: { include: { subject: true } } },
+                orderBy: { created_at: 'desc' }
+            },
+            school_fees: {
+                include: {
+                    payment_transactions: {
+                        include: { recorded_by: { select: { name: true } } },
+                        orderBy: { created_at: 'desc' }
+                    }
+                }
+            },
+            discipline_issues: { orderBy: { created_at: 'desc' } },
+            absences: { orderBy: { created_at: 'desc' }, take: 30 }
+        }
+    });
+
+    let reports: any[] = [];
+    try {
+        reports = await prisma.generatedReport.findMany({
+            where: {
+                student_id: student.id,
+                ...(yearId ? { academic_year_id: yearId } : {})
+            },
+            include: {
+                exam_sequence: {
+                    select: {
+                        sequence_number: true,
+                        term: { select: { name: true } }
+                    }
+                },
+                academic_year: { select: { name: true } }
+            },
+            orderBy: { created_at: 'desc' }
+        });
+    } catch {
+        reports = [];
+    }
+
+    const currentEnrollment = enrollments[0];
+
+    const totalSchoolDays = 180;
+    const absentDays = currentEnrollment?.absences?.length || 0;
+    const presentDays = totalSchoolDays - absentDays;
+    const lateDays = 5;
+    const attendanceRate = (presentDays / totalSchoolDays) * 100;
+
+    const subjectPerformanceMap = new Map<number, SubjectPerformance>();
+    currentEnrollment?.marks?.forEach(mark => {
+        const subjectId = mark.sub_class_subject?.subject?.id;
+        const subjectName = mark.sub_class_subject?.subject?.name;
+        if (!subjectId || !subjectName) return;
+        if (!subjectPerformanceMap.has(subjectId)) {
+            subjectPerformanceMap.set(subjectId, {
+                subject_name: subjectName,
+                teacher_name: 'Teacher Name',
+                marks: [],
+                average: 0
+            });
+        }
+        subjectPerformanceMap.get(subjectId)!.marks.push({
+            sequence: 'Sequence',
+            mark: (mark.score ?? 0) || 0,
+            total: 20,
+            date: mark.created_at
+        });
+    });
+
+    const subjects = Array.from(subjectPerformanceMap.values()).map(subject => {
+        const total = subject.marks.reduce((s, m) => s + m.mark, 0);
+        subject.average = subject.marks.length > 0 ? total / subject.marks.length : 0;
+        return subject;
+    });
+
+    const overallAverage = subjects.length > 0
+        ? subjects.reduce((s, sub) => s + sub.average, 0) / subjects.length
+        : 0;
+
+    const fees = currentEnrollment?.school_fees?.[0];
+    const totalExpected = fees?.amount_expected || 0;
+    const totalPaid = fees?.amount_paid || 0;
+    const paymentHistory: PaymentRecord[] = fees?.payment_transactions?.map(t => ({
+        id: t.id,
+        amount: t.amount,
+        payment_date: t.payment_date,
+        payment_method: t.payment_method,
+        receipt_number: t.receipt_number || undefined,
+        recorded_by: t.recorded_by?.name || 'Unknown'
+    })) || [];
+
+    const disciplineRecords: DisciplineRecord[] = currentEnrollment?.discipline_issues?.map(i => ({
+        id: i.id,
+        type: i.issue_type,
+        description: i.description,
+        date_occurred: i.created_at,
+        status: 'PENDING',
+        resolved_at: undefined
+    })) || [];
+
+    const reportCards: ReportCard[] = reports.map(r => ({
+        id: r.id,
+        sequence_name: `${r.exam_sequence?.term?.name || 'Term'} - Sequence ${r.exam_sequence?.sequence_number || 'N/A'}`,
+        academic_year: r.academic_year?.name || 'Unknown Year',
+        generated_at: r.created_at,
+        download_url: `/api/v1/report-cards/${r.id}/download`
+    }));
+
+    return {
+        id: student.id,
+        name: student.name,
+        matricule: student.matricule,
+        date_of_birth: student.date_of_birth,
+        class_info: currentEnrollment?.sub_class ? {
+            class_name: currentEnrollment.sub_class.class.name,
+            subclass_name: currentEnrollment.sub_class.name,
+            class_master: currentEnrollment.sub_class.class_master?.name
+        } : undefined,
+        attendance: {
+            present_days: presentDays,
+            absent_days: absentDays,
+            late_days: lateDays,
+            attendance_rate: attendanceRate
+        },
+        academic_performance: {
+            subjects,
+            overall_average: overallAverage,
+            position_in_class: undefined
+        },
+        fees: {
+            total_expected: totalExpected,
+            total_paid: totalPaid,
+            outstanding_balance: totalExpected - totalPaid,
+            last_payment_date: paymentHistory[0]?.payment_date,
+            payment_history: paymentHistory
+        },
+        discipline: {
+            total_issues: disciplineRecords.length,
+            recent_issues: disciplineRecords.slice(0, 5)
+        },
+        reports: { available_reports: reportCards }
+    };
+}
+
+/**
+ * Quiz results for a single child (by matricule).
+ */
+export async function getChildQuizResultsByMatricule(
+    matricule: string,
+    academicYearId?: number
+): Promise<any[]> {
+    const student = await resolveStudentByMatricule(matricule);
+    const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
+
+    const submissions = await prisma.quizSubmission.findMany({
+        where: {
+            student_id: student.id,
+            ...(yearId ? { academic_year_id: yearId } : {})
+        },
+        include: { quiz: { include: { subject: true } } },
+        orderBy: { submitted_at: 'desc' }
+    });
+
+    return submissions.map(s => ({
+        submissionId: s.id,
+        quizTitle: s.quiz.title,
+        subject: s.quiz.subject.name,
+        score: s.score,
+        totalMarks: s.total_marks,
+        percentage: s.percentage,
+        status: s.status,
+        submittedAt: s.submitted_at
+    }));
+}
+
+/**
+ * Analytics for a single child (by matricule).
+ */
+export async function getChildAnalyticsByMatricule(
+    matricule: string,
+    academicYearId?: number
+): Promise<any> {
+    const student = await resolveStudentByMatricule(matricule);
+    const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
+
+    let studentWithEnrollments = await prisma.student.findUnique({
+        where: { id: student.id },
+        include: {
+            enrollments: yearId ? { where: { academic_year_id: yearId } } : true
+        }
+    });
+
+    if (studentWithEnrollments && studentWithEnrollments.enrollments.length === 0 && yearId) {
+        studentWithEnrollments = await prisma.student.findUnique({
+            where: { id: student.id },
+            include: { enrollments: { orderBy: { created_at: 'desc' } } }
+        });
+    }
+
+    if (!studentWithEnrollments || studentWithEnrollments.enrollments.length === 0) {
+        return {
+            studentInfo: { id: student.id, name: student.name, classInfo: null },
+            performanceAnalytics: {
+                overall_average: 0,
+                total_assessments: 0,
+                improvement_trend: 'No data',
+                performance_grade: 'N/A',
+                strengths: [],
+                areas_for_improvement: []
+            },
+            attendanceAnalytics: {
+                overall_attendance_rate: 0,
+                total_absences: 0,
+                monthly_trends: [],
+                attendance_status: 'No data',
+                recent_absences: []
+            },
+            quizAnalytics: {
+                total_quizzes: 0,
+                average_score: 0,
+                improvement_trend: 'No data',
+                subject_performance: [],
+                recent_quizzes: []
+            },
+            subjectTrends: [],
+            comparativeAnalytics: {
+                class_comparison: 'No enrollment data',
+                relative_performance: 'N/A'
+            }
+        };
+    }
+
+    const enrollment = studentWithEnrollments.enrollments[0];
+    const actualYearId = enrollment.academic_year_id;
+    const marks = await prisma.mark.findMany({ where: { enrollment_id: enrollment.id } });
+
+    const [
+        performanceAnalytics,
+        attendanceAnalytics,
+        quizAnalytics,
+        subjectTrends,
+        comparativeAnalytics
+    ] = await Promise.all([
+        calculatePerformanceAnalytics(marks),
+        calculateAttendanceAnalytics(enrollment.id, actualYearId),
+        calculateQuizAnalytics(student.id, actualYearId),
+        calculateSubjectTrends(marks),
+        calculateComparativeAnalytics(student.id, enrollment.sub_class_id, actualYearId)
+    ]);
+
+    return {
+        studentInfo: {
+            id: student.id,
+            name: student.name,
+            classInfo: enrollment.sub_class_id ? {
+                className: 'Class Info Not Available',
+                subclassName: 'Subclass Info Not Available'
+            } : null
+        },
+        performanceAnalytics,
+        attendanceAnalytics,
+        quizAnalytics,
+        subjectTrends,
+        comparativeAnalytics
+    };
+}
+
+/**
+ * Send a message from the child's linked parent to a staff member.
+ * Sender identity is derived from the first ParentStudent link on the matricule.
+ */
+export async function sendMessageToStaffFromMatricule(
+    matricule: string,
+    data: {
+        recipient_id: number;
+        subject: string;
+        message: string;
+        priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+    }
+): Promise<any> {
+    const parentId = await resolveLinkedParentIdByMatricule(matricule);
+    return prisma.message.create({
+        data: {
+            sender_id: parentId,
+            receiver_id: data.recipient_id,
+            subject: data.subject,
+            content: data.message
+        }
+    });
 }

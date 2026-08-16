@@ -2,6 +2,10 @@ import prisma, {
     FinanceRequest, FinanceRequestType, FinanceRequestStatus, Role, Prisma,
 } from '../../../config/db';
 import { RoleTier, userHasMinTier } from '../../../utils/roleHierarchy';
+import * as feeService from './feeService';
+import * as feeRefundService from './feeRefundService';
+import * as notificationService from './notificationService';
+import { getAcademicYearId } from '../../../utils/academicYear';
 
 // ---------- Payload typing ----------
 export interface FeeReductionPayload {
@@ -18,6 +22,25 @@ export interface BankVerificationPayload {
     studentId: number;
     claimedAmount?: number;
     estimatedPaymentPeriod: string; // e.g. "2026-03 to 2026-04"
+}
+
+// Parent (or Bursar+ on their behalf) submits proof of a payment they made.
+// Bursar validates → on APPROVE we create the real PaymentTransaction.
+export interface PaymentClaimPayload {
+    enrollmentId?: number;        // preferred
+    studentId?: number;           // fallback — resolved to current-year enrollment
+    feeId?: number;               // if omitted we pick the current-year SchoolFees row
+    paymentMethod: string;        // PaymentMethod enum
+    paymentDate: string;          // ISO date on the receipt
+    receiptNumber?: string;
+}
+
+// Bursar initiates a refund for an overpayment. SUPER_MANAGER approves.
+// On APPROVE we create the real Refund (which decrements SchoolFees.amount_paid).
+export interface RefundRequestPayload {
+    enrollmentId: number;
+    refundMethod: string;         // RefundMethod enum
+    refundDate: string;
 }
 
 function validatePayload(type: FinanceRequestType, payload: any, amount: number | null | undefined) {
@@ -40,7 +63,64 @@ function validatePayload(type: FinanceRequestType, payload: any, amount: number 
             throw new Error('BANK_VERIFICATION payload.studentId and payload.estimatedPaymentPeriod are required');
         }
         // amount may be null
+    } else if (type === 'PAYMENT_CLAIM') {
+        if (!payload || (typeof payload.enrollmentId !== 'number' && typeof payload.studentId !== 'number')) {
+            throw new Error('PAYMENT_CLAIM payload.enrollmentId or payload.studentId is required');
+        }
+        if (!payload.paymentMethod || typeof payload.paymentMethod !== 'string') {
+            throw new Error('PAYMENT_CLAIM payload.paymentMethod is required');
+        }
+        if (!payload.paymentDate || typeof payload.paymentDate !== 'string') {
+            throw new Error('PAYMENT_CLAIM payload.paymentDate is required');
+        }
+        if (amount === null || amount === undefined || amount <= 0) {
+            throw new Error('PAYMENT_CLAIM amount must be > 0');
+        }
+    } else if (type === 'REFUND') {
+        if (!payload || typeof payload.enrollmentId !== 'number') {
+            throw new Error('REFUND payload.enrollmentId is required');
+        }
+        if (!payload.refundMethod || typeof payload.refundMethod !== 'string') {
+            throw new Error('REFUND payload.refundMethod is required');
+        }
+        if (!payload.refundDate || typeof payload.refundDate !== 'string') {
+            throw new Error('REFUND payload.refundDate is required');
+        }
+        if (amount === null || amount === undefined || amount <= 0) {
+            throw new Error('REFUND amount must be > 0');
+        }
     }
+}
+
+// Per-type creator restrictions (route authorize() is intentionally permissive).
+function assertCreatorRole(type: FinanceRequestType, roles: Role[]) {
+    const isPrincipalPlus = userHasMinTier(roles, RoleTier.HEAD_OF_SCHOOL);
+    const isBursarPlus = userHasMinTier(roles, RoleTier.SENIOR_LEADERSHIP);
+    const isParent = roles.includes('PARENT' as Role);
+
+    if (type === 'PAYMENT_CLAIM') {
+        if (!isParent && !isBursarPlus) {
+            throw new Error('Only PARENT or Bursar+ may create a PAYMENT_CLAIM');
+        }
+    } else if (type === 'REFUND') {
+        if (!isBursarPlus) {
+            throw new Error('Only Bursar+ may create a REFUND request');
+        }
+    } else if (type === 'FEE_REDUCTION' || type === 'PERSONNEL_DISBURSEMENT' || type === 'BANK_VERIFICATION') {
+        if (!isBursarPlus) {
+            throw new Error(`Only Bursar+ may create a ${type} request`);
+        }
+    }
+}
+
+async function assertParentOwnsEnrollment(parentUserId: number, enrollmentId: number) {
+    const enr = await prisma.enrollment.findUnique({ where: { id: enrollmentId }, select: { student_id: true } });
+    if (!enr) throw new Error(`Enrollment ${enrollmentId} not found`);
+    const link = await prisma.parentStudent.findFirst({
+        where: { parent_id: parentUserId, student_id: enr.student_id },
+        select: { id: true },
+    });
+    if (!link) throw new Error('You are not linked to this student');
 }
 
 // ---------- Create ----------
@@ -51,10 +131,12 @@ export interface CreateFinanceRequestInput {
     notes?: string;
     payload: Record<string, any>;
     requested_by_id: number;
+    requested_by_roles?: Role[];
 }
 
 export async function createFinanceRequest(input: CreateFinanceRequestInput): Promise<FinanceRequest> {
     if (!input.reason || !input.reason.trim()) throw new Error('reason is required');
+    if (input.requested_by_roles) assertCreatorRole(input.type, input.requested_by_roles);
     validatePayload(input.type, input.payload, input.amount ?? null);
 
     if (input.type === 'FEE_REDUCTION') {
@@ -66,9 +148,46 @@ export async function createFinanceRequest(input: CreateFinanceRequestInput): Pr
     } else if (input.type === 'BANK_VERIFICATION') {
         const s = await prisma.student.findUnique({ where: { id: input.payload.studentId } });
         if (!s) throw new Error(`Student ${input.payload.studentId} not found`);
+    } else if (input.type === 'PAYMENT_CLAIM') {
+        // Resolve enrollment (from studentId if needed) and validate parent linkage.
+        let enrollmentId: number | undefined = input.payload.enrollmentId;
+        if (!enrollmentId && input.payload.studentId) {
+            const yearId = await getAcademicYearId();
+            if (!yearId) throw new Error('No current academic year — cannot resolve enrollment from studentId');
+            const enr = await prisma.enrollment.findFirst({
+                where: { student_id: input.payload.studentId, academic_year_id: yearId },
+                select: { id: true },
+            });
+            if (!enr) throw new Error(`Student ${input.payload.studentId} has no enrollment for the current academic year`);
+            enrollmentId = enr.id;
+            input.payload.enrollmentId = enrollmentId;
+        }
+        if (!enrollmentId) throw new Error('Could not resolve enrollment for PAYMENT_CLAIM');
+        const enr = await prisma.enrollment.findUnique({ where: { id: enrollmentId } });
+        if (!enr) throw new Error(`Enrollment ${enrollmentId} not found`);
+
+        const isParent = (input.requested_by_roles ?? []).includes('PARENT' as Role);
+        const isBursarPlus = userHasMinTier(input.requested_by_roles ?? [], RoleTier.SENIOR_LEADERSHIP);
+        if (isParent && !isBursarPlus) {
+            await assertParentOwnsEnrollment(input.requested_by_id, enrollmentId);
+        }
+    } else if (input.type === 'REFUND') {
+        const enr = await prisma.enrollment.findUnique({
+            where: { id: input.payload.enrollmentId },
+            include: { school_fees: { include: { refunds: { select: { amount: true } } } } },
+        });
+        if (!enr) throw new Error(`Enrollment ${input.payload.enrollmentId} not found`);
+        const fees = enr.school_fees[0];
+        if (!fees) throw new Error(`Enrollment ${input.payload.enrollmentId} has no SchoolFees record`);
+        const totalRefunded = fees.refunds.reduce((s, r) => s + r.amount, 0);
+        const currentOverpayment = fees.amount_paid - fees.amount_expected - totalRefunded;
+        if (currentOverpayment <= 0) throw new Error('Enrollment has no current overpayment to refund');
+        if ((input.amount ?? 0) > currentOverpayment) {
+            throw new Error(`Refund amount (${input.amount}) exceeds current overpayment (${currentOverpayment})`);
+        }
     }
 
-    return prisma.financeRequest.create({
+    const created = await prisma.financeRequest.create({
         data: {
             type: input.type,
             status: 'PENDING',
@@ -79,6 +198,11 @@ export async function createFinanceRequest(input: CreateFinanceRequestInput): Pr
             requested_by_id: input.requested_by_id,
         },
     });
+
+    // Fire notifications (best-effort — never block the create).
+    notifyOnCreate(created).catch((e) => console.error('finance-request notify-on-create failed', e));
+
+    return created;
 }
 
 // ---------- Listing ----------
@@ -155,6 +279,14 @@ function isPrincipalPlus(roles: Role[]): boolean {
     return userHasMinTier(roles, RoleTier.HEAD_OF_SCHOOL);
 }
 
+function isBursarPlus(roles: Role[]): boolean {
+    return userHasMinTier(roles, RoleTier.SENIOR_LEADERSHIP);
+}
+
+function isSuperManager(roles: Role[]): boolean {
+    return roles.includes('SUPER_MANAGER' as Role);
+}
+
 function canActOnRequest(
     req: FinanceRequest,
     action: 'APPROVE' | 'REJECT' | 'COMPLETE',
@@ -197,7 +329,71 @@ function canActOnRequest(
         return { allowed: true };
     }
 
+    if (req.type === 'PAYMENT_CLAIM') {
+        if (action !== 'APPROVE' && action !== 'REJECT') {
+            return { allowed: false, reason: 'PAYMENT_CLAIM only supports APPROVE or REJECT' };
+        }
+        if (!isBursarPlus(actorRoles)) {
+            return { allowed: false, reason: 'Only Bursar+ can validate a PAYMENT_CLAIM' };
+        }
+        return { allowed: true };
+    }
+
+    if (req.type === 'REFUND') {
+        if (action !== 'APPROVE' && action !== 'REJECT') {
+            return { allowed: false, reason: 'REFUND only supports APPROVE or REJECT' };
+        }
+        if (!isSuperManager(actorRoles)) {
+            return { allowed: false, reason: 'Only SUPER_MANAGER can approve or reject a REFUND request' };
+        }
+        return { allowed: true };
+    }
+
     return { allowed: false, reason: 'Unknown request type' };
+}
+
+// ---------- Side effects on approve ----------
+// PAYMENT_CLAIM approve → create a real PaymentTransaction.
+async function performApprovedPaymentClaim(req: FinanceRequest, actorUserId: number) {
+    const payload = req.payload as any;
+    const feeId: number | undefined = payload.feeId;
+    let resolvedFeeId = feeId;
+
+    if (!resolvedFeeId) {
+        // Pick the current-year SchoolFees row for the enrollment.
+        const enr = await prisma.enrollment.findUnique({
+            where: { id: payload.enrollmentId },
+            include: { school_fees: { select: { id: true }, orderBy: { id: 'desc' }, take: 1 } },
+        });
+        if (!enr) throw new Error(`Enrollment ${payload.enrollmentId} not found`);
+        const fee = enr.school_fees[0];
+        if (!fee) throw new Error(`Enrollment ${payload.enrollmentId} has no SchoolFees record`);
+        resolvedFeeId = fee.id;
+    }
+
+    await feeService.recordPayment({
+        amount: req.amount ?? 0,
+        payment_date: payload.paymentDate,
+        receipt_number: payload.receiptNumber,
+        payment_method: payload.paymentMethod,
+        enrollment_id: payload.enrollmentId,
+        fee_id: resolvedFeeId!,
+        recorded_by_id: actorUserId,
+    });
+}
+
+// REFUND approve → create a real Refund (decrements SchoolFees.amount_paid).
+async function performApprovedRefund(req: FinanceRequest, actorUserId: number) {
+    const payload = req.payload as any;
+    await feeRefundService.recordRefund({
+        enrollment_id: payload.enrollmentId,
+        amount: req.amount ?? 0,
+        refund_date: payload.refundDate,
+        refund_method: payload.refundMethod,
+        reason: req.reason,
+        notes: req.notes ?? undefined,
+        recorded_by_id: actorUserId,
+    });
 }
 
 // ---------- Transitions ----------
@@ -218,12 +414,21 @@ async function transition(
         throw err;
     }
 
+    // Side effects on APPROVE — do them BEFORE flipping status so a failure aborts the transition.
+    if (action === 'APPROVE') {
+        if (req.type === 'PAYMENT_CLAIM') {
+            await performApprovedPaymentClaim(req, actorUserId);
+        } else if (req.type === 'REFUND') {
+            await performApprovedRefund(req, actorUserId);
+        }
+    }
+
     const newStatus: FinanceRequestStatus =
         action === 'APPROVE' ? 'APPROVED' :
         action === 'REJECT' ? 'REJECTED' :
         'COMPLETED';
 
-    return prisma.financeRequest.update({
+    const updated = await prisma.financeRequest.update({
         where: { id },
         data: {
             status: newStatus,
@@ -232,6 +437,13 @@ async function transition(
             acted_notes: notes?.trim() || null,
         },
     });
+
+    // Fan out notifications.
+    notifyOnTransition(updated, action, actorUserId).catch((e) =>
+        console.error('finance-request notify-on-transition failed', e)
+    );
+
+    return updated;
 }
 
 export const approveFinanceRequest = (id: number, actorUserId: number, actorRoles: Role[], notes?: string) =>
@@ -242,3 +454,168 @@ export const rejectFinanceRequest = (id: number, actorUserId: number, actorRoles
 
 export const completeFinanceRequest = (id: number, actorUserId: number, actorRoles: Role[], notes?: string) =>
     transition(id, 'COMPLETE', actorUserId, actorRoles, notes);
+
+// ---------- Notifications ----------
+async function studentLabelForEnrollment(enrollmentId?: number): Promise<string> {
+    if (!enrollmentId) return '';
+    const enr = await prisma.enrollment.findUnique({
+        where: { id: enrollmentId },
+        include: { student: { select: { name: true, matricule: true } } },
+    });
+    if (!enr?.student) return '';
+    return `${enr.student.name} (${enr.student.matricule})`;
+}
+
+async function parentUserIdsForEnrollment(enrollmentId?: number): Promise<number[]> {
+    if (!enrollmentId) return [];
+    const enr = await prisma.enrollment.findUnique({ where: { id: enrollmentId }, select: { student_id: true } });
+    if (!enr) return [];
+    const links = await prisma.parentStudent.findMany({
+        where: { student_id: enr.student_id },
+        select: { parent_id: true },
+    });
+    return Array.from(new Set(links.map(l => l.parent_id)));
+}
+
+async function notifyOnCreate(req: FinanceRequest) {
+    const payload = req.payload as any;
+    const actionUrl = `/finance-requests/${req.id}`;
+
+    if (req.type === 'PAYMENT_CLAIM') {
+        const label = await studentLabelForEnrollment(payload.enrollmentId);
+        const amount = req.amount ?? 0;
+        await notificationService.sendToRoles(
+            ['BURSAR', 'PRINCIPAL', 'SUPER_MANAGER', 'MANAGER'],
+            {
+                title: 'Payment claim awaiting validation',
+                message: `New payment claim of ${amount} for ${label}. Please verify and approve.`,
+                sender_id: req.requested_by_id,
+                category: 'APPROVAL_NEEDED',
+                priority: 'HIGH',
+                entity_type: 'FinanceRequest',
+                entity_id: req.id,
+                action_url: actionUrl,
+            }
+        );
+        return;
+    }
+
+    if (req.type === 'REFUND') {
+        const label = await studentLabelForEnrollment(payload.enrollmentId);
+        const amount = req.amount ?? 0;
+        await notificationService.notifySuperManagers({
+            title: 'Refund request awaiting approval',
+            message: `Bursar requests refund of ${amount} for ${label}. Reason: ${req.reason}`,
+            sender_id: req.requested_by_id,
+            priority: 'HIGH',
+            entity_type: 'FinanceRequest',
+            entity_id: req.id,
+            action_url: actionUrl,
+        });
+        return;
+    }
+
+    // Existing types keep their pre-existing (silent) behavior; add fanouts opportunistically.
+    if (req.type === 'FEE_REDUCTION') {
+        await notificationService.sendToRoles(['PRINCIPAL', 'SUPER_MANAGER'], {
+            title: 'Fee-reduction request',
+            message: `Bursar requests fee reduction of ${req.amount}. Reason: ${req.reason}`,
+            sender_id: req.requested_by_id,
+            category: 'APPROVAL_NEEDED',
+            priority: 'HIGH',
+            entity_type: 'FinanceRequest',
+            entity_id: req.id,
+            action_url: actionUrl,
+        });
+    } else if (req.type === 'PERSONNEL_DISBURSEMENT') {
+        const recipientId = payload?.recipientUserId;
+        if (typeof recipientId === 'number') {
+            await notificationService.sendNotification({
+                user_id: recipientId,
+                title: 'Disbursement awaiting your confirmation',
+                message: `A disbursement of ${req.amount} for "${payload?.purpose}" has been recorded. Confirm receipt.`,
+                sender_id: req.requested_by_id,
+                category: 'APPROVAL_NEEDED',
+                priority: 'HIGH',
+                entity_type: 'FinanceRequest',
+                entity_id: req.id,
+                action_url: actionUrl,
+            });
+        }
+    } else if (req.type === 'BANK_VERIFICATION') {
+        await notificationService.sendToRoles(['SECRETARY', 'FEE_AUDITOR', 'BURSAR', 'PRINCIPAL'], {
+            title: 'Bank verification requested',
+            message: `Verify bank slip for student ${payload?.studentId} (${payload?.estimatedPaymentPeriod}).`,
+            sender_id: req.requested_by_id,
+            category: 'APPROVAL_NEEDED',
+            priority: 'HIGH',
+            entity_type: 'FinanceRequest',
+            entity_id: req.id,
+            action_url: actionUrl,
+        });
+    }
+}
+
+async function notifyOnTransition(req: FinanceRequest, action: 'APPROVE' | 'REJECT' | 'COMPLETE', actorId: number) {
+    const payload = req.payload as any;
+    const actionUrl = `/finance-requests/${req.id}`;
+    const label = await studentLabelForEnrollment(payload?.enrollmentId);
+
+    const category =
+        action === 'APPROVE' ? 'APPROVAL_APPROVED' :
+        action === 'REJECT' ? 'APPROVAL_REJECTED' :
+        'FEE_UPDATE';
+
+    // Always notify the requester. Approve/reject outcomes are high-priority so
+    // the requester sees them immediately as a popup; COMPLETE is informational.
+    const verb = action === 'APPROVE' ? 'approved' : action === 'REJECT' ? 'rejected' : 'completed';
+    const humanType = req.type.replace(/_/g, ' ').toLowerCase();
+    const requesterPriority = action === 'COMPLETE' ? 'NORMAL' : 'HIGH';
+    await notificationService.sendNotification({
+        user_id: req.requested_by_id,
+        sender_id: actorId,
+        title: `Your ${humanType} request was ${verb}`,
+        message: req.acted_notes || `${humanType} request ${verb}.`,
+        category: category as any,
+        priority: requesterPriority,
+        entity_type: 'FinanceRequest',
+        entity_id: req.id,
+        action_url: actionUrl,
+    });
+
+    // On PAYMENT_CLAIM approve: also notify all linked parents of the student
+    // that the payment was recorded (unless the requester is the parent themself).
+    if (req.type === 'PAYMENT_CLAIM' && action === 'APPROVE') {
+        const parentIds = await parentUserIdsForEnrollment(payload?.enrollmentId);
+        const recipients = parentIds.filter(pid => pid !== req.requested_by_id);
+        if (recipients.length) {
+            await notificationService.sendBulkNotifications({
+                title: 'Payment recorded',
+                message: `Payment of ${req.amount} for ${label} has been validated by the bursar.`,
+                recipient_ids: recipients,
+                sender_id: actorId,
+                category: 'FEE_UPDATE',
+                entity_type: 'FinanceRequest',
+                entity_id: req.id,
+                action_url: actionUrl,
+            });
+        }
+    }
+
+    // On REFUND approve: notify all linked parents that a refund was issued.
+    if (req.type === 'REFUND' && action === 'APPROVE') {
+        const parentIds = await parentUserIdsForEnrollment(payload?.enrollmentId);
+        if (parentIds.length) {
+            await notificationService.sendBulkNotifications({
+                title: 'Refund issued',
+                message: `A refund of ${req.amount} has been issued for ${label}.`,
+                recipient_ids: parentIds,
+                sender_id: actorId,
+                category: 'FEE_UPDATE',
+                entity_type: 'FinanceRequest',
+                entity_id: req.id,
+                action_url: actionUrl,
+            });
+        }
+    }
+}

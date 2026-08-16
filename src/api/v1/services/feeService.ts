@@ -1079,6 +1079,25 @@ export async function recordPayment(data: {
         throw new Error("Academic year ID is required to record a payment, but none was provided or found.");
     }
 
+    const windowStart = new Date(Date.now() - DUPLICATE_PAYMENT_WINDOW_SECONDS * 1000);
+    const recentDuplicate = await prisma.paymentTransaction.findFirst({
+        where: {
+            enrollment_id: data.enrollment_id,
+            amount: data.amount,
+            payment_method: normalizedPaymentMethod,
+            created_at: { gte: windowStart },
+        },
+        orderBy: { created_at: 'desc' },
+    });
+    if (recentDuplicate) {
+        const secondsAgo = Math.round((Date.now() - recentDuplicate.created_at.getTime()) / 1000);
+        throw new DuplicatePaymentError(
+            `Duplicate payment detected — a payment of ${data.amount} via ${normalizedPaymentMethod} for this student was recorded ${secondsAgo} second(s) ago. If this is intentional, wait ${DUPLICATE_PAYMENT_WINDOW_SECONDS} seconds and retry.`,
+            recentDuplicate.id,
+            secondsAgo,
+        );
+    }
+
     const createData: any = {
         fee_id: data.fee_id,
         enrollment_id: data.enrollment_id,
@@ -1289,6 +1308,19 @@ export class PaymentEditWindowClosedError extends Error {
         this.name = 'PaymentEditWindowClosedError';
     }
 }
+
+export class DuplicatePaymentError extends Error {
+    public readonly existingPaymentId: number;
+    public readonly secondsAgo: number;
+    constructor(message: string, existingPaymentId: number, secondsAgo: number) {
+        super(message);
+        this.name = 'DuplicatePaymentError';
+        this.existingPaymentId = existingPaymentId;
+        this.secondsAgo = secondsAgo;
+    }
+}
+
+export const DUPLICATE_PAYMENT_WINDOW_SECONDS = 60;
 
 export async function updatePayment(
     paymentId: number,

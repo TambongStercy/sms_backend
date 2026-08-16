@@ -6,7 +6,7 @@ import * as unifiedPaymentService from '../services/unifiedPaymentService';
  * Record payment for primary fees - creates fee if it doesn't exist
  * POST /api/v1/payments/primary
  */
-export const recordPrimaryPaymentWithFee = async (req: Request, res: Response) => {
+export const recordPrimaryPaymentWithFee = async (req: Request, res: Response): Promise<any> => {
     try {
         // Use the body directly plus recorded_by_id - middleware handles the conversion
         const paymentData = {
@@ -29,6 +29,17 @@ export const recordPrimaryPaymentWithFee = async (req: Request, res: Response) =
         });
     } catch (error: any) {
         console.error('Error recording primary payment:', error);
+
+        if (error instanceof unifiedPaymentService.DuplicatePaymentError) {
+            return res.status(409).json({
+                success: false,
+                error: error.message,
+                code: 'DUPLICATE_PAYMENT',
+                existingPaymentId: error.existingPaymentId,
+                secondsAgo: error.secondsAgo,
+            });
+        }
+
         res.status(500).json({
             success: false,
             error: error.message
@@ -40,7 +51,7 @@ export const recordPrimaryPaymentWithFee = async (req: Request, res: Response) =
  * Record payment for control fees - creates fee if it doesn't exist
  * POST /api/v1/payments/control
  */
-export const recordControlPaymentWithFee = async (req: Request, res: Response) => {
+export const recordControlPaymentWithFee = async (req: Request, res: Response): Promise<any> => {
     try {
         // Use the body directly plus recorded_by_id - middleware handles the conversion
         const paymentData = {
@@ -63,6 +74,17 @@ export const recordControlPaymentWithFee = async (req: Request, res: Response) =
         });
     } catch (error: any) {
         console.error('Error recording control payment:', error);
+
+        if (error instanceof unifiedPaymentService.DuplicatePaymentError) {
+            return res.status(409).json({
+                success: false,
+                error: error.message,
+                code: 'DUPLICATE_PAYMENT',
+                existingPaymentId: error.existingPaymentId,
+                secondsAgo: error.secondsAgo,
+            });
+        }
+
         res.status(500).json({
             success: false,
             error: error.message

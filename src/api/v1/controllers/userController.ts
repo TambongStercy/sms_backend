@@ -50,6 +50,128 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
+// PARENT is intentionally excluded — parents are not personnel and have their own endpoints.
+const PERSONNEL_VALID_ROLES = new Set<Role>([
+    'SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'CONTROLLER',
+    'TEACHER', 'DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_OF_DISCIPLINE',
+    'DEAN_OF_STUDIES', 'FEE_AUDITOR', 'SECRETARY', 'NURSE', 'GUIDANCE_COUNSELOR', 'HOD'
+] as unknown as Role[]);
+
+const PERSONNEL_VALID_GENDERS = new Set(['Male', 'Female']);
+const PERSONNEL_VALID_STATUSES = new Set(['ACTIVE', 'INACTIVE', 'SUSPENDED']);
+const PERSONNEL_VALID_SORT_BY = new Set([
+    'id', 'name', 'email', 'matricule', 'phone', 'gender', 'status',
+    'created_at', 'updated_at', 'date_of_birth', 'last_seen_at'
+]);
+
+export const searchPersonnel = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const query = (req as any).finalQuery || req.query;
+
+        // Pagination validation
+        const pageRaw = query.page;
+        const limitRaw = query.limit;
+        const page = pageRaw !== undefined ? parseInt(pageRaw as string, 10) : 1;
+        const limit = limitRaw !== undefined ? parseInt(limitRaw as string, 10) : 20;
+
+        if (pageRaw !== undefined && (isNaN(page) || page < 1)) {
+            res.status(400).json({ success: false, error: 'page must be a positive integer' });
+            return;
+        }
+        if (limitRaw !== undefined && (isNaN(limit) || limit < 1 || limit > 100)) {
+            res.status(400).json({ success: false, error: 'limit must be an integer between 1 and 100' });
+            return;
+        }
+
+        // Sort validation
+        const sortBy = (query.sort_by || query.sortBy) as string | undefined;
+        const sortOrderRaw = (query.sort_order || query.sortOrder) as string | undefined;
+        if (sortBy && !PERSONNEL_VALID_SORT_BY.has(sortBy)) {
+            res.status(400).json({
+                success: false,
+                error: `Invalid sort_by. Allowed: ${Array.from(PERSONNEL_VALID_SORT_BY).join(', ')}`
+            });
+            return;
+        }
+        if (sortOrderRaw && !['asc', 'desc'].includes(sortOrderRaw)) {
+            res.status(400).json({ success: false, error: "sort_order must be 'asc' or 'desc'" });
+            return;
+        }
+
+        // Roles: accept `role` (single or csv) or `roles` (csv/array)
+        const rolesInput = query.roles ?? query.role;
+        let roles: Role[] | undefined;
+        if (rolesInput !== undefined && rolesInput !== '') {
+            const list = Array.isArray(rolesInput)
+                ? rolesInput
+                : String(rolesInput).split(',').map(s => s.trim()).filter(Boolean);
+            const invalid = list.filter(r => !PERSONNEL_VALID_ROLES.has(r as Role));
+            if (invalid.length > 0) {
+                res.status(400).json({
+                    success: false,
+                    error: `Invalid role(s): ${invalid.join(', ')}. PARENT is not personnel; allowed roles: ${Array.from(PERSONNEL_VALID_ROLES).join(', ')}`
+                });
+                return;
+            }
+            roles = list as Role[];
+        }
+
+        // Gender validation
+        const gender = query.gender as string | undefined;
+        if (gender && !PERSONNEL_VALID_GENDERS.has(gender)) {
+            res.status(400).json({ success: false, error: "gender must be 'Male' or 'Female'" });
+            return;
+        }
+
+        // Status validation
+        const status = query.status as string | undefined;
+        if (status && !PERSONNEL_VALID_STATUSES.has(status)) {
+            res.status(400).json({ success: false, error: 'status must be ACTIVE, INACTIVE, or SUSPENDED' });
+            return;
+        }
+
+        // Academic year id validation
+        let academicYearId: number | undefined;
+        const yearRaw = query.academic_year_id ?? query.academicYearId;
+        if (yearRaw !== undefined && yearRaw !== '') {
+            const parsed = parseInt(yearRaw as string, 10);
+            if (isNaN(parsed) || parsed < 1) {
+                res.status(400).json({ success: false, error: 'academic_year_id must be a positive integer' });
+                return;
+            }
+            academicYearId = parsed;
+        }
+
+        const result = await userService.searchPersonnel({
+            q: query.q as string | undefined,
+            name: query.name as string | undefined,
+            email: query.email as string | undefined,
+            matricule: query.matricule as string | undefined,
+            phone: query.phone as string | undefined,
+            roles,
+            gender: gender as any,
+            status: status as any,
+            academic_year_id: academicYearId,
+            page,
+            limit,
+            sort_by: sortBy,
+            sort_order: sortOrderRaw === 'desc' ? 'desc' : 'asc'
+        });
+
+        res.json({
+            success: true,
+            data: result.data.map(transformUser),
+            meta: result.meta
+        });
+    } catch (error: any) {
+        console.error('Error searching personnel:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to search personnel'
+        });
+    }
+};
+
 export const createUser = async (req: Request, res: Response): Promise<void> => {
     try {
         const userData = req.body;
@@ -287,7 +409,9 @@ export const updateCurrentUserProfile = async (req: AuthenticatedRequest, res: R
         }
 
         const userId = req.user.id;
-        const updatedUser = await userService.updateUser(userId, req.body);
+        // Route through updateOwnProfile so email/matricule/status/password/roles cannot be
+        // altered here. Password changes must go through POST /auth/change-password.
+        const updatedUser = await userService.updateOwnProfile(userId, req.body);
 
         res.json({
             success: true,
@@ -300,6 +424,35 @@ export const updateCurrentUserProfile = async (req: AuthenticatedRequest, res: R
         } else {
             res.status(500).json({ success: false, error: error.message });
         }
+    }
+};
+
+export const getCurrentUserSettings = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        if (!req.user || typeof req.user.id !== 'number') {
+            res.status(401).json({ success: false, error: 'Unauthorized' });
+            return;
+        }
+        const settings = await userService.getOrCreateUserSettings(req.user.id);
+        res.json({ success: true, data: settings });
+    } catch (error: any) {
+        console.error('Error fetching user settings:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const updateCurrentUserSettings = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        if (!req.user || typeof req.user.id !== 'number') {
+            res.status(401).json({ success: false, error: 'Unauthorized' });
+            return;
+        }
+        const settings = await userService.updateUserSettings(req.user.id, req.body);
+        res.json({ success: true, data: settings });
+    } catch (error: any) {
+        console.error('Error updating user settings:', error);
+        const status = error.message?.startsWith('Invalid') || error.message?.includes('must be') ? 400 : 500;
+        res.status(status).json({ success: false, error: error.message });
     }
 };
 
@@ -624,6 +777,136 @@ export const removeDisciplineMaster = async (req: Request, res: Response): Promi
         } else {
             res.status(200).json({ success: true, message: 'Discipline Master assignment removed successfully (or did not exist).' });
         }
+    }
+};
+
+// Management-side teacher search with pagination, sorting, and rich filters.
+// Roles allowed by route: SUPER_MANAGER, MANAGER, PRINCIPAL, VICE_PRINCIPAL,
+// BURSAR, SECRETARY, DEAN_OF_STUDIES, HOD.
+const TEACHER_SEARCH_VALID_GENDERS = new Set(['Male', 'Female']);
+const TEACHER_SEARCH_VALID_STATUSES = new Set(['ACTIVE', 'INACTIVE', 'SUSPENDED']);
+const TEACHER_SEARCH_VALID_SORT_BY = new Set([
+    'id', 'name', 'email', 'matricule', 'phone', 'gender', 'status',
+    'created_at', 'updated_at', 'date_of_birth', 'last_seen_at', 'total_hours_per_week'
+]);
+
+const parseBoolParam = (v: any): boolean | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+    const s = String(v).toLowerCase();
+    if (s === 'true' || s === '1') return true;
+    if (s === 'false' || s === '0') return false;
+    return undefined;
+};
+
+const parseIntParam = (v: any, res: Response, name: string): number | undefined | null => {
+    if (v === undefined || v === null || v === '') return undefined;
+    const parsed = parseInt(v as string, 10);
+    if (isNaN(parsed) || parsed < 0) {
+        res.status(400).json({ success: false, error: `${name} must be a non-negative integer` });
+        return null;
+    }
+    return parsed;
+};
+
+export const searchTeachers = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const query = (req as any).finalQuery || req.query;
+
+        // Pagination validation
+        const pageRaw = query.page;
+        const limitRaw = query.limit;
+        const page = pageRaw !== undefined ? parseInt(pageRaw as string, 10) : 1;
+        const limit = limitRaw !== undefined ? parseInt(limitRaw as string, 10) : 20;
+
+        if (pageRaw !== undefined && (isNaN(page) || page < 1)) {
+            res.status(400).json({ success: false, error: 'page must be a positive integer' });
+            return;
+        }
+        if (limitRaw !== undefined && (isNaN(limit) || limit < 1 || limit > 100)) {
+            res.status(400).json({ success: false, error: 'limit must be an integer between 1 and 100' });
+            return;
+        }
+
+        // Sort validation
+        const sortBy = (query.sort_by || query.sortBy) as string | undefined;
+        const sortOrderRaw = (query.sort_order || query.sortOrder) as string | undefined;
+        if (sortBy && !TEACHER_SEARCH_VALID_SORT_BY.has(sortBy)) {
+            res.status(400).json({
+                success: false,
+                error: `Invalid sort_by. Allowed: ${Array.from(TEACHER_SEARCH_VALID_SORT_BY).join(', ')}`
+            });
+            return;
+        }
+        if (sortOrderRaw && !['asc', 'desc'].includes(sortOrderRaw)) {
+            res.status(400).json({ success: false, error: "sort_order must be 'asc' or 'desc'" });
+            return;
+        }
+
+        // Gender/status validation
+        const gender = query.gender as string | undefined;
+        if (gender && !TEACHER_SEARCH_VALID_GENDERS.has(gender)) {
+            res.status(400).json({ success: false, error: "gender must be 'Male' or 'Female'" });
+            return;
+        }
+        const status = query.status as string | undefined;
+        if (status && !TEACHER_SEARCH_VALID_STATUSES.has(status)) {
+            res.status(400).json({ success: false, error: 'status must be ACTIVE, INACTIVE, or SUSPENDED' });
+            return;
+        }
+
+        // Numeric param validation (parseIntParam sends 400 on error and returns null)
+        const subjectId = parseIntParam(query.subject_id, res, 'subject_id');
+        if (subjectId === null) return;
+        const subClassId = parseIntParam(query.sub_class_id, res, 'sub_class_id');
+        if (subClassId === null) return;
+        const academicYearId = parseIntParam(query.academic_year_id, res, 'academic_year_id');
+        if (academicYearId === null) return;
+        const hodSubjectId = parseIntParam(query.hod_subject_id, res, 'hod_subject_id');
+        if (hodSubjectId === null) return;
+        const classMasterSubClassId = parseIntParam(
+            query.class_master_of_sub_class_id, res, 'class_master_of_sub_class_id'
+        );
+        if (classMasterSubClassId === null) return;
+        const minHours = parseIntParam(query.min_hours_per_week, res, 'min_hours_per_week');
+        if (minHours === null) return;
+        const maxHours = parseIntParam(query.max_hours_per_week, res, 'max_hours_per_week');
+        if (maxHours === null) return;
+
+        const result = await userService.searchTeachers({
+            q: query.q as string | undefined,
+            name: query.name as string | undefined,
+            email: query.email as string | undefined,
+            matricule: query.matricule as string | undefined,
+            phone: query.phone as string | undefined,
+            gender: gender as any,
+            status: status as any,
+            subject_id: subjectId,
+            sub_class_id: subClassId,
+            academic_year_id: academicYearId,
+            is_hod: parseBoolParam(query.is_hod),
+            hod_subject_id: hodSubjectId,
+            is_class_master: parseBoolParam(query.is_class_master),
+            class_master_of_sub_class_id: classMasterSubClassId,
+            min_hours_per_week: minHours,
+            max_hours_per_week: maxHours,
+            has_assignments: parseBoolParam(query.has_assignments),
+            page,
+            limit,
+            sort_by: sortBy,
+            sort_order: sortOrderRaw === 'desc' ? 'desc' : 'asc'
+        });
+
+        res.json({
+            success: true,
+            data: result.data,
+            meta: result.meta
+        });
+    } catch (error: any) {
+        console.error('Error searching teachers:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to search teachers'
+        });
     }
 };
 

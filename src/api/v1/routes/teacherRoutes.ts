@@ -16,7 +16,8 @@ import {
     getAttendanceStatistics,
     getSubClassAttendance,
     getMyCurrentAndNextSubjects,
-    getMyTimetable
+    getMyTimetable,
+    exportMyTimetablePdf
 } from '../controllers/teacherController';
 import {
     getMyCurrentPeriod,
@@ -62,6 +63,9 @@ router.get('/me/timetable/current-next', getMyCurrentAndNextSubjects);
 
 // Route for a teacher to get their own timetable
 router.get('/me/timetable', authenticate, authorize(['TEACHER']), getMyTimetable);
+
+// GET /teachers/me/timetable/export/pdf - Download own timetable as PDF
+router.get('/me/timetable/export/pdf', authenticate, authorize(['TEACHER']), exportMyTimetablePdf);
 
 // =============================
 // TEACHER ATTENDANCE MANAGEMENT ROUTES

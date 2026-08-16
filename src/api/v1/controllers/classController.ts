@@ -105,7 +105,8 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
             miscellaneous_fee,
             first_term_fee,
             second_term_fee,
-            third_term_fee
+            third_term_fee,
+            period_set_id
         } = req.body;
 
         if (!name) {
@@ -125,7 +126,8 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
             miscellaneous_fee: miscellaneous_fee !== undefined ? parseFloat(miscellaneous_fee) : undefined,
             first_term_fee: first_term_fee !== undefined ? parseFloat(first_term_fee) : undefined,
             second_term_fee: second_term_fee !== undefined ? parseFloat(second_term_fee) : undefined,
-            third_term_fee: third_term_fee !== undefined ? parseFloat(third_term_fee) : undefined
+            third_term_fee: third_term_fee !== undefined ? parseFloat(third_term_fee) : undefined,
+            period_set_id: period_set_id === null ? null : (period_set_id !== undefined ? parseInt(period_set_id) : undefined)
         };
 
         // Auto-calculate base_fee if term fees are provided
@@ -212,7 +214,8 @@ export const updateClass = async (req: Request, res: Response): Promise<void> =>
             miscellaneous_fee,
             first_term_fee,
             second_term_fee,
-            third_term_fee
+            third_term_fee,
+            period_set_id
         } = req.body;
 
         // Prepare update data, converting potential string numbers
@@ -225,6 +228,9 @@ export const updateClass = async (req: Request, res: Response): Promise<void> =>
         if (first_term_fee !== undefined) updateData.first_term_fee = parseFloat(first_term_fee);
         if (second_term_fee !== undefined) updateData.second_term_fee = parseFloat(second_term_fee);
         if (third_term_fee !== undefined) updateData.third_term_fee = parseFloat(third_term_fee);
+        if (period_set_id !== undefined) {
+            updateData.period_set_id = period_set_id === null ? null : parseInt(period_set_id);
+        }
 
         // Auto-calculate base_fee if any term fees are provided
         const termFeesProvided = first_term_fee !== undefined || second_term_fee !== undefined || third_term_fee !== undefined;
@@ -602,6 +608,42 @@ export const removeClassMaster = async (req: Request, res: Response): Promise<vo
  * @param req Request with sub_classId parameter
  * @param res Response object
  */
+/**
+ * PUT /classes/:id/period-set  { periodSetId: number|null }
+ * Switch the class's bell schedule. All subclasses inherit through the class.
+ */
+export const assignClassPeriodSet = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const classId = parseInt(req.params.id);
+        if (isNaN(classId)) {
+            res.status(400).json({ success: false, error: 'Invalid class ID format' });
+            return;
+        }
+
+        const raw = req.body.period_set_id;
+        const periodSetId: number | null =
+            raw === null || raw === undefined || raw === '' ? null : parseInt(raw);
+        if (raw !== null && raw !== undefined && raw !== '' && isNaN(periodSetId as number)) {
+            res.status(400).json({ success: false, error: 'Invalid period_set_id' });
+            return;
+        }
+
+        const updated = await classService.assignPeriodSet(classId, periodSetId);
+        res.json({ success: true, data: updated });
+    } catch (error: any) {
+        if (error.message === 'PERIOD_SET_NOT_FOUND') {
+            res.status(404).json({ success: false, error: 'Period set not found' });
+            return;
+        }
+        if (error.code === 'P2025') {
+            res.status(404).json({ success: false, error: 'Class not found' });
+            return;
+        }
+        console.error('Error assigning period set:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 export const getSubclassSubjects = async (req: Request, res: Response): Promise<void> => {
     try {
         const subClassId = parseInt(req.params.subClassId); // Match route param name

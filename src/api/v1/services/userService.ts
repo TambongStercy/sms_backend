@@ -1,10 +1,11 @@
 // src/api/v1/services/userService.ts
 
-import prisma, { Gender, User, Role, UserRole, UserStatus, RoleAssignment, AssignmentRole } from '../../../config/db';
+import prisma, { Gender, User, Role, UserRole, UserStatus, RoleAssignment, AssignmentRole, UserSettings, Theme, NotificationCategory } from '../../../config/db';
 import bcrypt from 'bcrypt';
 import { paginate, PaginationOptions, FilterOptions, PaginatedResult } from '../../../utils/pagination';
 import { getAcademicYearId, getCurrentAcademicYear } from '../../../utils/academicYear'; // Import the utility
 import { generateStaffMatricule } from '../../../utils/matriculeGenerator'; // Import staff matricule generator
+import { SUBCLASS_MAX_STUDENTS } from '../../../utils/capacity';
 import * as disciplineService from './disciplineService'; // Import discipline service for SDM dashboard
 
 // Type definition for the input data for registering with roles
@@ -86,6 +87,373 @@ export async function getAllUsers(
         processedFilters,
         include // Pass the expanded include object
     );
+}
+
+// Personnel = staff users. PARENT is NOT personnel and is never returned here.
+export interface SearchPersonnelParams {
+    q?: string;
+    name?: string;
+    email?: string;
+    matricule?: string;
+    phone?: string;
+    roles?: Role[];
+    gender?: Gender;
+    status?: UserStatus;
+    academic_year_id?: number;
+    page?: number;
+    limit?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+}
+
+export const PERSONNEL_ROLES: Role[] = [
+    'SUPER_MANAGER', 'MANAGER', 'PRINCIPAL', 'VICE_PRINCIPAL', 'BURSAR', 'CONTROLLER',
+    'TEACHER', 'DISCIPLINE_MASTER', 'SENIOR_DISCIPLINE_MASTER', 'DEAN_OF_DISCIPLINE',
+    'DEAN_OF_STUDIES', 'FEE_AUDITOR', 'SECRETARY', 'NURSE', 'GUIDANCE_COUNSELOR', 'HOD'
+];
+
+const SORTABLE_FIELDS = new Set([
+    'id', 'name', 'email', 'matricule', 'phone', 'gender', 'status',
+    'created_at', 'updated_at', 'date_of_birth', 'last_seen_at'
+]);
+
+export async function searchPersonnel(params: SearchPersonnelParams): Promise<PaginatedResult<User>> {
+    const page = params.page && params.page > 0 ? params.page : 1;
+    const limit = params.limit && params.limit > 0 ? Math.min(params.limit, 100) : 20;
+    const skip = (page - 1) * limit;
+
+    const currentAcademicYear = await getCurrentAcademicYear();
+    const roleAcademicYearId = params.academic_year_id ?? currentAcademicYear?.id;
+
+    const where: any = { AND: [] };
+
+    // Free-text search across name, email, matricule, phone
+    if (params.q && params.q.trim()) {
+        const term = params.q.trim();
+        where.AND.push({
+            OR: [
+                { name: { contains: term, mode: 'insensitive' } },
+                { email: { contains: term, mode: 'insensitive' } },
+                { matricule: { contains: term, mode: 'insensitive' } },
+                { phone: { contains: term, mode: 'insensitive' } }
+            ]
+        });
+    }
+
+    if (params.name) where.AND.push({ name: { contains: params.name, mode: 'insensitive' } });
+    if (params.email) where.AND.push({ email: { contains: params.email, mode: 'insensitive' } });
+    if (params.matricule) where.AND.push({ matricule: { contains: params.matricule, mode: 'insensitive' } });
+    if (params.phone) where.AND.push({ phone: { contains: params.phone, mode: 'insensitive' } });
+    if (params.gender) where.AND.push({ gender: params.gender });
+    // Default to ACTIVE so soft-deleted (INACTIVE) users are hidden unless the
+    // caller explicitly requests another status.
+    where.AND.push({ status: params.status ?? 'ACTIVE' });
+
+    // Role scoping. If explicit roles provided, intersect with PERSONNEL_ROLES so PARENT can never be included.
+    const rolesToMatch: Role[] = (params.roles && params.roles.length > 0)
+        ? params.roles.filter(r => PERSONNEL_ROLES.includes(r))
+        : PERSONNEL_ROLES;
+
+    where.AND.push({
+        user_roles: {
+            some: {
+                role: { in: rolesToMatch },
+                // Global roles have null year, year-specific ones match current/requested year
+                OR: [
+                    { academic_year_id: null },
+                    ...(roleAcademicYearId ? [{ academic_year_id: roleAcademicYearId }] : [])
+                ]
+            }
+        }
+    });
+
+    if (where.AND.length === 0) delete where.AND;
+
+    const sortBy = params.sort_by && SORTABLE_FIELDS.has(params.sort_by) ? params.sort_by : 'name';
+    const sortOrder: 'asc' | 'desc' = params.sort_order === 'desc' ? 'desc' : 'asc';
+
+    const include: any = {
+        user_roles: {
+            where: {
+                OR: [
+                    { academic_year_id: null },
+                    ...(roleAcademicYearId ? [{ academic_year_id: roleAcademicYearId }] : [])
+                ]
+            }
+        },
+        subject_teachers: { include: { subject: true } }
+    };
+
+    const [total, data] = await Promise.all([
+        prisma.user.count({ where }),
+        prisma.user.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { [sortBy]: sortOrder },
+            include
+        })
+    ]);
+
+    return {
+        data,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        }
+    };
+}
+
+// ---------- Teacher management search (management-side) ----------
+
+export interface SearchTeachersParams {
+    q?: string;
+    name?: string;
+    email?: string;
+    matricule?: string;
+    phone?: string;
+    gender?: Gender;
+    status?: UserStatus;
+    subject_id?: number;
+    sub_class_id?: number;
+    academic_year_id?: number;
+    is_hod?: boolean;
+    hod_subject_id?: number;
+    is_class_master?: boolean;
+    class_master_of_sub_class_id?: number;
+    min_hours_per_week?: number;
+    max_hours_per_week?: number;
+    has_assignments?: boolean;
+    page?: number;
+    limit?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+}
+
+const TEACHER_SORTABLE_FIELDS = new Set([
+    'id', 'name', 'email', 'matricule', 'phone', 'gender', 'status',
+    'created_at', 'updated_at', 'date_of_birth', 'last_seen_at', 'total_hours_per_week'
+]);
+
+export async function searchTeachers(params: SearchTeachersParams): Promise<PaginatedResult<any>> {
+    const page = params.page && params.page > 0 ? params.page : 1;
+    const limit = params.limit && params.limit > 0 ? Math.min(params.limit, 100) : 20;
+    const skip = (page - 1) * limit;
+
+    const currentAcademicYear = await getCurrentAcademicYear();
+    const academicYearId = params.academic_year_id ?? currentAcademicYear?.id;
+
+    const where: any = { AND: [] as any[] };
+
+    // Must have TEACHER role (global or year-scoped)
+    where.AND.push({
+        user_roles: {
+            some: {
+                role: 'TEACHER',
+                OR: [
+                    { academic_year_id: null },
+                    ...(academicYearId ? [{ academic_year_id: academicYearId }] : [])
+                ]
+            }
+        }
+    });
+
+    // Free-text search
+    if (params.q && params.q.trim()) {
+        const term = params.q.trim();
+        where.AND.push({
+            OR: [
+                { name: { contains: term, mode: 'insensitive' } },
+                { email: { contains: term, mode: 'insensitive' } },
+                { matricule: { contains: term, mode: 'insensitive' } },
+                { phone: { contains: term, mode: 'insensitive' } }
+            ]
+        });
+    }
+
+    if (params.name) where.AND.push({ name: { contains: params.name, mode: 'insensitive' } });
+    if (params.email) where.AND.push({ email: { contains: params.email, mode: 'insensitive' } });
+    if (params.matricule) where.AND.push({ matricule: { contains: params.matricule, mode: 'insensitive' } });
+    if (params.phone) where.AND.push({ phone: { contains: params.phone, mode: 'insensitive' } });
+    if (params.gender) where.AND.push({ gender: params.gender });
+    // Default to ACTIVE so soft-deleted (INACTIVE) users are hidden unless the
+    // caller explicitly requests another status.
+    where.AND.push({ status: params.status ?? 'ACTIVE' });
+
+    // Subject-taught filter (via SubjectTeacher)
+    if (params.subject_id) {
+        where.AND.push({
+            subject_teachers: { some: { subject_id: params.subject_id } }
+        });
+    }
+
+    // Subclass-taught filter (via TeacherPeriod for the academic year)
+    if (params.sub_class_id) {
+        where.AND.push({
+            teacher_periods: {
+                some: {
+                    sub_class_id: params.sub_class_id,
+                    ...(academicYearId ? { academic_year_id: academicYearId } : {})
+                }
+            }
+        });
+    }
+
+    // HOD filters
+    if (params.hod_subject_id) {
+        where.AND.push({ hod_subjects: { some: { id: params.hod_subject_id } } });
+    } else if (params.is_hod === true) {
+        where.AND.push({ hod_subjects: { some: {} } });
+    } else if (params.is_hod === false) {
+        where.AND.push({ hod_subjects: { none: {} } });
+    }
+
+    // Class master filters
+    if (params.class_master_of_sub_class_id) {
+        where.AND.push({ class_master_of: { some: { id: params.class_master_of_sub_class_id } } });
+    } else if (params.is_class_master === true) {
+        where.AND.push({ class_master_of: { some: {} } });
+    } else if (params.is_class_master === false) {
+        where.AND.push({ class_master_of: { none: {} } });
+    }
+
+    // Hours per week range
+    if (params.min_hours_per_week !== undefined || params.max_hours_per_week !== undefined) {
+        const hoursFilter: any = {};
+        if (params.min_hours_per_week !== undefined) hoursFilter.gte = params.min_hours_per_week;
+        if (params.max_hours_per_week !== undefined) hoursFilter.lte = params.max_hours_per_week;
+        where.AND.push({ total_hours_per_week: hoursFilter });
+    }
+
+    // has_assignments: any subject_teachers OR teacher_periods for the year
+    if (params.has_assignments === true) {
+        where.AND.push({
+            OR: [
+                { subject_teachers: { some: {} } },
+                {
+                    teacher_periods: {
+                        some: academicYearId ? { academic_year_id: academicYearId } : {}
+                    }
+                }
+            ]
+        });
+    } else if (params.has_assignments === false) {
+        where.AND.push({ subject_teachers: { none: {} } });
+        where.AND.push({
+            teacher_periods: {
+                none: academicYearId ? { academic_year_id: academicYearId } : {}
+            }
+        });
+    }
+
+    if (where.AND.length === 0) delete where.AND;
+
+    const sortBy = params.sort_by && TEACHER_SORTABLE_FIELDS.has(params.sort_by) ? params.sort_by : 'name';
+    const sortOrder: 'asc' | 'desc' = params.sort_order === 'desc' ? 'desc' : 'asc';
+
+    const include: any = {
+        user_roles: {
+            where: {
+                OR: [
+                    { academic_year_id: null },
+                    ...(academicYearId ? [{ academic_year_id: academicYearId }] : [])
+                ]
+            }
+        },
+        subject_teachers: { include: { subject: true } },
+        hod_subjects: { select: { id: true, name: true, category: true } },
+        class_master_of: {
+            select: {
+                id: true,
+                name: true,
+                class: { select: { id: true, name: true } }
+            }
+        },
+        teacher_periods: {
+            where: academicYearId ? { academic_year_id: academicYearId } : {},
+            select: {
+                sub_class_id: true,
+                subject_id: true,
+                sub_class: {
+                    select: {
+                        id: true,
+                        name: true,
+                        class: { select: { id: true, name: true } }
+                    }
+                },
+                subject: { select: { id: true, name: true, category: true } }
+            }
+        }
+    };
+
+    const [total, data] = await Promise.all([
+        prisma.user.count({ where }),
+        prisma.user.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { [sortBy]: sortOrder },
+            include
+        })
+    ]);
+
+    // Shape response: derive subjects, subclasses, HOD info, class-master info
+    const shaped = data.map((t: any) => {
+        const subjectsMap = new Map<number, any>();
+        for (const st of t.subject_teachers || []) {
+            if (st.subject) subjectsMap.set(st.subject.id, st.subject);
+        }
+        for (const tp of t.teacher_periods || []) {
+            if (tp.subject && !subjectsMap.has(tp.subject.id)) subjectsMap.set(tp.subject.id, tp.subject);
+        }
+
+        const subClassMap = new Map<number, any>();
+        for (const tp of t.teacher_periods || []) {
+            if (tp.sub_class && !subClassMap.has(tp.sub_class.id)) subClassMap.set(tp.sub_class.id, tp.sub_class);
+        }
+
+        return {
+            id: t.id,
+            name: t.name,
+            email: t.email,
+            matricule: t.matricule,
+            phone: t.phone,
+            whatsapp_number: t.whatsapp_number,
+            gender: t.gender,
+            status: t.status,
+            date_of_birth: t.date_of_birth,
+            address: t.address,
+            photo: t.photo,
+            total_hours_per_week: t.total_hours_per_week,
+            last_seen_at: t.last_seen_at,
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+            roles: (t.user_roles || []).map((ur: any) => ({
+                role: ur.role,
+                academic_year_id: ur.academic_year_id
+            })),
+            subjects: Array.from(subjectsMap.values()),
+            sub_classes: Array.from(subClassMap.values()),
+            is_hod: (t.hod_subjects || []).length > 0,
+            hod_subjects: t.hod_subjects || [],
+            is_class_master: (t.class_master_of || []).length > 0,
+            class_master_of: t.class_master_of || [],
+            total_assignments:
+                (t.subject_teachers?.length || 0) + (t.teacher_periods?.length || 0)
+        };
+    });
+
+    return {
+        data: shaped,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        }
+    };
 }
 
 export async function createUser(data: {
@@ -180,15 +548,122 @@ export async function updateUser(id: number, data: Partial<User>): Promise<User>
     });
 }
 
+// Fields a user is allowed to change on their own profile via PUT /users/me.
+// Sensitive/scoped fields (email, matricule, status, password, roles) are excluded —
+// password changes must go through POST /auth/change-password so the current password is verified.
+const SELF_EDITABLE_PROFILE_FIELDS = [
+    'name',
+    'phone',
+    'whatsapp_number',
+    'address',
+    'photo',
+    'id_card_num',
+    'date_of_birth',
+    'gender',
+] as const;
+
+export async function updateOwnProfile(id: number, data: Record<string, any>): Promise<User> {
+    const sanitized: Record<string, any> = {};
+    for (const field of SELF_EDITABLE_PROFILE_FIELDS) {
+        if (data[field] !== undefined) sanitized[field] = data[field];
+    }
+    if (sanitized.date_of_birth && typeof sanitized.date_of_birth === 'string') {
+        sanitized.date_of_birth = new Date(sanitized.date_of_birth);
+    }
+    return prisma.user.update({
+        where: { id },
+        data: sanitized,
+        include: { user_roles: true },
+    });
+}
+
+// ---------- User settings (preferences) ----------
+
+const SETTINGS_DEFAULTS = {
+    theme: Theme.SYSTEM,
+    language: 'en',
+    timezone: 'Africa/Douala',
+    notifications_email: true,
+    notifications_sms: false,
+    notifications_push: true,
+    notifications_in_app: true,
+    quiet_hours_enabled: false,
+    quiet_hours_start: null as string | null,
+    quiet_hours_end: null as string | null,
+    muted_categories: [] as NotificationCategory[],
+};
+
+const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export async function getOrCreateUserSettings(userId: number): Promise<UserSettings> {
+    const existing = await prisma.userSettings.findUnique({ where: { user_id: userId } });
+    if (existing) return existing;
+    return prisma.userSettings.create({
+        data: { user_id: userId, ...SETTINGS_DEFAULTS },
+    });
+}
+
+export async function updateUserSettings(
+    userId: number,
+    data: Partial<{
+        theme: Theme;
+        language: string;
+        timezone: string;
+        notifications_email: boolean;
+        notifications_sms: boolean;
+        notifications_push: boolean;
+        notifications_in_app: boolean;
+        quiet_hours_enabled: boolean;
+        quiet_hours_start: string | null;
+        quiet_hours_end: string | null;
+        muted_categories: NotificationCategory[];
+    }>
+): Promise<UserSettings> {
+    if (data.theme !== undefined && !Object.values(Theme).includes(data.theme)) {
+        throw new Error(`Invalid theme. Allowed: ${Object.values(Theme).join(', ')}`);
+    }
+    for (const key of ['quiet_hours_start', 'quiet_hours_end'] as const) {
+        const val = data[key];
+        if (val !== undefined && val !== null && !HHMM_REGEX.test(val)) {
+            throw new Error(`${key} must be in HH:MM 24-hour format`);
+        }
+    }
+    if (data.muted_categories !== undefined) {
+        const invalid = data.muted_categories.filter(
+            c => !Object.values(NotificationCategory).includes(c)
+        );
+        if (invalid.length > 0) {
+            throw new Error(`Invalid notification categories: ${invalid.join(', ')}`);
+        }
+    }
+
+    return prisma.userSettings.upsert({
+        where: { user_id: userId },
+        create: { user_id: userId, ...SETTINGS_DEFAULTS, ...data },
+        update: data,
+    });
+}
+
 export async function deleteUser(id: number): Promise<User> {
-    // Use transaction to delete user and related roles
+    // Soft delete: personnel have FK references across ~40 tables (marks history,
+    // audit log, financial records, discipline, chat, inventory, salary, etc.).
+    // Hard-deleting would either fail or destroy historical records, so we mark
+    // the user INACTIVE and revoke role assignments. Auth already blocks login
+    // when status !== 'ACTIVE', and personnel search filters INACTIVE by default.
     return prisma.$transaction(async (tx) => {
-        // Delete related roles first
-        await tx.userRole.deleteMany({
-            where: { user_id: id },
+        const existing = await tx.user.findUnique({ where: { id } });
+        if (!existing) {
+            const err: any = new Error('User not found');
+            err.code = 'P2025';
+            throw err;
+        }
+
+        await tx.userRole.deleteMany({ where: { user_id: id } });
+
+        return tx.user.update({
+            where: { id },
+            data: { status: 'INACTIVE' },
         });
-        // Then delete the user
-        return tx.user.delete({ where: { id } });
     });
 }
 
@@ -624,9 +1099,10 @@ export async function getSuperManagerDashboard(academicYearId?: number): Promise
             // Count total academic years
             prisma.academicYear.count(),
 
-            // Count unique users with any role assignment (personnel)
+            // Count unique users with any staff role assignment (personnel excludes PARENT)
             prisma.userRole.groupBy({
                 by: ['user_id'],
+                where: { role: { not: 'PARENT' } },
                 _count: { user_id: true }
             }).then(result => result.length),
 
@@ -1231,15 +1707,17 @@ export async function getManagerDashboard(academicYearId?: number): Promise<any>
             attendanceRate: 85 + Math.random() * 10 // Placeholder - would calculate from actual data
         }));
 
-        const classProfileStats = classUtilization.map(subclass => ({
-            id: subclass.id,
-            name: subclass.name,
-            className: subclass.class.name,
-            currentStudents: subclass.current_students || 0,
-            maxStudents: Math.floor((subclass.class.max_students || 80) / 2), // Assuming 2 subclasses per class
-            utilizationRate: subclass.current_students ? 
-                (subclass.current_students / Math.floor((subclass.class.max_students || 80) / 2)) * 100 : 0
-        }));
+        const classProfileStats = classUtilization.map(subclass => {
+            const current = subclass.current_students || 0;
+            return {
+                id: subclass.id,
+                name: subclass.name,
+                className: subclass.class.name,
+                currentStudents: current,
+                maxStudents: SUBCLASS_MAX_STUDENTS,
+                utilizationRate: (current / SUBCLASS_MAX_STUDENTS) * 100
+            };
+        });
 
         const averageClassUtilization = classProfileStats.length > 0 ?
             classProfileStats.reduce((sum, cls) => sum + cls.utilizationRate, 0) / classProfileStats.length : 0;
