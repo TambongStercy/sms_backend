@@ -15,6 +15,8 @@ export interface SyncConflict {
   field: string;
   localValue: any;
   remoteValue: any;
+  localUpdatedAt?: Date;
+  remoteUpdatedAt?: Date;
   resolution: ConflictResolution;
   resolvedValue: any;
 }

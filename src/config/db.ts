@@ -38,6 +38,45 @@ console.log(`Using database URL for ${process.env.NODE_ENV} environment`);
 
 const prisma = new PrismaClient();
 
+// Sync attribution: stamp server_id on every write to a synced table so the
+// sync manager can tell "record was written by THIS server" apart from
+// "record was pulled from a peer" and avoid echo loops. The sync module
+// bypasses this by passing server_id explicitly (from the remote payload).
+const SYNCED_MODELS = new Set([
+    'User', 'AcademicYear', 'Class', 'SubClass', 'Subject', 'Enrollment',
+    'Mark', 'StudentAbsence', 'TeacherAbsence', 'PaymentTransaction',
+    'GeneratedReport', 'Announcement',
+]);
+
+prisma.$use(async (params, next) => {
+    if (!params.model || !SYNCED_MODELS.has(params.model)) return next(params);
+    const localId = process.env.SERVER_ID || 'local';
+
+    if (params.action === 'create' || params.action === 'update') {
+        if (params.args?.data && !('server_id' in params.args.data)) {
+            params.args.data.server_id = localId;
+        }
+    } else if (params.action === 'upsert') {
+        if (params.args?.create && !('server_id' in params.args.create)) {
+            params.args.create.server_id = localId;
+        }
+        if (params.args?.update && !('server_id' in params.args.update)) {
+            params.args.update.server_id = localId;
+        }
+    } else if (params.action === 'createMany' || params.action === 'updateMany') {
+        const data = params.args?.data;
+        if (Array.isArray(data)) {
+            for (const row of data) {
+                if (row && !('server_id' in row)) row.server_id = localId;
+            }
+        } else if (data && !('server_id' in data)) {
+            data.server_id = localId;
+        }
+    }
+
+    return next(params);
+});
+
 export {
     User, SchoolFees, ControlSchoolFees, AcademicYear, Gender, SubjectCategory, Role, Student, ParentStudent,
     PaymentTransaction, ControlPaymentTransaction, PaymentMethod, Announcement, MobileNotification, Audience, Class, SubClass,

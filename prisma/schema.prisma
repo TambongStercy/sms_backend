@@ -16,6 +16,8 @@ model AcademicYear {
   report_deadline              DateTime?
   created_at                   DateTime                    @default(now())
   updated_at                   DateTime                    @updatedAt
+  server_id                    String?
+  checksum                     String?
   announcements                Announcement[]
   enrollments                  Enrollment[]
   exam_papers                  ExamPaper[]
@@ -63,6 +65,8 @@ model User {
   last_seen_at                  DateTime? // Presence: updated when a chat websocket disconnects
   created_at                    DateTime                    @default(now())
   updated_at                    DateTime                    @updatedAt
+  server_id                     String?
+  checksum                      String?
   // Relationships
   announcements                 Announcement[]
   discipline_issues_assigned    DisciplineIssue[]           @relation("AssignedDisciplineIssue")
@@ -240,6 +244,8 @@ model Class {
   period_set_id     Int?
   created_at        DateTime        @default(now())
   updated_at        DateTime        @updatedAt
+  server_id         String?
+  checksum          String?
   // Simplified fee structure
   base_fee          Float           @default(0)
   miscellaneous_fee Float           @default(0)
@@ -263,6 +269,8 @@ model SubClass {
   current_students   Int               @default(0) // Track current enrollment
   created_at         DateTime          @default(now())
   updated_at         DateTime          @updatedAt
+  server_id          String?
+  checksum           String?
   class_id           Int
   class_master_id    Int?
   enrollments        Enrollment[]
@@ -331,6 +339,8 @@ model Enrollment {
   enrollment_date              DateTime                    @default(now())
   created_at                   DateTime                    @default(now())
   updated_at                   DateTime                    @updatedAt
+  server_id                    String?
+  checksum                     String?
   sub_class_id                 Int? // Subclass assignment after interview (optional)
   discipline_issues            DisciplineIssue[]
   academic_year                AcademicYear                @relation(fields: [academic_year_id], references: [id])
@@ -402,6 +412,8 @@ model Subject {
   hod_id             Int? // Head of Department
   created_at         DateTime          @default(now())
   updated_at         DateTime          @updatedAt
+  server_id          String?
+  checksum           String?
   hod                User?             @relation("HODSubject", fields: [hod_id], references: [id])
   exam_papers        ExamPaper[]
   questions          Question[]
@@ -477,6 +489,8 @@ model StudentAbsence {
   makeup_verified_by_id Int?
   created_at            DateTime          @default(now())
   updated_at            DateTime          @updatedAt
+  server_id             String?
+  checksum              String?
   assigned_by           User              @relation(fields: [assigned_by_id], references: [id])
   enrollment            Enrollment        @relation(fields: [enrollment_id], references: [id])
   teacher_period        TeacherPeriod?    @relation(fields: [teacher_period_id], references: [id])
@@ -497,6 +511,8 @@ model TeacherAbsence {
   teacher_period_id Int?
   created_at        DateTime       @default(now())
   updated_at        DateTime       @updatedAt
+  server_id         String?
+  checksum          String?
   assigned_by       User           @relation("AssignedByUser", fields: [assigned_by_id], references: [id])
   teacher           User           @relation(fields: [teacher_id], references: [id])
   teacher_period    TeacherPeriod? @relation(fields: [teacher_period_id], references: [id])
@@ -544,6 +560,8 @@ model Mark {
   score                Float? // Optional score (can be null)
   created_at           DateTime        @default(now())
   updated_at           DateTime        @updatedAt
+  server_id            String?
+  checksum             String?
   sub_class_subject_id Int
   enrollment           Enrollment      @relation(fields: [enrollment_id], references: [id])
   exam_sequence        ExamSequence    @relation(fields: [exam_sequence_id], references: [id])
@@ -651,6 +669,8 @@ model PaymentTransaction {
   notes            String? // Feedback notes
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
+  server_id        String?
+  checksum         String?
   fee_id           Int
   academic_year    AcademicYear  @relation(fields: [academic_year_id], references: [id])
   enrollment       Enrollment    @relation(fields: [enrollment_id], references: [id])
@@ -687,6 +707,8 @@ model Announcement {
   created_by_id    Int?
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
+  server_id        String?
+  checksum         String?
   academic_year    AcademicYear? @relation(fields: [academic_year_id], references: [id])
   created_by       User?         @relation(fields: [created_by_id], references: [id])
 }
@@ -785,6 +807,8 @@ model GeneratedReport {
   page_number      Int?
   created_at       DateTime     @default(now())
   updated_at       DateTime     @updatedAt
+  server_id        String?
+  checksum         String?
   academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
   exam_sequence    ExamSequence @relation(fields: [exam_sequence_id], references: [id], onDelete: Cascade)
   student          Student?     @relation(fields: [student_id], references: [id])

@@ -46,11 +46,18 @@ export class DatabaseSyncer {
     const model = (prisma as any)[tableName.toLowerCase()];
     if (!model) throw new Error(`Model ${tableName} not found`);
 
+    // Only push records that originated locally (or predate the sync system).
+    // Records with a foreign server_id were just pulled from remote — pushing
+    // them back creates an echo loop and manufactures phantom conflicts.
+    const localServerId = process.env.SERVER_ID || 'local';
+
     return await model.findMany({
       where: {
-        updated_at: {
-          gt: lastSync
-        }
+        updated_at: { gt: lastSync },
+        OR: [
+          { server_id: null },
+          { server_id: localServerId }
+        ]
       }
     });
   }
@@ -139,6 +146,8 @@ export class DatabaseSyncer {
           field: conflictingFields[0], // Handle first conflict
           localValue: localRecord[conflictingFields[0]],
           remoteValue: remoteRecord.data[conflictingFields[0]],
+          localUpdatedAt: localRecord.updated_at,
+          remoteUpdatedAt: remoteRecord.updated_at,
           resolution: ConflictResolution.TIMESTAMP_WINS,
           resolvedValue: null
         };
@@ -164,15 +173,17 @@ export class DatabaseSyncer {
   }
 
   private async insertRecord(model: any, data: any) {
-    const { server_id, checksum, ...recordData } = data;
-    await model.create({ data: recordData });
+    // Preserve server_id and checksum from the remote payload so
+    // getLocalChanges can later filter out records that originated remotely
+    // (echo-loop prevention). The Prisma middleware in db.ts sees server_id
+    // is already present and won't overwrite it.
+    await model.create({ data });
   }
 
   private async updateRecord(model: any, id: string, data: any) {
-    const { server_id, checksum, ...recordData } = data;
     await model.update({
       where: { id: parseInt(id) },
-      data: recordData
+      data
     });
   }
 

@@ -78,8 +78,16 @@ export class ConflictResolver {
   }
 
   private getLatestValue(conflict: SyncConflict): any {
-    // This would need timestamp comparison logic
-    // For now, return remote value as default
+    // Compare updated_at timestamps of the two sides; whichever was written
+    // more recently wins. Falls back to remote if timestamps are missing or
+    // equal — remote is the safer default because it typically represents
+    // a wider audience of changes (VPS aggregates parent-facing updates).
+    const localTs = conflict.localUpdatedAt ? new Date(conflict.localUpdatedAt).getTime() : NaN;
+    const remoteTs = conflict.remoteUpdatedAt ? new Date(conflict.remoteUpdatedAt).getTime() : NaN;
+
+    if (!isNaN(localTs) && !isNaN(remoteTs)) {
+      return localTs > remoteTs ? conflict.localValue : conflict.remoteValue;
+    }
     return conflict.remoteValue;
   }
 
