@@ -1,5 +1,5 @@
 import prisma from '../config/db';
-import { SyncResult, SyncConflict, ConflictResolution, RemoteRecord } from './types';
+import { SyncResult, SyncConflict, ConflictResolution, RemoteRecord, DeferredRecord } from './types';
 import { ConflictResolver } from './conflict-resolver';
 import { ApiClient } from './api-client';
 import * as crypto from 'crypto';
@@ -13,11 +13,6 @@ export class DatabaseSyncer {
     this.apiClient = new ApiClient();
   }
 
-  // Prisma exposes delegates in camelCase ("SubClass" -> prisma.subClass), so
-  // lowercasing the whole name only resolves for single-word models. Every
-  // multi-word table (AcademicYear, PaymentTransaction, ...) returned undefined
-  // and threw "Model not found", which syncTable swallowed into result.errors —
-  // sync reported COMPLETED while silently skipping half its tables.
   // Exposed so SyncManager can refuse a sync run outright when no peer is set,
   // instead of failing once per record deep inside pushLocalChanges.
   isRemoteConfigured(): boolean {
@@ -40,6 +35,11 @@ export class DatabaseSyncer {
     return out;
   }
 
+  // Prisma exposes delegates in camelCase ("SubClass" -> prisma.subClass), so
+  // lowercasing the whole name only resolves for single-word models. Every
+  // multi-word table (AcademicYear, PaymentTransaction, ...) returned undefined
+  // and threw "Model not found", which syncTable swallowed into result.errors —
+  // sync reported COMPLETED while silently skipping half its tables.
   private modelFor(tableName: string) {
     const key = tableName.charAt(0).toLowerCase() + tableName.slice(1);
     const model = (prisma as any)[key];
@@ -51,7 +51,8 @@ export class DatabaseSyncer {
     const result: SyncResult = {
       recordsProcessed: 0,
       conflicts: [],
-      errors: []
+      errors: [],
+      deferred: []
     };
 
     try {
@@ -154,9 +155,56 @@ export class DatabaseSyncer {
         }
 
       } catch (error: any) {
-        result.errors.push(`Pull ${tableName}[${remoteRecord.id}]: ${error.message}`);
+        // A missing referenced row is usually a timing problem, not a real
+        // failure: the target may belong to a table later in the run, or to
+        // another row of this same table (Class -> Class via next_class_id).
+        // Hold it back for the retry pass instead of burning it as an error.
+        if (this.isMissingReferenceError(error)) {
+          result.deferred.push({
+            table: tableName,
+            record: remoteRecord,
+            lastError: this.shortError(error)
+          });
+        } else {
+          result.errors.push(`Pull ${tableName}[${remoteRecord.id}]: ${this.shortError(error)}`);
+        }
       }
     }
+  }
+
+  // P2003 is Prisma's foreign-key constraint failure. P2025 ("required record
+  // not found") shows up for the same underlying cause on some update paths.
+  private isMissingReferenceError(error: any): boolean {
+    if (error?.code === 'P2003' || error?.code === 'P2025') return true;
+    return typeof error?.message === 'string'
+      && error.message.includes('Foreign key constraint');
+  }
+
+  // Prisma renders a multi-line source excerpt into error.message; keep the
+  // meaningful tail so a run with thousands of failures stays readable.
+  private shortError(error: any): string {
+    const msg = String(error?.message ?? error);
+    const constraint = msg.match(/Foreign key constraint violated:? `?([^`\n]+)`?/);
+    if (constraint) return `FK violation: ${constraint[1].trim()}`;
+    return msg.split('\n').map(l => l.trim()).filter(Boolean).pop() || msg;
+  }
+
+  // Retry a batch of held-back records. Returns the ones that still failed, so
+  // the caller can loop until a pass stops making progress.
+  async retryDeferred(deferred: DeferredRecord[]): Promise<{ applied: number; remaining: DeferredRecord[] }> {
+    let applied = 0;
+    const remaining: DeferredRecord[] = [];
+
+    for (const item of deferred) {
+      try {
+        await this.processIncomingRecord(item.table, item.record);
+        applied++;
+      } catch (error: any) {
+        remaining.push({ ...item, lastError: this.shortError(error) });
+      }
+    }
+
+    return { applied, remaining };
   }
 
   private async detectConflict(tableName: string, localRecord: any, remoteRecord: RemoteRecord): Promise<SyncConflict | null> {
@@ -257,7 +305,11 @@ export class DatabaseSyncer {
         await this.insertRecord(model, record);
       }
     } catch (error: any) {
-      console.error(`Error processing ${tableName}[${record.id}]:`, error.message);
+      // Logged short, not raw: Prisma embeds a multi-line source excerpt in
+      // error.message, and the retry pass calls this once per held-back record —
+      // 2481 of those buried the actual summary. The caller groups and reports
+      // these, so one line each is enough to trace.
+      console.error(`Error processing ${tableName}[${record.id}]: ${this.shortError(error)}`);
       throw error;
     }
   }

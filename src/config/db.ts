@@ -42,10 +42,18 @@ const prisma = new PrismaClient();
 // sync manager can tell "record was written by THIS server" apart from
 // "record was pulled from a peer" and avoid echo loops. The sync module
 // bypasses this by passing server_id explicitly (from the remote payload).
+// Must stay in step with SYNC_TABLES in src/sync/sync-manager.ts: a table that
+// syncs without being stamped here has server_id null on every local write, so
+// the echo-loop filter in getLocalChanges cannot tell its own rows from a
+// peer's and pushes them straight back.
 const SYNCED_MODELS = new Set([
     'User', 'AcademicYear', 'Class', 'SubClass', 'Subject', 'Enrollment',
     'Mark', 'StudentAbsence', 'TeacherAbsence', 'PaymentTransaction',
     'GeneratedReport', 'Announcement',
+    // Added so sync can bootstrap a node: without Student every Enrollment
+    // failed on its foreign key, which cascaded to fees, payments and marks.
+    'Student', 'PeriodSet', 'Term', 'Period', 'SubClassSubject',
+    'ExamSequence', 'TeacherPeriod', 'ParentStudent', 'SchoolFees',
 ]);
 
 prisma.$use(async (params, next) => {
