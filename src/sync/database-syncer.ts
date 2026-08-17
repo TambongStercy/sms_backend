@@ -13,6 +13,24 @@ export class DatabaseSyncer {
     this.apiClient = new ApiClient();
   }
 
+  // Prisma exposes delegates in camelCase ("SubClass" -> prisma.subClass), so
+  // lowercasing the whole name only resolves for single-word models. Every
+  // multi-word table (AcademicYear, PaymentTransaction, ...) returned undefined
+  // and threw "Model not found", which syncTable swallowed into result.errors —
+  // sync reported COMPLETED while silently skipping half its tables.
+  // Exposed so SyncManager can refuse a sync run outright when no peer is set,
+  // instead of failing once per record deep inside pushLocalChanges.
+  isRemoteConfigured(): boolean {
+    return this.apiClient.isConfigured();
+  }
+
+  private modelFor(tableName: string) {
+    const key = tableName.charAt(0).toLowerCase() + tableName.slice(1);
+    const model = (prisma as any)[key];
+    if (!model) throw new Error(`Model ${tableName} not found (prisma.${key} is undefined)`);
+    return model;
+  }
+
   async syncTable(tableName: string, lastSync: Date): Promise<SyncResult> {
     const result: SyncResult = {
       recordsProcessed: 0,
@@ -43,8 +61,7 @@ export class DatabaseSyncer {
   }
 
   async getLocalChanges(tableName: string, lastSync: Date) {
-    const model = (prisma as any)[tableName.toLowerCase()];
-    if (!model) throw new Error(`Model ${tableName} not found`);
+    const model = this.modelFor(tableName);
 
     // Only push records that originated locally (or predate the sync system).
     // Records with a foreign server_id were just pulled from remote — pushing
@@ -86,7 +103,7 @@ export class DatabaseSyncer {
   }
 
   private async pullRemoteChanges(tableName: string, remoteChanges: RemoteRecord[], result: SyncResult) {
-    const model = (prisma as any)[tableName.toLowerCase()];
+    const model = this.modelFor(tableName);
 
     for (const remoteRecord of remoteChanges) {
       try {
@@ -136,8 +153,10 @@ export class DatabaseSyncer {
     const remoteChecksum = remoteRecord.checksum;
 
     if (localChecksum !== remoteChecksum) {
-      // Find conflicting fields
-      const conflictingFields = this.findConflictingFields(localRecord, remoteRecord.data);
+      // RemoteRecord is a flat Prisma row (see types.ts) — passing
+      // remoteRecord.data here iterated `undefined`, so this always found zero
+      // conflicting fields and every remote row silently overwrote the local one.
+      const conflictingFields = this.findConflictingFields(localRecord, remoteRecord);
 
       if (conflictingFields.length > 0) {
         return {
@@ -204,8 +223,7 @@ export class DatabaseSyncer {
   // Additional methods needed by SyncManager
 
   async processIncomingRecord(tableName: string, record: any) {
-    const model = (prisma as any)[tableName.toLowerCase()];
-    if (!model) throw new Error(`Model ${tableName} not found`);
+    const model = this.modelFor(tableName);
 
     try {
       // Check if record exists
