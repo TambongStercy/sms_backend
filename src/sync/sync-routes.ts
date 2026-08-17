@@ -114,9 +114,16 @@ router.post('/sync/receive/:tableName', requireSyncAuth, async (req: Request, re
     const { tableName } = req.params;
     const { records } = req.body;
 
+    // Attribute anything arriving without provenance to the sender (ApiClient
+    // always sets X-Server-ID). Storing it as null instead would make
+    // getLocalChanges treat the sender's own rows as ours and push them back on
+    // the next run — the echo loop that stamped 6370 rows with the wrong node.
+    const rawSender = req.headers['x-server-id'];
+    const sender = Array.isArray(rawSender) ? rawSender[0] : rawSender;
+
     // Process incoming changes
     for (const record of records) {
-      await dbSyncer.processIncomingRecord(tableName, record);
+      await dbSyncer.processIncomingRecord(tableName, record, sender);
     }
 
     res.json({

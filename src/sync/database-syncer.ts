@@ -1,4 +1,4 @@
-import prisma from '../config/db';
+import prisma, { Prisma } from '../config/db';
 import { SyncResult, SyncConflict, ConflictResolution, RemoteRecord, DeferredRecord } from './types';
 import { ConflictResolver } from './conflict-resolver';
 import { ApiClient } from './api-client';
@@ -19,18 +19,54 @@ export class DatabaseSyncer {
     return this.apiClient.isConfigured();
   }
 
+  // Field names per model, straight from the generated schema. Used to map
+  // incoming keys onto what Prisma actually accepts.
+  private static fieldCache = new Map<string, Set<string>>();
+
+  private fieldsOf(tableName: string): Set<string> {
+    const cached = DatabaseSyncer.fieldCache.get(tableName);
+    if (cached) return cached;
+
+    const model = (Prisma as any).dmmf?.datamodel?.models?.find(
+      (m: any) => m.name === tableName
+    );
+    const names = new Set<string>((model?.fields ?? []).map((f: any) => f.name));
+    DatabaseSyncer.fieldCache.set(tableName, names);
+    return names;
+  }
+
   // Records arriving from a peer may be camelCase: app.ts applied
   // convertSnakeToCamelCase globally, above the sync routes, so
   // GET /sync/changes/:table served "serverId"/"updatedAt" and every Prisma
   // write on this side rejected them. app.ts now mounts sync ahead of that
   // middleware, but a peer running an older build still camelCases, so
-  // normalise defensively on receipt. Keys are flattened one level only —
-  // these are flat Prisma rows, and recursing would turn Date values into {}.
-  private toSnakeKeys(record: any): any {
+  // normalise defensively on receipt.
+  //
+  // Converting every camelCase key to snake_case is wrong, though: this schema
+  // is snake_case except for SubClassSubject.userId, which a blind conversion
+  // turned into user_id and Prisma rejected — all 397 rows of that table. So
+  // check the real field list: keep a key that already matches, convert only
+  // when the snake_case form is the one the model declares, and otherwise leave
+  // it alone so genuine schema drift still surfaces as an error.
+  //
+  // Keys are handled one level only — these are flat Prisma rows, and recursing
+  // would turn Date values into {}.
+  private toSnakeKeys(record: any, tableName?: string): any {
     if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
+
+    const fields = tableName ? this.fieldsOf(tableName) : null;
     const out: any = {};
+
     for (const key of Object.keys(record)) {
-      out[key.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`)] = record[key];
+      const snake = key.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`);
+      let target = key;
+      if (fields && fields.size > 0) {
+        if (fields.has(key)) target = key;
+        else if (fields.has(snake)) target = snake;
+      } else {
+        target = snake;
+      }
+      out[target] = record[key];
     }
     return out;
   }
@@ -122,8 +158,24 @@ export class DatabaseSyncer {
   private async pullRemoteChanges(tableName: string, remoteChanges: RemoteRecord[], result: SyncResult) {
     const model = this.modelFor(tableName);
 
+    // Rows that predate the sync system carry server_id null, and
+    // getLocalChanges reads null as "written here" so it can push pre-sync
+    // history once. On a freshly seeded node that reasoning inverts: every row
+    // is null and every row is in fact the peer's, so the next run pushed the
+    // peer's own data straight back at it. That is not hypothetical — it
+    // stamped 6370 production rows with this node's SERVER_ID, and because the
+    // peer only serves `server_id IS NULL OR server_id = <its own>`, those rows
+    // stopped being visible to any other node.
+    //
+    // So anything arriving without provenance is attributed to the peer it came
+    // from, which is the truth about where it came from.
+    const peerId = await this.apiClient.getPeerServerId();
+
     for (const rawRemote of remoteChanges) {
-      const remoteRecord = this.toSnakeKeys(rawRemote) as RemoteRecord;
+      const remoteRecord = this.toSnakeKeys(rawRemote, tableName) as RemoteRecord;
+      if (peerId && !remoteRecord.server_id) {
+        remoteRecord.server_id = peerId;
+      }
       try {
         // Check if record exists locally
         const localRecord = await model.findUnique({
@@ -287,9 +339,14 @@ export class DatabaseSyncer {
 
   // Additional methods needed by SyncManager
 
-  async processIncomingRecord(tableName: string, rawRecord: any) {
+  async processIncomingRecord(tableName: string, rawRecord: any, attributeTo?: string) {
     const model = this.modelFor(tableName);
-    const record = this.toSnakeKeys(rawRecord);
+    const record = this.toSnakeKeys(rawRecord, tableName);
+    // Same attribution rule as pullRemoteChanges: a record with no provenance
+    // belongs to whoever sent it, never to us, or the next run pushes it back.
+    if (attributeTo && !record.server_id) {
+      record.server_id = attributeTo;
+    }
 
     try {
       // Check if record exists
