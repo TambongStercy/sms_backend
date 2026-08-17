@@ -177,7 +177,7 @@ export async function getChannel(channelId: number, userId: number) {
     // Enrich each member with presence + expose last_read_at at the top level
     // so the client can compute per-message "seen by" without extra plumbing.
     const memberIds = channel.members.map((m) => m.user_id);
-    const presenceMap = presenceLookup(memberIds);
+    const presenceMap = await presenceLookup(memberIds);
 
     return {
         ...channel,
@@ -762,7 +762,7 @@ export async function searchContacts(
         }
     }
 
-    const presenceMap = presenceLookup(userIds);
+    const presenceMap = await presenceLookup(userIds);
 
     return users.map((u) => ({
         ...u,
@@ -781,7 +781,7 @@ export async function searchContacts(
  */
 export async function getBatchPresence(userIds: number[]) {
     if (userIds.length === 0) return {};
-    const memory = presenceLookup(userIds);
+    const memory = await presenceLookup(userIds);
     const rows = await prisma.user.findMany({
         where: { id: { in: userIds } },
         select: { id: true, last_seen_at: true },

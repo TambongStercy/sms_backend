@@ -1,4 +1,6 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import IORedis from 'ioredis';
 import type { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db';
@@ -18,7 +20,17 @@ interface AuthenticatedSocketData {
 
 let ioInstance: SocketIOServer | null = null;
 
-// ---------- Presence store (in-memory, multi-tab aware) ----------
+// ---------- Presence store (multi-tab aware) ----------
+//
+// The local Map holds this worker's own sockets. It cannot answer "is user X
+// online" once there is more than one worker, because a user connected to
+// worker 3 is invisible to worker 1 — everyone would look offline to most of
+// their colleagues. So presence is mirrored into Redis, which every worker
+// shares, and Redis is authoritative for lookups whenever it is configured.
+//
+// The Map stays as the local source of truth for connect/disconnect
+// transitions (which are inherently per-socket, so per-worker) and as the
+// fallback for single-process runs with no REDIS_URL.
 
 interface PresenceEntry {
     sockets: Set<string>;      // Active socket ids for this user
@@ -27,30 +39,84 @@ interface PresenceEntry {
 
 const presence = new Map<number, PresenceEntry>();
 
-function markOnline(userId: number, socketId: string): boolean {
+// Set once by initRealtime. Null means single-process mode.
+let presenceRedis: IORedis | null = null;
+
+// Sockets are keyed per worker so a crashed worker's entries can be dropped
+// wholesale on its next boot; otherwise its users would appear online forever.
+const WORKER_ID = process.env.NODE_APP_INSTANCE ?? '0';
+const presenceKey = (userId: number) => `presence:sockets:${userId}`;
+const workerMember = (socketId: string) => `${WORKER_ID}:${socketId}`;
+// Entries are refreshed on every connect; the TTL is a backstop against leaks.
+const PRESENCE_TTL_SECONDS = 60 * 60 * 12;
+
+async function markOnline(userId: number, socketId: string): Promise<boolean> {
     let entry = presence.get(userId);
-    const wasOffline = !entry || entry.sockets.size === 0;
+    const wasOfflineLocally = !entry || entry.sockets.size === 0;
     if (!entry) {
         entry = { sockets: new Set(), lastSeenAt: null };
         presence.set(userId, entry);
     }
     entry.sockets.add(socketId);
-    return wasOffline;
-}
 
-function markOffline(userId: number, socketId: string): boolean {
-    const entry = presence.get(userId);
-    if (!entry) return false;
-    entry.sockets.delete(socketId);
-    if (entry.sockets.size === 0) {
-        entry.lastSeenAt = new Date();
-        return true; // fully offline
+    if (!presenceRedis) return wasOfflineLocally;
+
+    try {
+        // The count BEFORE adding decides whether this is a genuine
+        // offline->online transition across the whole cluster, not just here.
+        const before = await presenceRedis.scard(presenceKey(userId));
+        await presenceRedis
+            .multi()
+            .sadd(presenceKey(userId), workerMember(socketId))
+            .expire(presenceKey(userId), PRESENCE_TTL_SECONDS)
+            .exec();
+        return before === 0;
+    } catch {
+        return wasOfflineLocally;
     }
-    return false;
 }
 
-export function getBatchPresence(userIds: number[]): Record<number, { online: boolean; last_seen_at: Date | null }> {
+async function markOffline(userId: number, socketId: string): Promise<boolean> {
+    const entry = presence.get(userId);
+    if (entry) {
+        entry.sockets.delete(socketId);
+        if (entry.sockets.size === 0) entry.lastSeenAt = new Date();
+    }
+
+    if (!presenceRedis) return !!entry && entry.sockets.size === 0;
+
+    try {
+        await presenceRedis.srem(presenceKey(userId), workerMember(socketId));
+        // Fully offline only when no worker still holds a socket for them.
+        return (await presenceRedis.scard(presenceKey(userId))) === 0;
+    } catch {
+        return !!entry && entry.sockets.size === 0;
+    }
+}
+
+export async function getBatchPresence(
+    userIds: number[]
+): Promise<Record<number, { online: boolean; last_seen_at: Date | null }>> {
     const out: Record<number, { online: boolean; last_seen_at: Date | null }> = {};
+
+    if (presenceRedis) {
+        try {
+            const pipeline = presenceRedis.pipeline();
+            for (const id of userIds) pipeline.scard(presenceKey(id));
+            const results = await pipeline.exec();
+            userIds.forEach((id, i) => {
+                const count = Number(results?.[i]?.[1] ?? 0);
+                out[id] = {
+                    online: count > 0,
+                    last_seen_at: count > 0 ? null : (presence.get(id)?.lastSeenAt ?? null),
+                };
+            });
+            return out;
+        } catch {
+            // fall through to the local view rather than reporting everyone offline
+        }
+    }
+
     for (const id of userIds) {
         const entry = presence.get(id);
         out[id] = {
@@ -61,9 +127,34 @@ export function getBatchPresence(userIds: number[]): Record<number, { online: bo
     return out;
 }
 
-export function isOnline(userId: number): boolean {
+export async function isOnline(userId: number): Promise<boolean> {
+    if (presenceRedis) {
+        try {
+            return (await presenceRedis.scard(presenceKey(userId))) > 0;
+        } catch { /* fall through */ }
+    }
     const entry = presence.get(userId);
     return !!(entry && entry.sockets.size > 0);
+}
+
+// Drop any presence this worker registered before it restarted. Without it a
+// worker that crashed with live sockets leaves those users online forever.
+async function clearStalePresenceForWorker(client: IORedis) {
+    try {
+        const prefix = `${WORKER_ID}:`;
+        let cursor = '0';
+        do {
+            const [next, keys] = await client.scan(cursor, 'MATCH', 'presence:sockets:*', 'COUNT', 500);
+            cursor = next;
+            for (const key of keys) {
+                const members = await client.smembers(key);
+                const mine = members.filter(m => m.startsWith(prefix));
+                if (mine.length > 0) await client.srem(key, ...mine);
+            }
+        } while (cursor !== '0');
+    } catch (err: any) {
+        console.warn('presence: stale-entry cleanup failed:', err?.message ?? err);
+    }
 }
 
 // ---------- Typing timers ----------
@@ -116,6 +207,28 @@ export function initRealtime(httpServer: HttpServer): SocketIOServer {
         path: '/socket.io',
     });
 
+    // Without this, each worker only reaches the sockets it personally holds:
+    // a message emitted on worker 3 never arrives for a recipient connected to
+    // worker 1, so with N workers roughly (N-1)/N of chat traffic disappears.
+    // The Redis adapter fans every emit out across workers.
+    //
+    // Skipped when REDIS_URL is unset so a single-process dev run needs no
+    // Redis; that is safe precisely because one process holds every socket.
+    if (process.env.REDIS_URL) {
+        const pubClient = new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
+        const subClient = pubClient.duplicate();
+        io.adapter(createAdapter(pubClient, subClient));
+
+        // Separate connection: the adapter's clients are dedicated to pub/sub
+        // and cannot serve normal commands.
+        presenceRedis = pubClient.duplicate();
+        clearStalePresenceForWorker(presenceRedis).catch(() => { /* logged inside */ });
+
+        console.log('Socket.IO: Redis adapter attached (cross-worker broadcast + presence)');
+    } else {
+        console.log('Socket.IO: no REDIS_URL — single-process broadcast and presence only');
+    }
+
     io.use(async (socket: Socket, next) => {
         try {
             const token =
@@ -161,7 +274,7 @@ export function initRealtime(httpServer: HttpServer): SocketIOServer {
         }
 
         // Presence: mark online. Fan out to everyone who might care.
-        const wasOffline = markOnline(userId, socket.id);
+        const wasOffline = await markOnline(userId, socket.id);
         if (wasOffline) {
             const onlineAt = new Date();
             io.emit('presence.online', { userId, onlineAt });
@@ -307,7 +420,7 @@ export function initRealtime(httpServer: HttpServer): SocketIOServer {
                 }
             }
 
-            const fullyOffline = markOffline(userId, socket.id);
+            const fullyOffline = await markOffline(userId, socket.id);
             if (fullyOffline) {
                 const lastSeenAt = new Date();
                 try {
