@@ -4,6 +4,7 @@ import { renderSchema } from './aiAssistant/schemaCatalog';
 import { guardSql, GUARD_MAX_ROWS } from './aiAssistant/sqlGuard';
 import { generate, isAvailable, OLLAMA_MODEL } from './aiAssistant/ollamaClient';
 import { matchFastIntent } from './aiAssistant/fastIntents';
+import { matchSmallTalk } from './aiAssistant/smallTalk';
 
 /**
  * Answers a natural-language question about school data.
@@ -19,7 +20,7 @@ import { matchFastIntent } from './aiAssistant/fastIntents';
  * which is correct, and exactly why it is kept away from the arithmetic.
  */
 
-export type AnswerSource = 'fast-intent' | 'generated-sql';
+export type AnswerSource = 'small-talk' | 'fast-intent' | 'generated-sql';
 
 export interface AskResult {
     question: string;
@@ -134,6 +135,23 @@ export async function ask(rawQuestion: string): Promise<AskResult> {
     if (question.length > MAX_QUESTION_LENGTH) {
         throw new AiAssistantError(`Questions are limited to ${MAX_QUESTION_LENGTH} characters.`);
     }
+    // Greetings and "what can you do" first, before anything touches the
+    // database or the model. These are the first thing anyone types, and
+    // sending them down the SQL path produced a three-second wait ending in
+    // "Only SELECT queries are allowed."
+    const chat = matchSmallTalk(question);
+    if (chat) {
+        return {
+            question,
+            answer: chat.answer,
+            source: 'small-talk',
+            rows: [],
+            rowCount: 0,
+            tookMs: Date.now() - started,
+            truncated: false,
+        };
+    }
+
     if (!isAiDbConfigured()) {
         throw new AiAssistantError(
             'The assistant is not configured.',
@@ -190,6 +208,23 @@ export async function ask(rawQuestion: string): Promise<AskResult> {
 
     const guard = guardSql(sqlDraft);
     if (!guard.ok) {
+        // Distinguish "the model did not write a query" from "the query was
+        // unsafe". The first means the question was not about data, and the
+        // user needs to hear that, not a rule about SELECT statements. The
+        // second is a genuine refusal worth reporting as one.
+        const notAQuery =
+            guard.reason === 'Only SELECT queries are allowed.' ||
+            guard.reason === 'The model did not produce a query — no table was referenced.' ||
+            guard.reason === 'The model returned no SQL.';
+
+        if (notAQuery) {
+            throw new AiAssistantError(
+                "I can only answer questions about the school's data.",
+                'Try asking about enrolment, classes, fees, payments, staff, attendance or marks — ' +
+                'for example "how many students are in FORM 1?" or "how much have we collected?".'
+            );
+        }
+
         throw new AiAssistantError(
             'That question produced a query the assistant will not run.',
             guard.reason

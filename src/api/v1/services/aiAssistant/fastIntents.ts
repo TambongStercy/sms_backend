@@ -20,6 +20,17 @@ export interface FastIntent {
     params?: (m: RegExpMatchArray) => any[];
     /** Turns the single result row into a sentence. */
     describe: (row: any, m: RegExpMatchArray) => string;
+    /**
+     * Whether a non-leadership role may ask this.
+     *
+     * The assistant is reachable from every dashboard, but "who can open it" and
+     * "what it will answer" are different questions. A head count per class is
+     * unremarkable; what the school is owed is not something a parent or a
+     * teacher should be able to ask, and the free-text path is off for them
+     * entirely — an arbitrary SELECT over student records, fees, marks and
+     * discipline is the whole school's private data behind one text box.
+     */
+    general?: boolean;
 }
 
 // Enrolment is per academic year, so "how many students" without a year means
@@ -33,6 +44,7 @@ export const FAST_INTENTS: FastIntent[] = [
         // it and searched for a class literally named "EACH CLASS", returning
         // a confident zero. First match wins, so ordering is the fix.
         name: 'class_breakdown',
+        general: true,
         patterns: [
             /how many (?:students?|pupils?) (?:are )?(?:in|per) (?:each|every|all) (?:class|classes|form)/i,
             /(?:students?|enrol(?:l)?ment) (?:per|by|in each|for each) class/i,
@@ -50,6 +62,7 @@ export const FAST_INTENTS: FastIntent[] = [
     },
     {
         name: 'students_in_class',
+        general: true,
         patterns: [
             // The negative lookahead is a second guard on the same confusion:
             // even reordered, "in each class" should never be read as a name.
@@ -67,6 +80,7 @@ export const FAST_INTENTS: FastIntent[] = [
     },
     {
         name: 'students_total',
+        general: true,
         patterns: [
             /how many (?:students?|pupils?|children)(?: are there| do we have| are enrolled)?\s*(?:in (?:the )?school)?\??$/i,
             /total (?:number of )?(?:students?|pupils?)\??$/i,
@@ -127,6 +141,7 @@ export const FAST_INTENTS: FastIntent[] = [
     },
     {
         name: 'teacher_count',
+        general: true,
         patterns: [
             /how many (?:teachers?|teaching staff)/i,
             /(?:number|count) of teachers?/i,
@@ -139,6 +154,7 @@ export const FAST_INTENTS: FastIntent[] = [
     },
     {
         name: 'gender_split',
+        general: true,
         patterns: [
             /how many (?:boys|girls|male|female)/i,
             /gender (?:split|breakdown|distribution)/i,
@@ -154,9 +170,13 @@ export const FAST_INTENTS: FastIntent[] = [
     },
 ];
 
-export function matchFastIntent(question: string): { intent: FastIntent; match: RegExpMatchArray } | null {
+export function matchFastIntent(
+    question: string,
+    generalOnly = false
+): { intent: FastIntent; match: RegExpMatchArray } | null {
     const q = question.trim();
     for (const intent of FAST_INTENTS) {
+        if (generalOnly && !intent.general) continue;
         for (const pattern of intent.patterns) {
             const m = q.match(pattern);
             if (m) return { intent, match: m };
