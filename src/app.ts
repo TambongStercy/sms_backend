@@ -86,12 +86,19 @@ app.get('/api-docs.json', (req: Request, res: Response) => {
     res.send(swaggerSpec);
 });
 
+// Sync is server-to-server and carries raw Prisma rows, so it must NOT go
+// through case conversion — it is mounted ahead of that middleware deliberately.
+// Previously it sat below, so GET /api/sync/changes/:table returned camelCase
+// ("serverId", "updatedAt") and every model.create() on the receiving side
+// rejected the payload. Pull had never worked; push did, because incoming
+// snake_case passes through convertCamelToSnakeCase untouched.
+app.use('/api', syncRoutes);
+
 // Apply case conversion middlewares GLOBALLY before API routes
 app.use(convertCamelToSnakeCase); // Converts incoming camelCase query/body to snake_case
 app.use(convertSnakeToCamelCase); // Converts outgoing snake_case responses to camelCase
 
 // Routes
-app.use('/api', syncRoutes);
 app.use('/api/v1', apiV1Routes);
 
 // Health-check or root endpoint

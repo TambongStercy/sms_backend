@@ -118,6 +118,11 @@ export class SyncManager {
                 const result = await this.dbSyncer.syncTable(table, lastSync);
                 syncLog.recordsProcessed += result.recordsProcessed;
                 syncLog.conflicts.push(...result.conflicts);
+                // syncTable collects per-record failures into result.errors rather
+                // than throwing, so without this they were dropped entirely: a run
+                // where every single insert failed still reported COMPLETED with a
+                // clean error list. The catch below only ever saw thrown exceptions.
+                syncLog.errors.push(...result.errors);
             } catch (error: any) {
                 syncLog.errors.push(`${table}: ${error.message}`);
             }
@@ -132,6 +137,11 @@ export class SyncManager {
                 const result = await this.dbSyncer.syncTable(table, lastSync);
                 syncLog.recordsProcessed += result.recordsProcessed;
                 syncLog.conflicts.push(...result.conflicts);
+                // syncTable collects per-record failures into result.errors rather
+                // than throwing, so without this they were dropped entirely: a run
+                // where every single insert failed still reported COMPLETED with a
+                // clean error list. The catch below only ever saw thrown exceptions.
+                syncLog.errors.push(...result.errors);
             } catch (error: any) {
                 syncLog.errors.push(`${table}: ${error.message}`);
             }
@@ -146,6 +156,11 @@ export class SyncManager {
                 const result = await this.dbSyncer.syncTable(table, lastSync);
                 syncLog.recordsProcessed += result.recordsProcessed;
                 syncLog.conflicts.push(...result.conflicts);
+                // syncTable collects per-record failures into result.errors rather
+                // than throwing, so without this they were dropped entirely: a run
+                // where every single insert failed still reported COMPLETED with a
+                // clean error list. The catch below only ever saw thrown exceptions.
+                syncLog.errors.push(...result.errors);
             } catch (error: any) {
                 syncLog.errors.push(`${table}: ${error.message}`);
             }

@@ -24,6 +24,22 @@ export class DatabaseSyncer {
     return this.apiClient.isConfigured();
   }
 
+  // Records arriving from a peer may be camelCase: app.ts applied
+  // convertSnakeToCamelCase globally, above the sync routes, so
+  // GET /sync/changes/:table served "serverId"/"updatedAt" and every Prisma
+  // write on this side rejected them. app.ts now mounts sync ahead of that
+  // middleware, but a peer running an older build still camelCases, so
+  // normalise defensively on receipt. Keys are flattened one level only —
+  // these are flat Prisma rows, and recursing would turn Date values into {}.
+  private toSnakeKeys(record: any): any {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
+    const out: any = {};
+    for (const key of Object.keys(record)) {
+      out[key.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`)] = record[key];
+    }
+    return out;
+  }
+
   private modelFor(tableName: string) {
     const key = tableName.charAt(0).toLowerCase() + tableName.slice(1);
     const model = (prisma as any)[key];
@@ -105,7 +121,8 @@ export class DatabaseSyncer {
   private async pullRemoteChanges(tableName: string, remoteChanges: RemoteRecord[], result: SyncResult) {
     const model = this.modelFor(tableName);
 
-    for (const remoteRecord of remoteChanges) {
+    for (const rawRemote of remoteChanges) {
+      const remoteRecord = this.toSnakeKeys(rawRemote) as RemoteRecord;
       try {
         // Check if record exists locally
         const localRecord = await model.findUnique({
@@ -222,8 +239,9 @@ export class DatabaseSyncer {
 
   // Additional methods needed by SyncManager
 
-  async processIncomingRecord(tableName: string, record: any) {
+  async processIncomingRecord(tableName: string, rawRecord: any) {
     const model = this.modelFor(tableName);
+    const record = this.toSnakeKeys(rawRecord);
 
     try {
       // Check if record exists
