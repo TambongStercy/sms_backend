@@ -1,7 +1,61 @@
 import prisma from '../config/db';
-import { SyncLog, SyncStatus, SyncDirection } from './types';
+import { SyncLog, SyncStatus, SyncDirection, DeferredRecord } from './types';
 import { DatabaseSyncer } from './database-syncer';
 import { NetworkChecker } from './network-checker';
+
+// Ordered so a table's dependencies are synced before it. The previous
+// critical/operational/transactional grouping was not dependency-ordered and
+// omitted Student and PeriodSet entirely, so on an empty database every
+// Enrollment failed on Enrollment_student_id_fkey (1602 rows), taking
+// SchoolFees, PaymentTransaction and Mark down with it.
+//
+// Order alone is not sufficient — Class references Class through
+// next_class_id, so row order within a table matters too. The deferred-retry
+// pass in performSync covers that, and any ordering mistake here.
+const SYNC_TABLES: string[] = [
+    // No foreign keys
+    'AcademicYear',
+    'User',
+    'Subject',
+    // -> AcademicYear
+    'Student',
+    'PeriodSet',
+    'Term',
+    // -> PeriodSet
+    'Period',
+    'Class',
+    // -> Class
+    'SubClass',
+    // -> SubClass, Subject, User
+    'SubClassSubject',
+    // -> AcademicYear, Term
+    'ExamSequence',
+    // -> AcademicYear, Period, SubClass, Subject
+    'TeacherPeriod',
+    // -> User, Student
+    'ParentStudent',
+    // -> AcademicYear, Student, Class, SubClass
+    'Enrollment',
+    // -> AcademicYear, Enrollment
+    'SchoolFees',
+    // -> AcademicYear, Enrollment, SchoolFees
+    'PaymentTransaction',
+    // -> Enrollment, ExamSequence, SubClassSubject
+    'Mark',
+    // -> User, Enrollment, TeacherPeriod
+    'StudentAbsence',
+    // -> User, TeacherPeriod
+    'TeacherAbsence',
+    // -> AcademicYear, ExamSequence, Student, SubClass
+    'GeneratedReport',
+    // -> AcademicYear, User
+    'Announcement',
+];
+
+// Deferred records are retried until a pass applies nothing new. The cap is a
+// backstop against a pathological cycle, not an expected limit — a correctly
+// ordered run converges in one or two passes.
+const MAX_DEFERRED_PASSES = 5;
 
 export class SyncManager {
     private dbSyncer: DatabaseSyncer;
@@ -69,16 +123,16 @@ export class SyncManager {
             // 1. Get last sync timestamp
             const lastSync = await this.getLastSyncTimestamp();
 
-            // 2. Sync critical data first (users, academic years, classes)
-            await this.syncCriticalData(lastSync, syncLog);
+            // 2. Sync every table in dependency order, collecting records whose
+            //    referenced rows have not arrived yet.
+            const deferred = await this.syncAllTables(lastSync, syncLog);
 
-            // 3. Sync operational data (enrollments, marks, attendance)
-            await this.syncOperationalData(lastSync, syncLog);
+            // 3. Retry those until a pass stops making progress. This is what
+            //    resolves self-references (Class -> Class) and anything the
+            //    static ordering gets wrong.
+            await this.drainDeferred(deferred, syncLog);
 
-            // 4. Sync transactional data (payments, reports)
-            await this.syncTransactionalData(lastSync, syncLog);
-
-            // 5. Update sync timestamp
+            // 4. Update sync timestamp
             await this.updateSyncTimestamp();
 
             // Per-table failures are collected into syncLog.errors rather than
@@ -93,7 +147,7 @@ export class SyncManager {
             if (syncLog.errors.length > 0) {
                 console.warn(
                     `Sync PARTIAL: ${syncLog.recordsProcessed} records processed, ` +
-                    `${syncLog.errors.length} table(s) failed:`
+                    `${syncLog.errors.length} issue(s):`
                 );
                 for (const err of syncLog.errors) console.warn(`  - ${err}`);
             } else {
@@ -110,10 +164,12 @@ export class SyncManager {
         return syncLog;
     }
 
-    private async syncCriticalData(lastSync: Date, syncLog: SyncLog) {
-        const tables = ['User', 'AcademicYear', 'Class', 'SubClass', 'Subject'];
+    // Walks SYNC_TABLES in dependency order and returns the records held back
+    // because something they reference has not arrived yet.
+    private async syncAllTables(lastSync: Date, syncLog: SyncLog): Promise<DeferredRecord[]> {
+        const deferred: DeferredRecord[] = [];
 
-        for (const table of tables) {
+        for (const table of SYNC_TABLES) {
             try {
                 const result = await this.dbSyncer.syncTable(table, lastSync);
                 syncLog.recordsProcessed += result.recordsProcessed;
@@ -123,47 +179,49 @@ export class SyncManager {
                 // where every single insert failed still reported COMPLETED with a
                 // clean error list. The catch below only ever saw thrown exceptions.
                 syncLog.errors.push(...result.errors);
+                deferred.push(...result.deferred);
             } catch (error: any) {
                 syncLog.errors.push(`${table}: ${error.message}`);
             }
         }
+
+        return deferred;
     }
 
-    private async syncOperationalData(lastSync: Date, syncLog: SyncLog) {
-        const tables = ['Enrollment', 'Mark', 'StudentAbsence', 'TeacherAbsence'];
+    // Retries held-back records until a pass applies nothing new. Whatever is
+    // left after that genuinely cannot be placed — it points at a table this
+    // module does not sync — so it becomes a reported error rather than
+    // vanishing.
+    private async drainDeferred(deferred: DeferredRecord[], syncLog: SyncLog) {
+        let pending = deferred;
 
-        for (const table of tables) {
-            try {
-                const result = await this.dbSyncer.syncTable(table, lastSync);
-                syncLog.recordsProcessed += result.recordsProcessed;
-                syncLog.conflicts.push(...result.conflicts);
-                // syncTable collects per-record failures into result.errors rather
-                // than throwing, so without this they were dropped entirely: a run
-                // where every single insert failed still reported COMPLETED with a
-                // clean error list. The catch below only ever saw thrown exceptions.
-                syncLog.errors.push(...result.errors);
-            } catch (error: any) {
-                syncLog.errors.push(`${table}: ${error.message}`);
+        for (let pass = 1; pending.length > 0 && pass <= MAX_DEFERRED_PASSES; pass++) {
+            const { applied, remaining } = await this.dbSyncer.retryDeferred(pending);
+            console.log(
+                `Deferred pass ${pass}: applied ${applied}, ${remaining.length} still waiting`
+            );
+            syncLog.recordsProcessed += applied;
+
+            // No progress means every remaining record is blocked on something
+            // this run will never produce. Further passes cannot help.
+            if (applied === 0) {
+                pending = remaining;
+                break;
             }
+            pending = remaining;
         }
-    }
 
-    private async syncTransactionalData(lastSync: Date, syncLog: SyncLog) {
-        const tables = ['PaymentTransaction', 'GeneratedReport', 'Announcement'];
+        if (pending.length === 0) return;
 
-        for (const table of tables) {
-            try {
-                const result = await this.dbSyncer.syncTable(table, lastSync);
-                syncLog.recordsProcessed += result.recordsProcessed;
-                syncLog.conflicts.push(...result.conflicts);
-                // syncTable collects per-record failures into result.errors rather
-                // than throwing, so without this they were dropped entirely: a run
-                // where every single insert failed still reported COMPLETED with a
-                // clean error list. The catch below only ever saw thrown exceptions.
-                syncLog.errors.push(...result.errors);
-            } catch (error: any) {
-                syncLog.errors.push(`${table}: ${error.message}`);
-            }
+        // Collapse to one line per table+constraint; thousands of identical FK
+        // failures are one problem, not thousands.
+        const grouped = new Map<string, number>();
+        for (const item of pending) {
+            const key = `${item.table}: ${item.lastError}`;
+            grouped.set(key, (grouped.get(key) ?? 0) + 1);
+        }
+        for (const [key, count] of grouped) {
+            syncLog.errors.push(`${key} (${count} record${count === 1 ? '' : 's'} unplaced)`);
         }
     }
 

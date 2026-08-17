@@ -21,10 +21,21 @@ export interface SyncConflict {
   resolvedValue: any;
 }
 
+// A record whose insert failed only because a row it points at has not arrived
+// yet — a later table in the run, or another row of its own table (Class
+// points at Class via next_class_id). Held back and retried once the rest of
+// the run has landed, rather than reported as an error immediately.
+export interface DeferredRecord {
+  table: string;
+  record: any;
+  lastError: string;
+}
+
 export interface SyncResult {
   recordsProcessed: number;
   conflicts: SyncConflict[];
   errors: string[];
+  deferred: DeferredRecord[];
 }
 
 export enum SyncStatus {
