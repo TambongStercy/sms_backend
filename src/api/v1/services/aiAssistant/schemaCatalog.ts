@@ -24,7 +24,7 @@ export interface CatalogEntry {
 export const SCHEMA_CATALOG: CatalogEntry[] = [
     {
         table: 'Student',
-        description: 'One row per student ever registered. Not scoped to a year — a student stays here after leaving, so counts of "current" students must go through Enrollment.',
+        description: 'One row per student ever registered. Not scoped to a year — a student stays here after leaving, so counts of "current" students must go through Enrollment. gender is an enum with exactly two values, spelled Male and Female (not upper case).',
         columns: 'id, name, matricule, date_of_birth, place_of_birth, gender, residence, former_school, status, first_enrollment_year_id, admission_academic_year_id, created_at',
         keywords: ['student', 'students', 'pupil', 'pupils', 'child', 'children', 'learner', 'matricule', 'gender', 'boy', 'girl', 'male', 'female', 'age', 'born', 'birth'],
         joins: 'Enrollment.student_id = Student.id',
@@ -59,10 +59,17 @@ export const SCHEMA_CATALOG: CatalogEntry[] = [
     },
     {
         table: 'PaymentTransaction',
-        description: 'An individual payment against a fee record. Sum these for revenue collected over a period.',
+        description: 'An individual payment against a fee record. Sum these for revenue collected over a period. payment_method is an enum whose ONLY values are EXPRESS_UNION, CCA, F3DC, AFRILAND_FIRST_BANK — there is no cash or mobile-money value, and comparing against any other string is a type error, not an empty result.',
         columns: 'id, enrollment_id, academic_year_id, amount, payment_date, receipt_number, payment_method, fee_id, recorded_by_id',
-        keywords: ['payment', 'payments', 'paid', 'collected', 'revenue', 'income', 'receipt', 'transaction', 'cash', 'momo', 'mobile money', 'bank', 'today', 'this month'],
+        keywords: ['payment', 'payments', 'paid', 'collected', 'revenue', 'income', 'receipt', 'transaction', 'cash', 'momo', 'mobile money', 'bank', 'express union', 'afriland', 'today', 'this month'],
         joins: 'PaymentTransaction.enrollment_id = Enrollment.id',
+    },
+    {
+        table: 'SubClassSubject',
+        description: 'Links a subject to a subclass, with the coefficient used to weight its marks. Marks join to this rather than directly to Subject, so any question about performance by subject passes through here.',
+        columns: 'id, sub_class_id, subject_id, coefficient',
+        keywords: ['subject', 'coefficient', 'weighting', 'taught', 'per subject', 'by subject', 'subject average'],
+        joins: 'SubClassSubject.sub_class_id = SubClass.id, SubClassSubject.subject_id = Subject.id',
     },
     {
         table: 'User',
@@ -93,16 +100,16 @@ export const SCHEMA_CATALOG: CatalogEntry[] = [
     },
     {
         table: 'Mark',
-        description: 'A score for one enrolment, in one subject, for one exam sequence.',
+        description: 'A score for one enrolment, in one subject, for one exam sequence. The subject is reached through sub_class_subject_id -> "SubClassSubject" -> "Subject"; there is no subject_id on this table, and no academic_year_id either — for a year, join "Enrollment" and filter on its academic_year_id.',
         columns: 'id, enrollment_id, sub_class_subject_id, exam_sequence_id, score, teacher_id',
         keywords: ['mark', 'marks', 'score', 'scores', 'grade', 'grades', 'result', 'results', 'average', 'exam', 'performance', 'pass', 'fail'],
-        joins: 'Mark.enrollment_id = Enrollment.id, Mark.exam_sequence_id = ExamSequence.id',
+        joins: 'Mark.enrollment_id = Enrollment.id, Mark.exam_sequence_id = ExamSequence.id, Mark.sub_class_subject_id = SubClassSubject.id',
     },
     {
         table: 'StudentAbsence',
-        description: 'A recorded student absence.',
-        columns: 'id, enrollment_id, assigned_by_id, absence_type, created_at',
-        keywords: ['absent', 'absence', 'absences', 'attendance', 'missed', 'away', 'truant'],
+        description: 'A recorded student absence. There is NO student_id column — reach the student through enrollment_id. absence_type is an enum with exactly two values: MORNING_LATENESS and CLASS_ABSENCE.',
+        columns: 'id, enrollment_id, assigned_by_id, absence_type, is_excused, excuse_reason, created_at',
+        keywords: ['absent', 'absence', 'absences', 'attendance', 'missed', 'away', 'truant', 'lateness', 'late', 'excused'],
         joins: 'StudentAbsence.enrollment_id = Enrollment.id',
     },
     {

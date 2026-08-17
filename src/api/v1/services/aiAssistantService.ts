@@ -196,16 +196,63 @@ export async function ask(rawQuestion: string): Promise<AskResult> {
         );
     }
 
+    let sql = guard.sql!;
     let rows: any[];
     try {
-        rows = serialise(await prisma.$queryRawUnsafe<any[]>(guard.sql!));
-    } catch (err: any) {
-        // Usually a hallucinated column. The generated SQL is included because
-        // it is the only way for the user to see why the question failed.
-        throw new AiAssistantError(
-            'The generated query could not be run against the database.',
-            `${err?.message ?? err}\n\nSQL: ${guard.sql}`
-        );
+        rows = serialise(await prisma.$queryRawUnsafe<any[]>(sql));
+    } catch (firstError: any) {
+        // Almost every failure here is an invented column or an enum value that
+        // does not exist — "sa.student_id does not exist", "invalid input value
+        // for enum PaymentMethod: MOBILE_MONEY". PostgreSQL says precisely what
+        // is wrong, and a model that reads the complaint usually fixes it. One
+        // retry only: a second failure means the question needs a human, and
+        // each attempt costs ten to twenty seconds.
+        const dbMessage = String(firstError?.message ?? firstError)
+            .split('\n').map(l => l.trim()).filter(Boolean).pop() ?? '';
+
+        try {
+            // Built fresh rather than appended to the original. Appending left
+            // the model looking at two "SQL:" markers and a half-finished
+            // statement, and it responded with prose that the guard then
+            // rejected — replacing a fixable column error with a worse one.
+            const retryPrompt = `Fix this PostgreSQL query.
+
+${schema}
+
+The query below failed. Correct it using only the columns listed above.
+
+Failed query:
+${sql}
+
+PostgreSQL error: ${dbMessage}
+
+Output ONLY the corrected SQL, starting with SELECT. Quote table names, e.g. "Enrollment".
+
+Corrected SQL:`;
+
+            const retried = cleanSql(await generate(retryPrompt, {
+                numPredict: 200,
+                temperature: 0,
+                stop: ['\n\n', 'Question:', 'Explanation:', ';'],
+            }));
+
+            const retryGuard = guardSql(retried);
+            if (!retryGuard.ok) {
+                throw new AiAssistantError(
+                    'That question produced a query the assistant will not run.',
+                    retryGuard.reason
+                );
+            }
+
+            rows = serialise(await prisma.$queryRawUnsafe<any[]>(retryGuard.sql!));
+            sql = retryGuard.sql!;
+        } catch (secondError: any) {
+            if (secondError instanceof AiAssistantError) throw secondError;
+            throw new AiAssistantError(
+                'The generated query could not be run against the database.',
+                `${dbMessage}\n\nSQL: ${sql}`
+            );
+        }
     }
 
     return {
@@ -214,7 +261,7 @@ export async function ask(rawQuestion: string): Promise<AskResult> {
         source: 'generated-sql',
         rows,
         rowCount: rows.length,
-        sql: guard.sql,
+        sql,
         tables: hits.map(h => h.entry.table),
         tookMs: Date.now() - started,
         truncated: rows.length >= GUARD_MAX_ROWS,

@@ -123,9 +123,22 @@ export function guardSql(raw: string): GuardResult {
         };
     }
 
+    let final = withoutTrailing.trim();
+
+    // Quote bare table names. The schema uses mixed-case identifiers, so
+    // PostgreSQL only finds "Enrollment" when it is quoted — unquoted, it folds
+    // to lowercase and reports that relation "enrollment" does not exist. The
+    // model writes it both ways, and the check above passed the bare form
+    // because the name itself is legitimate. Correcting it here turns a
+    // frequent, mechanical mistake into a working query rather than an error
+    // the user can do nothing about.
+    for (const table of ALLOWED_TABLES) {
+        const bare = new RegExp(`\\b(from|join)\\s+${table}\\b(?!")`, 'gi');
+        final = final.replace(bare, (_m, kw) => `${kw} "${table}"`);
+    }
+
     // Cap the result set. A question phrased as "list the students" would
     // otherwise return every row and stall the browser rendering it.
-    let final = withoutTrailing.trim();
     if (!/\blimit\s+\d+/i.test(final)) {
         final = `${final} LIMIT ${MAX_ROWS}`;
     }
