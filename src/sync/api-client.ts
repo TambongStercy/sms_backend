@@ -7,9 +7,13 @@ export class ApiClient {
   private apiKey: string;
 
   constructor() {
-    this.remoteUrl = process.env.REMOTE_SYNC_URL || 'https://your-vps.com/api/sync';
+    // Deliberately no placeholder default. This used to fall back to
+    // 'https://your-vps.com/api/sync' — a real, registrable domain — so a box
+    // with REMOTE_SYNC_URL unset would happily POST school records to whoever
+    // owned it. Empty means "no peer configured"; isConfigured() gates the calls.
+    this.remoteUrl = process.env.REMOTE_SYNC_URL || '';
     this.apiKey = process.env.SYNC_API_KEY || '';
-    
+
     this.client = axios.create({
       baseURL: this.remoteUrl,
       headers: {
@@ -21,7 +25,14 @@ export class ApiClient {
     });
   }
 
+  // True only when a peer URL is actually configured. Without this, every sync
+  // call would fire at a relative path against no baseURL.
+  isConfigured(): boolean {
+    return this.remoteUrl.length > 0;
+  }
+
   async getChanges(tableName: string, lastSync: Date): Promise<RemoteRecord[]> {
+    if (!this.isConfigured()) return [];
     try {
       const response = await this.client.get(`/changes/${tableName}`, {
         params: {
@@ -41,6 +52,9 @@ export class ApiClient {
   }
 
   async pushRecord(tableName: string, record: any): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new Error('REMOTE_SYNC_URL is not configured — refusing to push');
+    }
     try {
       // Server exposes a single /sync/receive/:table endpoint that accepts
       // {records: [...]}. Single-record pushes wrap in a one-element array.
@@ -58,6 +72,9 @@ export class ApiClient {
   }
 
   async pushBatch(tableName: string, records: any[]): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new Error('REMOTE_SYNC_URL is not configured — refusing to push');
+    }
     const batchSize = 100;
 
     for (let i = 0; i < records.length; i += batchSize) {
@@ -84,6 +101,7 @@ export class ApiClient {
   }
 
   async testConnection(): Promise<boolean> {
+    if (!this.isConfigured()) return false;
     try {
       await this.client.get('/health');
       return true;

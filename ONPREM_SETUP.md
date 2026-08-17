@@ -13,6 +13,14 @@ Fresh install of the SSIC backend + frontend on a school-premises Windows box, s
 
 While preparing this plan I found three more bugs in the sync module that will prevent end-to-end sync. These are separate from the three already fixed in commit `1e1f0b4`. **The plan below assumes these are fixed first.**
 
+> **Status:** §0.1 and §0.2 were fixed in `6ae9b81`. §0.3 remains open by design —
+> file sync is delegated to Syncthing (§8).
+>
+> A later pass on a real on-prem install found five more, fixed in `d76a1d8`.
+> They are recorded in §0.4 because **both sides must run that commit**: the VPS
+> serves `/sync/receive/:table` and `/sync/changes/:table`, so a fixed on-prem
+> box talking to an unfixed VPS is still broken.
+
 ### 0.1 Client/server route mismatch
 
 `src/sync/api-client.ts` calls paths that don't exist on the server:
@@ -34,6 +42,28 @@ While preparing this plan I found three more bugs in the sync module that will p
 ### 0.3 File uploads not synced
 
 Confirmed: `src/sync/*` only handles the DB. Photos uploaded on-prem will 404 for parents on VPS (and vice versa) unless the `uploads/` folder is replicated. See §8 below (Syncthing).
+
+### 0.4 Five further bugs — fixed in `d76a1d8`, must be deployed to BOTH sides
+
+Found while standing up an actual on-prem box. Listed because anyone running an
+older revision on either peer still has them.
+
+| # | Bug | Effect |
+|---|---|---|
+| 1 | `database-syncer` resolved models with `tableName.toLowerCase()`; Prisma delegates are camelCase | 6 of 12 synced tables returned `undefined` and threw "Model not found" — `AcademicYear`, `SubClass`, `StudentAbsence`, `TeacherAbsence`, `PaymentTransaction`, `GeneratedReport`. **Fee payments never replicated.** |
+| 2 | `performSync` set `COMPLETED` unconditionally | Per-table failures went into `syncLog.errors` and were never surfaced, so bug 1 stayed invisible. Now reports `PARTIAL`. |
+| 3 | `startAutoSync(0)` armed `setInterval(fn, 0)` | `AUTO_SYNC_INTERVAL=0` — the intuitive way to disable sync — instead spun the loop continuously, pegging a CPU core. Non-positive now means disabled. |
+| 4 | `REMOTE_SYNC_URL` defaulted to `https://your-vps.com/api/sync` | A real, registrable domain. An unconfigured box would POST school records to whoever owned it. Now defaults to empty. |
+| 5 | `detectConflict` passed `remoteRecord.data` after `6ae9b81` flattened the shape | Iterated `undefined`, always found zero conflicting fields, so remote silently overwrote local on every collision — conflict resolution never ran. |
+
+Because of bug 2, a system carrying bugs 1 and 5 reports healthy syncs while
+losing payment records and silently discarding local edits. Verify after
+deploying:
+
+```bash
+curl -H "Authorization: Bearer $SYNC_API_KEY" https://api.ssiccmr.com/api/sync/status
+# lastSyncStatus must be COMPLETED, not PARTIAL
+```
 
 ---
 
@@ -101,10 +131,18 @@ pm2 restart sms-backend --update-env
 
 ### 3.3 Confirm sync routes accessible
 
+The backend is served from the **`api.` subdomain**, not from `ssiccmr.com/api`.
+`ssiccmr.com` is the Next.js frontend and 404s on `/api/*` (it 308-redirects to a
+trailing slash first, which makes the failure look like a redirect problem).
+
 ```bash
-curl https://ssiccmr.com/api/sync/health
+curl https://api.ssiccmr.com/api/sync/health
 # should return {"status":"healthy","server_id":"vps",...}
 ```
+
+Confirm `server_id` in that response actually changed. `pm2 restart` without
+`--update-env` keeps the old environment, and the endpoint is the only place the
+value is visible — a stale `server_id` here means §3.2 did not take effect.
 
 ### 3.4 Snapshot the DB for on-prem seeding
 
@@ -190,8 +228,13 @@ SYNC_API_KEY=<SAME key as VPS>
 # Sync identity — must differ from VPS
 SERVER_ID=school-onprem
 SERVER_TYPE=local
-REMOTE_SYNC_URL=https://ssiccmr.com/api/sync
+REMOTE_SYNC_URL=https://api.ssiccmr.com/api/sync
 ```
+
+`REMOTE_SYNC_URL` must point at the **`api.` subdomain**. Pointing it at
+`https://ssiccmr.com/api/sync` reaches the frontend, which 404s — and because
+`getChanges` treats connection failures as "working offline" and returns `[]`,
+that misconfiguration looks like "no changes to sync" rather than an error.
 
 Copy `JWT_SECRET` from VPS `.env` — if they don't match, a token minted on VPS won't validate on-prem.
 
@@ -212,6 +255,21 @@ The dump from VPS already contains the schema including `server_id`/`checksum`. 
 ```bash
 docker compose exec backend npx prisma migrate deploy
 ```
+
+**`migrate deploy` cannot build the schema from scratch.** Migration
+`20260722130000_chat_advanced_features` runs `ALTER TABLE "ChatMessageAttachment"`,
+but no migration in the chain ever creates that table — it exists only in
+`schema.prisma`, so production must have acquired it via `prisma db push`, which
+writes no migration file. Against an empty database the run dies with:
+
+```
+Error: P3018 ... relation "ChatMessageAttachment" does not exist
+```
+
+So this step only works as an *incremental* top-up on a database already restored
+from a dump. To build a fresh database without a dump, use `npx prisma db push`,
+which applies `schema.prisma` directly and bypasses the broken chain. Repairing
+the migration history is the proper fix and is not done yet.
 
 ### 4.7 Verify
 
@@ -250,15 +308,29 @@ curl -X POST http://localhost:4000/api/sync/auto/start -d '{"intervalMinutes":5}
 
 ## 6. Split-horizon DNS (staff-on-LAN hits on-prem, everyone else hits VPS)
 
+**Both hostnames must be overridden.** The frontend is `ssiccmr.com` and the
+backend is `api.ssiccmr.com`. Overriding only the first gives staff a local
+frontend still calling the *remote* API over the internet — which defeats the
+offline requirement and is easy to miss, because the app looks like it works
+right up until the internet drops.
+
 **Option A — Router supports DNS overrides** (pfSense, UniFi, OpenWrt, most business routers):
 - Router admin → DNS/DHCP → add entry: `ssiccmr.com` → `192.168.1.10`
+- Add a second entry: `api.ssiccmr.com` → `192.168.1.10`
 - Reboot devices on the LAN or wait for DNS TTL
 
 **Option B — Router doesn't support it → Pi-hole (~$40)**
 - Flash Raspberry Pi OS on a Pi 4
 - Install Pi-hole: `curl -sSL https://install.pi-hole.net | bash`
 - Pi-hole admin → Local DNS → add `ssiccmr.com` → `192.168.1.10`
+- Add `api.ssiccmr.com` → `192.168.1.10` as well
 - Router DHCP settings → hand out Pi's IP as DNS server
+
+Verify from a staff laptop on the LAN, not just from the on-prem box:
+```bash
+nslookup ssiccmr.com       # -> 192.168.1.10
+nslookup api.ssiccmr.com   # -> 192.168.1.10
+```
 
 ### SSL cert
 
@@ -266,8 +338,11 @@ Public HTTPS is already handled by the VPS. On-prem needs the same cert to avoid
 
 1. On VPS, reissue with DNS-01 challenge (works for split-horizon):
    ```bash
-   certbot certonly --manual --preferred-challenges dns -d ssiccmr.com
+   certbot certonly --manual --preferred-challenges dns -d ssiccmr.com -d api.ssiccmr.com
    ```
+   Both names are needed — the on-prem Nginx terminates TLS for the frontend
+   *and* the API, so a cert covering only `ssiccmr.com` produces certificate
+   warnings on every API call once split-horizon DNS is active.
 2. Copy the cert + key to on-prem: `certs/fullchain.pem`, `certs/privkey.pem`
 3. Mount into Nginx (see `docker-compose.yml` in §4.3)
 4. Add a monthly cron on VPS to rsync the renewed cert to on-prem.
@@ -342,20 +417,23 @@ Send alerts via email or SMS gateway. Anything that pages a human.
 
 The three critical bugs fixed in commit `1e1f0b4` are the minimum for sync to be safe. These remain and should be addressed after initial deployment:
 
-1. **Multi-field conflicts**: `detectConflict` handles only the first conflicting field per record.
+1. **Multi-field conflicts**: `detectConflict` handles only the first conflicting field per record. (Conflict detection itself now runs — see §0.4 bug 5 — so this limitation is reachable for the first time.)
 2. **Per-table sync watermarks**: A crash mid-sync loses records after the crash point.
 3. **Manual conflict resolution**: `storeForManualResolution` only logs — no UI, no DB persistence.
 4. **File sync outside DB**: Handled by Syncthing here, not by the sync module itself.
-5. **Sync route auth**: See §0.2 above — must be added before public deployment.
-6. **Client/server route mismatch**: See §0.1 above — must be fixed before sync works at all.
+5. ~~**Sync route auth**~~: fixed in `6ae9b81`.
+6. ~~**Client/server route mismatch**~~: fixed in `6ae9b81`.
+7. **Partial table coverage**: only 12 of 88 tables sync — `User`, `AcademicYear`, `Class`, `SubClass`, `Subject`, `Enrollment`, `Mark`, `StudentAbsence`, `TeacherAbsence`, `PaymentTransaction`, `GeneratedReport`, `Announcement`. **`Student`, `SchoolFees` and `FeeItem` are not among them.** Sync therefore cannot bootstrap an empty database — pulling `Enrollment` rows fails foreign-key checks against an empty `Student` table. This is why §4.5 seeds from a dump first. The routes are generic over `:tableName`, so widening coverage is a matter of extending the three arrays in `sync-manager.ts` in FK-dependency order.
+8. **Migration chain cannot replay from empty**: see §4.6 — `ChatMessageAttachment` is altered but never created.
 
 ---
 
 ## 12. Rollout checklist
 
 - [ ] §0 blockers fixed
+- [ ] **Both** VPS and on-prem running `d76a1d8` or later (§0.4)
 - [ ] VPS `.env` updated with `SERVER_ID=vps`, `SYNC_API_KEY`
-- [ ] VPS `sms-backend` restarted, `/api/sync/health` returns `server_id=vps`
+- [ ] VPS `sms-backend` restarted, `https://api.ssiccmr.com/api/sync/health` returns `server_id=vps`
 - [ ] On-prem Windows box provisioned (Docker Desktop, static IP, UPS)
 - [ ] DB dump + uploads copied to on-prem
 - [ ] On-prem `.env` set (matching JWT, matching SYNC_API_KEY, unique SERVER_ID)
@@ -364,7 +442,7 @@ The three critical bugs fixed in commit `1e1f0b4` are the minimum for sync to be
 - [ ] Round-trip sync test with a throwaway student passes
 - [ ] Auto-sync enabled
 - [ ] Syncthing paired for `uploads/`
-- [ ] Split-horizon DNS active — staff laptop resolves `ssiccmr.com` to on-prem IP
+- [ ] Split-horizon DNS active — staff laptop resolves **both** `ssiccmr.com` and `api.ssiccmr.com` to on-prem IP
 - [ ] SSL cert on on-prem, browsers show green padlock
 - [ ] Nightly backup Task Scheduler job created and tested
 - [ ] Weekly USB rotation labeled
@@ -382,4 +460,4 @@ The three critical bugs fixed in commit `1e1f0b4` are the minimum for sync to be
 | `SYNC_API_KEY` | (generated in §3.1) | **same as VPS** | |
 | `SERVER_ID` | `vps` | `school-onprem` | Must differ — powers echo-loop filter |
 | `SERVER_TYPE` | `remote` | `local` | Informational only |
-| `REMOTE_SYNC_URL` | (unset or peer's URL) | `https://ssiccmr.com/api/sync` | |
+| `REMOTE_SYNC_URL` | (unset or peer's URL) | `https://api.ssiccmr.com/api/sync` | Must be the `api.` subdomain. Empty = sync disabled. |

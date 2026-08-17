@@ -14,6 +14,14 @@ export class SyncManager {
     }
 
     async startAutoSync(intervalMinutes: number = 5) {
+        // setInterval(fn, 0) fires on every event-loop turn, so AUTO_SYNC_INTERVAL=0
+        // — the intuitive way to switch sync off — instead span the sync loop as
+        // fast as the CPU allowed. Treat any non-positive interval as "disabled".
+        if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
+            console.log('Auto-sync disabled (AUTO_SYNC_INTERVAL <= 0)');
+            return;
+        }
+
         console.log(`Starting auto-sync every ${intervalMinutes} minutes`);
 
         this.syncInterval = setInterval(async () => {
@@ -44,6 +52,18 @@ export class SyncManager {
         };
 
         try {
+            // No peer configured means there is nothing to sync with. Bail out
+            // before touching the tables so a manual /sync/trigger returns one
+            // clear reason rather than one push failure per local record.
+            if (!this.dbSyncer.isRemoteConfigured()) {
+                syncLog.status = SyncStatus.FAILED;
+                syncLog.endTime = new Date();
+                syncLog.errors.push('REMOTE_SYNC_URL is not configured — no peer to sync with');
+                console.warn('Sync skipped: REMOTE_SYNC_URL is not configured');
+                await this.saveSyncLog(syncLog);
+                return syncLog;
+            }
+
             console.log('Starting database sync...');
 
             // 1. Get last sync timestamp
@@ -61,10 +81,24 @@ export class SyncManager {
             // 5. Update sync timestamp
             await this.updateSyncTimestamp();
 
-            syncLog.status = SyncStatus.COMPLETED;
+            // Per-table failures are collected into syncLog.errors rather than
+            // thrown, so reporting COMPLETED unconditionally hid them: a sync
+            // that skipped half its tables still looked healthy. Surface those
+            // as PARTIAL so monitoring (§10) can actually alert on them.
+            syncLog.status = syncLog.errors.length > 0
+                ? SyncStatus.PARTIAL
+                : SyncStatus.COMPLETED;
             syncLog.endTime = new Date();
 
-            console.log(`Sync completed: ${syncLog.recordsProcessed} records processed`);
+            if (syncLog.errors.length > 0) {
+                console.warn(
+                    `Sync PARTIAL: ${syncLog.recordsProcessed} records processed, ` +
+                    `${syncLog.errors.length} table(s) failed:`
+                );
+                for (const err of syncLog.errors) console.warn(`  - ${err}`);
+            } else {
+                console.log(`Sync completed: ${syncLog.recordsProcessed} records processed`);
+            }
 
         } catch (error: any) {
             syncLog.status = SyncStatus.FAILED;
