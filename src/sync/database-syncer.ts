@@ -158,8 +158,24 @@ export class DatabaseSyncer {
   private async pullRemoteChanges(tableName: string, remoteChanges: RemoteRecord[], result: SyncResult) {
     const model = this.modelFor(tableName);
 
+    // Rows that predate the sync system carry server_id null, and
+    // getLocalChanges reads null as "written here" so it can push pre-sync
+    // history once. On a freshly seeded node that reasoning inverts: every row
+    // is null and every row is in fact the peer's, so the next run pushed the
+    // peer's own data straight back at it. That is not hypothetical — it
+    // stamped 6370 production rows with this node's SERVER_ID, and because the
+    // peer only serves `server_id IS NULL OR server_id = <its own>`, those rows
+    // stopped being visible to any other node.
+    //
+    // So anything arriving without provenance is attributed to the peer it came
+    // from, which is the truth about where it came from.
+    const peerId = await this.apiClient.getPeerServerId();
+
     for (const rawRemote of remoteChanges) {
       const remoteRecord = this.toSnakeKeys(rawRemote, tableName) as RemoteRecord;
+      if (peerId && !remoteRecord.server_id) {
+        remoteRecord.server_id = peerId;
+      }
       try {
         // Check if record exists locally
         const localRecord = await model.findUnique({
@@ -323,9 +339,14 @@ export class DatabaseSyncer {
 
   // Additional methods needed by SyncManager
 
-  async processIncomingRecord(tableName: string, rawRecord: any) {
+  async processIncomingRecord(tableName: string, rawRecord: any, attributeTo?: string) {
     const model = this.modelFor(tableName);
     const record = this.toSnakeKeys(rawRecord, tableName);
+    // Same attribution rule as pullRemoteChanges: a record with no provenance
+    // belongs to whoever sent it, never to us, or the next run pushes it back.
+    if (attributeTo && !record.server_id) {
+      record.server_id = attributeTo;
+    }
 
     try {
       // Check if record exists

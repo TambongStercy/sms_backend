@@ -31,6 +31,24 @@ export class ApiClient {
     return this.remoteUrl.length > 0;
   }
 
+  // The peer's own SERVER_ID, read from its open /sync/health endpoint and
+  // cached. Needed to stamp pulled rows as foreign — see the echo-loop note in
+  // DatabaseSyncer.pullRemoteChanges.
+  private peerServerId: string | null = null;
+
+  async getPeerServerId(): Promise<string | null> {
+    if (this.peerServerId) return this.peerServerId;
+    if (!this.isConfigured()) return null;
+    try {
+      const response = await this.client.get('/health');
+      const id = response.data?.server_id ?? response.data?.serverId;
+      this.peerServerId = id ? String(id) : null;
+      return this.peerServerId;
+    } catch {
+      return null;
+    }
+  }
+
   async getChanges(tableName: string, lastSync: Date): Promise<RemoteRecord[]> {
     if (!this.isConfigured()) return [];
     try {
