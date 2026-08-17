@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { SyncManager } from './sync-manager';
 import { DatabaseSyncer } from './database-syncer';
 import prisma from '../config/db';
@@ -7,8 +7,28 @@ const router = Router();
 const syncManager = new SyncManager();
 const dbSyncer = new DatabaseSyncer();
 
+// Bearer-token guard. Every sync endpoint except /sync/health requires a
+// matching SYNC_API_KEY so peers can't inject records without credentials.
+// Health stays open so LAN monitoring can probe it without secrets.
+function requireSyncAuth(req: Request, res: Response, next: NextFunction) {
+  const expected = process.env.SYNC_API_KEY;
+  if (!expected) {
+    return res.status(503).json({
+      success: false,
+      error: 'Sync API key not configured on this server'
+    });
+  }
+  const raw = req.headers['authorization'];
+  const header = Array.isArray(raw) ? raw[0] : (raw || '');
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match || match[1] !== expected) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  next();
+}
+
 // Manual sync trigger
-router.post('/sync/trigger', async (req: Request, res: Response) => {
+router.post('/sync/trigger', requireSyncAuth, async (req: Request, res: Response) => {
   try {
     const syncLog = await syncManager.performSync();
     res.json({
@@ -24,7 +44,7 @@ router.post('/sync/trigger', async (req: Request, res: Response) => {
 });
 
 // Get sync status
-router.get('/sync/status', async (req: Request, res: Response) => {
+router.get('/sync/status', requireSyncAuth, async (req: Request, res: Response) => {
   try {
     const status = await syncManager.getSyncStatus();
     res.json(status);
@@ -37,7 +57,7 @@ router.get('/sync/status', async (req: Request, res: Response) => {
 });
 
 // Get sync logs
-router.get('/sync/logs', async (req: Request, res: Response) => {
+router.get('/sync/logs', requireSyncAuth, async (req: Request, res: Response) => {
   try {
     const logs = await prisma.syncLog.findMany({
       orderBy: { start_time: 'desc' },
@@ -54,7 +74,7 @@ router.get('/sync/logs', async (req: Request, res: Response) => {
 });
 
 // Start auto sync
-router.post('/sync/auto/start', async (req: Request, res: Response) => {
+router.post('/sync/auto/start', requireSyncAuth, async (req: Request, res: Response) => {
   try {
     const { intervalMinutes = 5 } = req.body;
     await syncManager.startAutoSync(intervalMinutes);
@@ -72,7 +92,7 @@ router.post('/sync/auto/start', async (req: Request, res: Response) => {
 });
 
 // Stop auto sync
-router.post('/sync/auto/stop', async (req: Request, res: Response) => {
+router.post('/sync/auto/stop', requireSyncAuth, async (req: Request, res: Response) => {
   try {
     syncManager.stopAutoSync();
 
@@ -89,7 +109,7 @@ router.post('/sync/auto/stop', async (req: Request, res: Response) => {
 });
 
 // Receive changes from remote server (webhook endpoint)
-router.post('/sync/receive/:tableName', async (req: Request, res: Response) => {
+router.post('/sync/receive/:tableName', requireSyncAuth, async (req: Request, res: Response) => {
   try {
     const { tableName } = req.params;
     const { records } = req.body;
@@ -112,7 +132,7 @@ router.post('/sync/receive/:tableName', async (req: Request, res: Response) => {
 });
 
 // Get changes since timestamp (for remote server to pull)
-router.get('/sync/changes/:tableName', async (req: Request, res: Response) => {
+router.get('/sync/changes/:tableName', requireSyncAuth, async (req: Request, res: Response) => {
   try {
     const { tableName } = req.params;
     const { since, server_id } = req.query;

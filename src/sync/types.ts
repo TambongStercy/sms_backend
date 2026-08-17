@@ -58,10 +58,14 @@ export interface SyncConfig {
   excludeTables: string[];
 }
 
+// Records come from GET /sync/changes/:table as raw Prisma rows — the columns
+// live at the top level, not wrapped in a `data` field. sync_metadata columns
+// (server_id, checksum) are optional because they were added in a later
+// migration and older rows may still be null.
 export interface RemoteRecord {
-  id: string;
-  data: any;
+  id: number | string;
   updated_at: Date;
-  server_id: string;
-  checksum: string;
+  server_id?: string | null;
+  checksum?: string | null;
+  [key: string]: any;
 }

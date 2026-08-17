@@ -96,8 +96,8 @@ export class DatabaseSyncer {
         });
 
         if (!localRecord) {
-          // New record - insert
-          await this.insertRecord(model, remoteRecord.data);
+          // New record - insert. The remote record is a flat Prisma row.
+          await this.insertRecord(model, remoteRecord);
           result.recordsProcessed++;
 
         } else {
@@ -114,7 +114,7 @@ export class DatabaseSyncer {
             }
           } else {
             // No conflict - update
-            await this.updateRecord(model, remoteRecord.id, remoteRecord.data);
+            await this.updateRecord(model, String(remoteRecord.id), remoteRecord);
             result.recordsProcessed++;
           }
         }
@@ -145,7 +145,7 @@ export class DatabaseSyncer {
           recordId: localRecord.id.toString(),
           field: conflictingFields[0], // Handle first conflict
           localValue: localRecord[conflictingFields[0]],
-          remoteValue: remoteRecord.data[conflictingFields[0]],
+          remoteValue: remoteRecord[conflictingFields[0]],
           localUpdatedAt: localRecord.updated_at,
           remoteUpdatedAt: remoteRecord.updated_at,
           resolution: ConflictResolution.TIMESTAMP_WINS,
@@ -157,7 +157,7 @@ export class DatabaseSyncer {
     return null;
   }
 
-  private findConflictingFields(localRecord: any, remoteRecord: any): string[] {
+  private findConflictingFields(localRecord: any, remoteRecord: RemoteRecord): string[] {
     const conflicts: string[] = [];
     const excludeFields = ['id', 'created_at', 'updated_at', 'server_id', 'checksum'];
 

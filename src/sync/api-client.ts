@@ -42,13 +42,14 @@ export class ApiClient {
 
   async pushRecord(tableName: string, record: any): Promise<void> {
     try {
-      await this.client.post(`/records/${tableName}`, {
-        record,
+      // Server exposes a single /sync/receive/:table endpoint that accepts
+      // {records: [...]}. Single-record pushes wrap in a one-element array.
+      await this.client.post(`/receive/${tableName}`, {
+        records: [record],
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
       if (error.response?.status === 409) {
-        // Conflict - handle appropriately
         console.log(`Conflict detected for ${tableName}[${record.id}]`);
         throw new Error('Conflict detected');
       }
@@ -58,25 +59,24 @@ export class ApiClient {
 
   async pushBatch(tableName: string, records: any[]): Promise<void> {
     const batchSize = 100;
-    
+
     for (let i = 0; i < records.length; i += batchSize) {
       const batch = records.slice(i, i + batchSize);
-      
+
       try {
-        await this.client.post(`/batch/${tableName}`, {
+        await this.client.post(`/receive/${tableName}`, {
           records: batch,
           timestamp: new Date().toISOString()
         });
       } catch (error: any) {
         console.error(`Batch push failed for ${tableName}:`, error.message);
-        // Continue with next batch
       }
     }
   }
 
   async getServerInfo(): Promise<any> {
     try {
-      const response = await this.client.get('/info');
+      const response = await this.client.get('/status');
       return response.data;
     } catch (error: any) {
       return null;
