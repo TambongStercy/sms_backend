@@ -1,4 +1,4 @@
-import prisma from '../config/db';
+import prisma, { Prisma } from '../config/db';
 import { SyncResult, SyncConflict, ConflictResolution, RemoteRecord, DeferredRecord } from './types';
 import { ConflictResolver } from './conflict-resolver';
 import { ApiClient } from './api-client';
@@ -19,18 +19,54 @@ export class DatabaseSyncer {
     return this.apiClient.isConfigured();
   }
 
+  // Field names per model, straight from the generated schema. Used to map
+  // incoming keys onto what Prisma actually accepts.
+  private static fieldCache = new Map<string, Set<string>>();
+
+  private fieldsOf(tableName: string): Set<string> {
+    const cached = DatabaseSyncer.fieldCache.get(tableName);
+    if (cached) return cached;
+
+    const model = (Prisma as any).dmmf?.datamodel?.models?.find(
+      (m: any) => m.name === tableName
+    );
+    const names = new Set<string>((model?.fields ?? []).map((f: any) => f.name));
+    DatabaseSyncer.fieldCache.set(tableName, names);
+    return names;
+  }
+
   // Records arriving from a peer may be camelCase: app.ts applied
   // convertSnakeToCamelCase globally, above the sync routes, so
   // GET /sync/changes/:table served "serverId"/"updatedAt" and every Prisma
   // write on this side rejected them. app.ts now mounts sync ahead of that
   // middleware, but a peer running an older build still camelCases, so
-  // normalise defensively on receipt. Keys are flattened one level only —
-  // these are flat Prisma rows, and recursing would turn Date values into {}.
-  private toSnakeKeys(record: any): any {
+  // normalise defensively on receipt.
+  //
+  // Converting every camelCase key to snake_case is wrong, though: this schema
+  // is snake_case except for SubClassSubject.userId, which a blind conversion
+  // turned into user_id and Prisma rejected — all 397 rows of that table. So
+  // check the real field list: keep a key that already matches, convert only
+  // when the snake_case form is the one the model declares, and otherwise leave
+  // it alone so genuine schema drift still surfaces as an error.
+  //
+  // Keys are handled one level only — these are flat Prisma rows, and recursing
+  // would turn Date values into {}.
+  private toSnakeKeys(record: any, tableName?: string): any {
     if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
+
+    const fields = tableName ? this.fieldsOf(tableName) : null;
     const out: any = {};
+
     for (const key of Object.keys(record)) {
-      out[key.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`)] = record[key];
+      const snake = key.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`);
+      let target = key;
+      if (fields && fields.size > 0) {
+        if (fields.has(key)) target = key;
+        else if (fields.has(snake)) target = snake;
+      } else {
+        target = snake;
+      }
+      out[target] = record[key];
     }
     return out;
   }
@@ -123,7 +159,7 @@ export class DatabaseSyncer {
     const model = this.modelFor(tableName);
 
     for (const rawRemote of remoteChanges) {
-      const remoteRecord = this.toSnakeKeys(rawRemote) as RemoteRecord;
+      const remoteRecord = this.toSnakeKeys(rawRemote, tableName) as RemoteRecord;
       try {
         // Check if record exists locally
         const localRecord = await model.findUnique({
@@ -289,7 +325,7 @@ export class DatabaseSyncer {
 
   async processIncomingRecord(tableName: string, rawRecord: any) {
     const model = this.modelFor(tableName);
-    const record = this.toSnakeKeys(rawRecord);
+    const record = this.toSnakeKeys(rawRecord, tableName);
 
     try {
       // Check if record exists
