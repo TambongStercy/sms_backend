@@ -2,7 +2,7 @@ import { getAiPrisma, isAiDbConfigured } from '../../../config/aiDb';
 import { retrieve } from './aiAssistant/retriever';
 import { renderSchema } from './aiAssistant/schemaCatalog';
 import { guardSql, GUARD_MAX_ROWS } from './aiAssistant/sqlGuard';
-import { generate, isAvailable, OLLAMA_MODEL } from './aiAssistant/ollamaClient';
+import { generate, isAvailable, laneStatus, OLLAMA_MODEL } from './aiAssistant/ollamaClient';
 import { matchFastIntent } from './aiAssistant/fastIntents';
 import { matchSmallTalk } from './aiAssistant/smallTalk';
 
@@ -304,11 +304,15 @@ Corrected SQL:`;
 }
 
 export async function status() {
-    const modelUp = await isAvailable();
+    // Per lane rather than one boolean. Two lanes means the assistant can be
+    // half up — the GPU copy down and the CPU one still answering, slower — and
+    // a single flag reports that as healthy, hiding the reason for the slowdown.
+    const lanes = await laneStatus();
     return {
         configured: isAiDbConfigured(),
-        modelAvailable: modelUp,
+        modelAvailable: lanes.some(l => l.up),
         model: OLLAMA_MODEL,
+        lanes,
         maxRows: GUARD_MAX_ROWS,
     };
 }

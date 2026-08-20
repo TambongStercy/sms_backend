@@ -7,6 +7,7 @@ import { AddressInfo } from 'net';
 import { SyncService } from './sync/sync-service';
 import { initRealtime } from './realtime/socket';
 import { seedChatChannels } from './scripts/seedChatChannels';
+import { warmUp } from './api/v1/services/aiAssistant/ollamaClient';
 
 // Load environment variables (if not already loaded in app.ts)
 dotenv.config();
@@ -62,6 +63,11 @@ function startServer(port: number) {
             // Seed department / subject chat channels (idempotent, but there is
             // no reason for every worker to race on it)
             seedChatChannels().catch(err => console.error('seedChatChannels failed:', err));
+            // Load the model into each inference lane now rather than making
+            // the first person to ask a question wait ~7 s for it. Primary
+            // worker only: twelve workers warming the same two lanes would
+            // just queue twelve identical loads behind each other.
+            warmUp().catch(() => { /* a cold first question is slow, not broken */ });
         } else {
             console.log(
                 `Worker ${process.env.NODE_APP_INSTANCE}: sync and channel seeding skipped (primary only)`
