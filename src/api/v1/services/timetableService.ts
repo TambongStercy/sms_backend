@@ -360,7 +360,7 @@ export async function bulkUpdateTimetable(
             }
 
             // ---- Clear assignment ----
-            if (subject_id === null && teacher_id === null) {
+            if ((subject_id === null || subject_id === undefined) && (teacher_id === null || teacher_id === undefined)) {
                 const existing = await prisma.teacherPeriod.findMany({
                     where: { sub_class_id: subclassId, period_id: period.id, academic_year_id: academicYearId }
                 });
@@ -371,16 +371,27 @@ export async function bulkUpdateTimetable(
                 continue;
             }
 
-            if (subject_id === undefined || subject_id === null || !teacher_id || teacher_id === undefined) {
-                result.errors.push({ periodId: parsedPeriodId, error: 'Both subject_id and teacher_id must be provided (or both null to clear)' });
+            // subject_id is still required — a slot without a subject has nothing
+            // to teach. Teacher is optional so a slot can be reserved for a
+            // subject before its teacher is decided.
+            if (subject_id === undefined || subject_id === null) {
+                result.errors.push({ periodId: parsedPeriodId, error: 'subject_id is required (pass both null to clear the slot)' });
                 continue;
             }
 
             const parsedSubjectId = parseInt(subject_id as any);
-            const parsedTeacherId = parseInt(teacher_id as any);
-            if (isNaN(parsedSubjectId) || isNaN(parsedTeacherId)) {
-                result.errors.push({ periodId: parsedPeriodId, error: 'Invalid subject_id or teacher_id format' });
+            if (isNaN(parsedSubjectId)) {
+                result.errors.push({ periodId: parsedPeriodId, error: 'Invalid subject_id format' });
                 continue;
+            }
+
+            let parsedTeacherId: number | null = null;
+            if (teacher_id !== null && teacher_id !== undefined) {
+                parsedTeacherId = parseInt(teacher_id as any);
+                if (isNaN(parsedTeacherId)) {
+                    result.errors.push({ periodId: parsedPeriodId, error: 'Invalid teacher_id format' });
+                    continue;
+                }
             }
 
             // Only BREAK slots are unbookable. Every other slot (including
@@ -395,56 +406,58 @@ export async function bulkUpdateTimetable(
                 continue;
             }
 
-            const canTeachSubject = await prisma.subjectTeacher.findFirst({
-                where: { subject_id: parsedSubjectId, teacher_id: parsedTeacherId }
-            });
-            if (!canTeachSubject) {
-                result.errors.push({
-                    periodId: parsedPeriodId,
-                    error: `Teacher ${parsedTeacherId} is not authorized to teach subject ${parsedSubjectId}`
+            if (parsedTeacherId !== null) {
+                const canTeachSubject = await prisma.subjectTeacher.findFirst({
+                    where: { subject_id: parsedSubjectId, teacher_id: parsedTeacherId }
                 });
-                continue;
-            }
+                if (!canTeachSubject) {
+                    result.errors.push({
+                        periodId: parsedPeriodId,
+                        error: `Teacher ${parsedTeacherId} is not authorized to teach subject ${parsedSubjectId}`
+                    });
+                    continue;
+                }
 
-            // ---- Time-overlap clash detection ----
-            // Look at every TeacherPeriod the teacher already has this day in
-            // this academic year (any subclass, any period set), and flag any
-            // whose [start,end) intersects the incoming slot.
-            const teacherSameDay = await prisma.teacherPeriod.findMany({
-                where: {
-                    teacher_id: parsedTeacherId,
-                    academic_year_id: academicYearId,
-                    period: { day_of_week: period.day_of_week },
-                    NOT: {
-                        AND: [
-                            { sub_class_id: subclassId },
-                            { period_id: period.id }
-                        ]
-                    }
-                },
-                include: { period: { include: { period_set: true } }, sub_class: true }
-            });
-
-            const clash = teacherSameDay.find(tp =>
-                intervalsOverlap(period.start_time, period.end_time, tp.period.start_time, tp.period.end_time)
-            );
-
-            if (clash) {
-                result.warnings.push({
-                    periodId: parsedPeriodId,
-                    type: 'TEACHER_CLASH',
-                    message: `Teacher is also booked in ${clash.sub_class.name} on ${clash.period.day_of_week} ${clash.period.start_time}–${clash.period.end_time} (${clash.period.name})`,
-                    clashWith: {
-                        subClassId: clash.sub_class.id,
-                        subClassName: clash.sub_class.name,
-                        day: clash.period.day_of_week,
-                        periodName: clash.period.name,
-                        periodStartTime: clash.period.start_time,
-                        periodEndTime: clash.period.end_time,
-                        periodSetCode: clash.period.period_set?.code ?? null
-                    }
+                // ---- Time-overlap clash detection ----
+                // Look at every TeacherPeriod the teacher already has this day in
+                // this academic year (any subclass, any period set), and flag any
+                // whose [start,end) intersects the incoming slot.
+                const teacherSameDay = await prisma.teacherPeriod.findMany({
+                    where: {
+                        teacher_id: parsedTeacherId,
+                        academic_year_id: academicYearId,
+                        period: { day_of_week: period.day_of_week },
+                        NOT: {
+                            AND: [
+                                { sub_class_id: subclassId },
+                                { period_id: period.id }
+                            ]
+                        }
+                    },
+                    include: { period: { include: { period_set: true } }, sub_class: true }
                 });
-                // Fall through — still persist so the caller keeps their edit.
+
+                const clash = teacherSameDay.find(tp =>
+                    intervalsOverlap(period.start_time, period.end_time, tp.period.start_time, tp.period.end_time)
+                );
+
+                if (clash) {
+                    result.warnings.push({
+                        periodId: parsedPeriodId,
+                        type: 'TEACHER_CLASH',
+                        message: `Teacher is also booked in ${clash.sub_class.name} on ${clash.period.day_of_week} ${clash.period.start_time}–${clash.period.end_time} (${clash.period.name})`,
+                        clashWith: {
+                            subClassId: clash.sub_class.id,
+                            subClassName: clash.sub_class.name,
+                            day: clash.period.day_of_week,
+                            periodName: clash.period.name,
+                            periodStartTime: clash.period.start_time,
+                            periodEndTime: clash.period.end_time,
+                            periodSetCode: clash.period.period_set?.code ?? null
+                        }
+                    });
+                    // Fall through — still persist so the caller keeps their edit.
+                }
             }
 
             const existingAssignment = await prisma.teacherPeriod.findFirst({

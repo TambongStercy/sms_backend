@@ -651,7 +651,8 @@ enum PeriodType {
 
 model TeacherPeriod {
   id               Int              @id @default(autoincrement())
-  teacher_id       Int
+  // teacher_id is nullable so a slot can carry a subject without a teacher yet.
+  teacher_id       Int?
   subject_id       Int
   period_id        Int
   academic_year_id Int
@@ -667,15 +668,15 @@ model TeacherPeriod {
   assigned_by      User             @relation("TeacherPeriods-AssignedBy", fields: [assigned_by_id], references: [id])
   period           Period           @relation(fields: [period_id], references: [id])
   sub_class        SubClass         @relation(fields: [sub_class_id], references: [id])
-  teacher          User             @relation("TeacherPeriods-Teacher", fields: [teacher_id], references: [id])
+  teacher          User?            @relation("TeacherPeriods-Teacher", fields: [teacher_id], references: [id])
   subject          Subject          @relation(fields: [subject_id], references: [id])
 
   logbook_entries LogbookEntry[]
   teacher_roll_calls TeacherRollCall[]
   teacher_period_attendances TeacherPeriodAttendance[]
 
-  // Prevents a teacher from being booked in two different classes at the same time.
-  @@unique([teacher_id, period_id, academic_year_id], name: "teacher_period_unique")
+  // Teacher clashes are now allowed with a warning, so the old
+  // (teacher_id, period_id, academic_year_id) uniqueness is dropped.
   // Prevents assigning the same teacher to the same subject in the same period/subclass twice.
   @@unique([teacher_id, subject_id, period_id, sub_class_id, academic_year_id], name: "teacher_subject_subclass_period_unique")
 }
