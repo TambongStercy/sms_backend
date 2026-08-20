@@ -52,10 +52,29 @@ function stripComments(sql: string): string {
         .replace(/--[^\n]*/g, ' ');
 }
 
-/** Table names appearing after FROM or JOIN, quoted or bare. */
+/**
+ * FROM is not always a table clause. PostgreSQL spells several functions with
+ * it — EXTRACT(YEAR FROM x), SUBSTRING(x FROM y), TRIM(BOTH ' ' FROM x) — so a
+ * plain scan for "from <word>" read EXTRACT(YEAR FROM AGE(dob)) as a reference
+ * to a table named AGE and refused the query. Every question about ages or
+ * date parts died there, with an error blaming a table the user never named.
+ *
+ * Only the keyword is masked, and only when the text between the function's
+ * own parenthesis and the keyword has no parentheses in it. A real subquery
+ * inside the call keeps its own FROM and is still checked against the allow
+ * list, so nothing hides a table reference this way.
+ */
+function maskFunctionFrom(sql: string): string {
+    return sql.replace(
+        /\b(extract|substring|trim|overlay|position)\s*\(([^()]*?)\bfrom\b/gi,
+        (_match, fn: string, inner: string) => `${fn}(${inner}__masked_from__`
+    );
+}
+
 function referencedTables(sql: string): string[] {
     const found = new Set<string>();
     const re = /\b(?:from|join)\s+"?([A-Za-z_][A-Za-z0-9_]*)"?/gi;
+    sql = maskFunctionFrom(sql);
     let m: RegExpExecArray | null;
     while ((m = re.exec(sql)) !== null) found.add(m[1]);
     return [...found];

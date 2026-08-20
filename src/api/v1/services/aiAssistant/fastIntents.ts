@@ -18,6 +18,15 @@ export interface FastIntent {
     sql: string;
     /** Builds extra parameters from the regex match. */
     params?: (m: RegExpMatchArray) => any[];
+    /**
+     * A last look at a pattern that already matched. Returning false declines
+     * it and lets the next intent — or the model — take the question.
+     *
+     * A regex that captures a name cannot tell a name from a name plus a
+     * condition, and it will always prefer to match. This is where that gets
+     * caught.
+     */
+    accept?: (m: RegExpMatchArray) => boolean;
     /** Turns the single result row into a sentence. */
     describe: (row: any, m: RegExpMatchArray) => string;
     /**
@@ -36,6 +45,35 @@ export interface FastIntent {
 // Enrolment is per academic year, so "how many students" without a year means
 // the current one. Every count below is scoped this way.
 const CURRENT_YEAR = `(SELECT id FROM "AcademicYear" WHERE is_current = true LIMIT 1)`;
+
+// The Gender enum is exactly two values, Female and Male, capitalised. Anything
+// a person might reasonably type has to land on one of them, so the mapping is
+// explicit rather than a capitalise-the-first-letter trick that would turn
+// "boys" into "Boys" and match nothing.
+const GENDER_WORDS: Record<string, 'Male' | 'Female'> = {
+    boy: 'Male', boys: 'Male', male: 'Male', males: 'Male',
+    girl: 'Female', girls: 'Female', female: 'Female', females: 'Female',
+};
+/**
+ * Words that mean the question carries a condition no hand-written intent can
+ * express.
+ *
+ * A capture group is greedy about names and cannot see that it has swallowed a
+ * clause: "how many students in FORM 1 were born in 2010" handed
+ * students_in_class the class name "FORM 1 WERE BORN IN 2010", which matched
+ * nothing and was reported as a confident zero. The question was answerable —
+ * just not by that intent. Declining the match sends it to the model instead,
+ * and a slow correct answer beats an instant wrong one.
+ */
+const QUALIFIER = /\b(?:who|whose|whom|that|which|with|without|born|age[ds]?|owe|owes|owing|debt|paid|pay|pays|unpaid|outstanding|live|lives|living|repeat\w*|new|old|above|below|over|under|more|less|fewer|between|than|before|after|since|during|and|or|not|male|female|boys?|girls?|top|first|last)\b/i;
+
+/** A class or subclass name, as opposed to a name with a condition stuck to it. */
+function looksLikeClassName(raw: string): boolean {
+    const name = raw.trim();
+    if (!name) return false;
+    if (name.split(/\s+/).length > 4) return false;
+    return !QUALIFIER.test(name);
+}
 
 export const FAST_INTENTS: FastIntent[] = [
     {
@@ -76,6 +114,7 @@ export const FAST_INTENTS: FastIntent[] = [
             WHERE e.academic_year_id = ${CURRENT_YEAR}
               AND UPPER(c.name) LIKE UPPER($1)`,
         params: m => [`%${m[1].trim()}%`],
+        accept: m => looksLikeClassName(m[1]),
         describe: (row, m) => `${row.count} student${row.count === 1 ? '' : 's'} are enrolled in ${m[1].trim().toUpperCase()} this academic year.`,
     },
     {
@@ -110,8 +149,10 @@ export const FAST_INTENTS: FastIntent[] = [
     {
         name: 'fees_collected',
         patterns: [
-            /how much (?:have we |has been )?(?:collected|received|paid)/i,
-            /total (?:fees )?(?:collected|paid|revenue|income)/i,
+            // Anchored, with room for the natural trailing phrases. Left open,
+            // "how much have we collected in FORM 1" was answered school-wide.
+            /how much (?:have we |has been )?(?:collected|received|paid)(?: so far| in total| altogether| this (?:year|term))?\s*\??$/i,
+            /total (?:fees )?(?:collected|paid|revenue|income)(?: so far| this (?:year|term))?\s*\??$/i,
         ],
         sql: `
             SELECT COALESCE(SUM(pt.amount), 0)::bigint AS total,
@@ -124,8 +165,8 @@ export const FAST_INTENTS: FastIntent[] = [
     {
         name: 'expected_total',
         patterns: [
-            /how much (?:are we |is )?(?:expect|owed|due)/i,
-            /total (?:fees )?expected/i,
+            /how much (?:are we |is )?(?:expect\w*|owed|due)(?: in total| altogether| this (?:year|term))?\s*\??$/i,
+            /total (?:fees )?expected(?: this (?:year|term))?\s*\??$/i,
         ],
         sql: `
             SELECT COALESCE(SUM(sf.amount_expected), 0)::bigint AS expected,
@@ -143,8 +184,10 @@ export const FAST_INTENTS: FastIntent[] = [
         name: 'teacher_count',
         general: true,
         patterns: [
-            /how many (?:teachers?|teaching staff)/i,
-            /(?:number|count) of teachers?/i,
+            // Anchored: unanchored, "how many teachers are female?" matched
+            // here and was answered with the total teacher count.
+            /how many (?:teachers?|teaching staff)(?: are there| do we have)?\s*\??$/i,
+            /(?:number|count) of (?:teachers?|teaching staff)\s*\??$/i,
         ],
         sql: `
             SELECT COUNT(DISTINCT ur.user_id)::int AS count
@@ -153,11 +196,52 @@ export const FAST_INTENTS: FastIntent[] = [
         describe: row => `${row.count} users hold the TEACHER role.`,
     },
     {
+        // Must precede gender_split, for exactly the reason class_breakdown
+        // must precede students_in_class. gender_split's pattern was
+        // /how many (?:boys|girls|male|female)/ with nothing anchoring the
+        // end, so "how many males in FORM 1" matched on "male" inside "males",
+        // the class was never looked at, and the answer was the whole school's
+        // gender split — confident, plausible, and about a different question
+        // than the one asked. First match wins, so ordering is half the fix;
+        // the anchors on gender_split below are the other half.
+        //
+        // Matches the class or the subclass: people ask about "FORM 1" and
+        // "FORM 1 A" interchangeably, and matching only Class would answer the
+        // second with a flat zero.
+        name: 'gender_in_class',
+        general: true,
+        patterns: [
+            /how many (boys?|girls?|males?|females?) (?:students? )?(?:are )?(?:there )?(?:in|enrolled in) (?!each|every|all|total|the school|school)([a-z0-9 ]+?)\??$/i,
+            /(?:number|count) of (boys?|girls?|males?|females?) (?:students? )?in (?!each|every|all|total|the school|school)([a-z0-9 ]+?)\??$/i,
+        ],
+        sql: `
+            SELECT COUNT(DISTINCT e.student_id)::int AS count
+            FROM "Enrollment" e
+            JOIN "Student" s ON s.id = e.student_id
+            LEFT JOIN "Class" c ON c.id = e.class_id
+            LEFT JOIN "SubClass" sc ON sc.id = e.sub_class_id
+            WHERE e.academic_year_id = ${CURRENT_YEAR}
+              AND s.gender::text = $2
+              AND (UPPER(c.name) LIKE UPPER($1) OR UPPER(sc.name) LIKE UPPER($1))`,
+        params: m => [`%${m[2].trim()}%`, GENDER_WORDS[m[1].toLowerCase()]],
+        accept: m => looksLikeClassName(m[2]),
+        describe: (row, m) => {
+            const word = GENDER_WORDS[m[1].toLowerCase()] === 'Male' ? 'male' : 'female';
+            const one = row.count === 1;
+            return `${row.count} ${word} student${one ? '' : 's'} ${one ? 'is' : 'are'} enrolled in ${m[2].trim().toUpperCase()} this academic year.`;
+        },
+    },
+    {
         name: 'gender_split',
         general: true,
         patterns: [
-            /how many (?:boys|girls|male|female)/i,
-            /gender (?:split|breakdown|distribution)/i,
+            // Anchored to the end of the question, unlike the original. Left
+            // open, it claimed every qualified gender question in the file -
+            // "how many males in FORM 1" among them - and answered all of them
+            // school-wide. Anything it no longer matches falls to the intent
+            // above, or to the model.
+            /how many (?:boys?|girls?|males?|females?)(?: students?)?(?: are)?(?: there)?(?: in (?:the )?(?:school|total))?(?: (?:this|the current) (?:academic )?year)?\s*\??$/i,
+            /gender (?:split|breakdown|distribution)(?: for (?:the )?(?:school|year))?\s*\??$/i,
         ],
         sql: `
             SELECT s.gender::text AS gender, COUNT(DISTINCT s.id)::int AS count
@@ -179,7 +263,7 @@ export function matchFastIntent(
         if (generalOnly && !intent.general) continue;
         for (const pattern of intent.patterns) {
             const m = q.match(pattern);
-            if (m) return { intent, match: m };
+            if (m && (!intent.accept || intent.accept(m))) return { intent, match: m };
         }
     }
     return null;
