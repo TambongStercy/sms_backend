@@ -164,6 +164,12 @@ model User {
   salary_withholdings_requested  SalaryWithholding[]         @relation("SalaryWithholdingRequestedBy")
   salary_withholdings_approved   SalaryWithholding[]         @relation("SalaryWithholdingApprovedBy")
   bursar_cash_injections         BursarCashInjection[]       @relation("BursarCashInjectedBy")
+  // Staff loans + leave
+  loans_requested                StaffLoan[]                 @relation("StaffLoanBorrower")
+  loans_approved                 StaffLoan[]                 @relation("StaffLoanApprover")
+  loan_repayments_recorded       StaffLoanRepayment[]        @relation("StaffLoanRepaymentRecordedBy")
+  leave_requested                LeaveRequest[]              @relation("LeaveRequestRequester")
+  leave_approved                 LeaveRequest[]              @relation("LeaveRequestApprover")
   // Per-user preferences (theme, language, notification toggles, quiet hours)
   settings                       UserSettings?
 }
@@ -263,6 +269,7 @@ model Class {
   fee_items         FeeItem[]
   subject_schemes   SubjectScheme[]
   period_set        PeriodSet?      @relation(fields: [period_set_id], references: [id])
+  term_classes      TermClass[]
 }
 
 model SubClass {
@@ -555,6 +562,9 @@ model Term {
   end_date         DateTime?
   academic_year_id Int?
   fee_deadline     DateTime?
+  // Marks the term as a holiday period rather than a teaching term. Holiday
+  // terms scope through TermClass so only the affected classes see them.
+  is_holiday       Boolean        @default(false)
   // Timestamps added for sync: getLocalChanges selects on updated_at, so a
   // table without it cannot participate in the sync at all.
   created_at       DateTime @default(now())
@@ -564,8 +574,26 @@ model Term {
   exam_sequences   ExamSequence[]
   academic_year    AcademicYear?  @relation(fields: [academic_year_id], references: [id])
   scheme_lessons   SchemeLesson[]
+  term_classes     TermClass[]
 
   @@unique([start_date, end_date, academic_year_id])
+}
+
+// Join table restricting a Term (typically a holiday term) to a specific set
+// of classes. Empty set on a non-holiday term = applies to all classes.
+model TermClass {
+  id         Int      @id @default(autoincrement())
+  term_id    Int
+  class_id   Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
+  term       Term     @relation(fields: [term_id], references: [id], onDelete: Cascade)
+  class      Class    @relation(fields: [class_id], references: [id], onDelete: Cascade)
+
+  @@unique([term_id, class_id])
+  @@index([class_id])
 }
 
 model Mark {
@@ -2518,4 +2546,108 @@ enum TaskStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+// ─── Staff loans ────────────────────────────────────────────────────────────
+// Any staff member can request a loan and pick a repayment duration in months.
+// Super manager approves and picks the repayment method (salary deduction,
+// cash, transfer, etc.). Repayments are logged one-by-one against the loan.
+
+enum LoanStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  PAID_OFF
+}
+
+enum LoanRepaymentMethod {
+  SALARY_DEDUCTION
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  OTHER
+}
+
+model StaffLoan {
+  id                  Int                  @id @default(autoincrement())
+  borrower_id         Int
+  amount              Float
+  duration_months     Int
+  monthly_installment Float // denormalised: amount / duration_months, computed at request time
+  reason              String?
+  status              LoanStatus           @default(PENDING)
+  repayment_method    LoanRepaymentMethod? // null until approved
+  approver_id         Int?
+  approver_note       String? // rationale on approve, reason on reject
+  approved_at         DateTime?
+  cancelled_at        DateTime?
+  paid_off_at         DateTime?
+  created_at          DateTime             @default(now())
+  updated_at          DateTime             @updatedAt
+
+  borrower   User                 @relation("StaffLoanBorrower", fields: [borrower_id], references: [id])
+  approver   User?                @relation("StaffLoanApprover", fields: [approver_id], references: [id])
+  repayments StaffLoanRepayment[]
+
+  @@index([borrower_id])
+  @@index([status])
+}
+
+model StaffLoanRepayment {
+  id             Int                 @id @default(autoincrement())
+  loan_id        Int
+  amount         Float
+  paid_on        DateTime
+  method         LoanRepaymentMethod
+  notes          String?
+  recorded_by_id Int
+  created_at     DateTime            @default(now())
+
+  loan        StaffLoan @relation(fields: [loan_id], references: [id], onDelete: Cascade)
+  recorded_by User      @relation("StaffLoanRepaymentRecordedBy", fields: [recorded_by_id], references: [id])
+
+  @@index([loan_id])
+}
+
+// ─── Leave requests ─────────────────────────────────────────────────────────
+// Any staff member can request time off; super manager approves.
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  MATERNITY
+  PATERNITY
+  BEREAVEMENT
+  UNPAID
+  OTHER
+}
+
+model LeaveRequest {
+  id            Int         @id @default(autoincrement())
+  requester_id  Int
+  leave_type    LeaveType
+  start_date    DateTime
+  end_date      DateTime
+  reason        String
+  status        LeaveStatus @default(PENDING)
+  approver_id   Int?
+  approver_note String?
+  decided_at    DateTime?
+  cancelled_at  DateTime?
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+
+  requester User  @relation("LeaveRequestRequester", fields: [requester_id], references: [id])
+  approver  User? @relation("LeaveRequestApprover", fields: [approver_id], references: [id])
+
+  @@index([requester_id])
+  @@index([status])
 }
