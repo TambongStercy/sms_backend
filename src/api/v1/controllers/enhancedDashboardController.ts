@@ -55,6 +55,25 @@ async function getStaffBreakdown() {
     return { totalStaff, teachers, administrators };
 }
 
+// SSIC stream hierarchy for ordering subclasses within a class:
+// N → NN → MN → M → MS → S → MW → W. Unknown codes sort last, alphabetically.
+const STREAM_RANK: Record<string, number> = {
+    N: 1,
+    NN: 1.5,
+    MN: 2,
+    M: 3,
+    MS: 4,
+    S: 5,
+    MW: 5.5,
+    W: 6,
+};
+
+const streamRank = (name: string | null | undefined): number => {
+    const parts = (name ?? '').trim().split(/\s+/);
+    const code = (parts[parts.length - 1] || '').toUpperCase();
+    return STREAM_RANK[code] ?? Number.POSITIVE_INFINITY;
+};
+
 // Enrollment summary: per-class rollup with per-subclass student counts for the given
 // academic year (defaults to the current year). Feeds the MANAGER overview so the
 // caller can see "how many students are in each class" at a glance.
@@ -78,7 +97,6 @@ async function getEnrollmentSummary(academicYearId?: number) {
                         },
                     },
                 },
-                orderBy: { name: 'asc' },
             },
         },
         orderBy: { name: 'asc' },
@@ -86,11 +104,18 @@ async function getEnrollmentSummary(academicYearId?: number) {
 
     let totalEnrolled = 0;
     const shaped = classes.map(cls => {
-        const subClasses = cls.sub_classes.map(sc => ({
-            subClassId: sc.id,
-            subClassName: sc.name,
-            studentCount: sc._count.enrollments,
-        }));
+        const subClasses = [...cls.sub_classes]
+            .sort((a, b) => {
+                const ra = streamRank(a.name);
+                const rb = streamRank(b.name);
+                if (ra !== rb) return ra - rb;
+                return a.name.localeCompare(b.name, undefined, { numeric: true });
+            })
+            .map(sc => ({
+                subClassId: sc.id,
+                subClassName: sc.name,
+                studentCount: sc._count.enrollments,
+            }));
         const classTotal = subClasses.reduce((sum, sc) => sum + sc.studentCount, 0);
         totalEnrolled += classTotal;
         return {
