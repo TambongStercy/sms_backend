@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import prisma from '../../../config/db';
 import * as enhancedDashboardService from '../services/enhancedDashboardService';
+import { getCurrentAcademicYear } from '../../../utils/academicYear';
 
 // Roles considered "administrators" for the MANAGER overview headline counts.
 // Aligns with Tier 1–3 of the role hierarchy (executives + head-of-school + senior leadership).
@@ -54,6 +55,55 @@ async function getStaffBreakdown() {
     return { totalStaff, teachers, administrators };
 }
 
+// Enrollment summary: per-class rollup with per-subclass student counts for the given
+// academic year (defaults to the current year). Feeds the MANAGER overview so the
+// caller can see "how many students are in each class" at a glance.
+async function getEnrollmentSummary(academicYearId?: number) {
+    const yearId = academicYearId ?? (await getCurrentAcademicYear())?.id;
+    if (!yearId) {
+        return { academicYearId: null, totalEnrolled: 0, classes: [] as any[] };
+    }
+
+    const classes = await prisma.class.findMany({
+        select: {
+            id: true,
+            name: true,
+            sub_classes: {
+                select: {
+                    id: true,
+                    name: true,
+                    _count: {
+                        select: {
+                            enrollments: { where: { academic_year_id: yearId } },
+                        },
+                    },
+                },
+                orderBy: { name: 'asc' },
+            },
+        },
+        orderBy: { name: 'asc' },
+    });
+
+    let totalEnrolled = 0;
+    const shaped = classes.map(cls => {
+        const subClasses = cls.sub_classes.map(sc => ({
+            subClassId: sc.id,
+            subClassName: sc.name,
+            studentCount: sc._count.enrollments,
+        }));
+        const classTotal = subClasses.reduce((sum, sc) => sum + sc.studentCount, 0);
+        totalEnrolled += classTotal;
+        return {
+            classId: cls.id,
+            className: cls.name,
+            totalStudents: classTotal,
+            subClasses,
+        };
+    });
+
+    return { academicYearId: yearId, totalEnrolled, classes: shaped };
+}
+
 /**
  * GET /api/v1/dashboard/super-manager/enhanced
  * Enhanced Super Manager Dashboard with comprehensive analytics
@@ -89,9 +139,10 @@ export const getEnhancedManagerDashboard = async (req: Request, res: Response) =
         const academicYearId = req.query.academicYearId ?
             parseInt(req.query.academicYearId as string) : undefined;
 
-        const [dashboardData, staffBreakdown] = await Promise.all([
+        const [dashboardData, staffBreakdown, enrollmentSummary] = await Promise.all([
             enhancedDashboardService.getEnhancedSuperManagerDashboard(academicYearId),
             getStaffBreakdown(),
+            getEnrollmentSummary(academicYearId),
         ]);
 
         const data: any = dashboardData;
@@ -100,6 +151,7 @@ export const getEnhancedManagerDashboard = async (req: Request, res: Response) =
             delete data.schoolOverview.finance;
         }
         data.staffBreakdown = staffBreakdown;
+        data.enrollmentSummary = enrollmentSummary;
 
         res.json({
             success: true,
