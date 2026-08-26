@@ -1,6 +1,58 @@
 // Enhanced Dashboard Controller for Advanced Role-Specific Features
 import { Request, Response } from 'express';
+import prisma from '../../../config/db';
 import * as enhancedDashboardService from '../services/enhancedDashboardService';
+
+// Roles considered "administrators" for the MANAGER overview headline counts.
+// Aligns with Tier 1–3 of the role hierarchy (executives + head-of-school + senior leadership).
+const ADMINISTRATOR_ROLES = [
+    'SUPER_MANAGER',
+    'MANAGER',
+    'PRINCIPAL',
+    'VICE_PRINCIPAL',
+    'BURSAR',
+    'SECRETARY',
+] as const;
+
+// Roles counted as "teachers" — TEACHER plus HOD (who teaches in addition to leading a subject).
+const TEACHER_ROLES = ['TEACHER', 'HOD'] as const;
+
+// All roles that count as staff (everything except PARENT).
+const STAFF_ROLES = [
+    'SUPER_MANAGER',
+    'MANAGER',
+    'PRINCIPAL',
+    'VICE_PRINCIPAL',
+    'BURSAR',
+    'SECRETARY',
+    'DEAN_OF_STUDIES',
+    'DEAN_OF_DISCIPLINE',
+    'SENIOR_DISCIPLINE_MASTER',
+    'HOD',
+    'TEACHER',
+    'DISCIPLINE_MASTER',
+    'NURSE',
+    'FEE_AUDITOR',
+    'CONTROLLER',
+    'GUIDANCE_COUNSELOR',
+] as const;
+
+async function countDistinctUsersWithAnyRole(roles: readonly string[]): Promise<number> {
+    return prisma.user.count({
+        where: {
+            user_roles: { some: { role: { in: roles as any } } },
+        },
+    });
+}
+
+async function getStaffBreakdown() {
+    const [totalStaff, teachers, administrators] = await Promise.all([
+        countDistinctUsersWithAnyRole(STAFF_ROLES),
+        countDistinctUsersWithAnyRole(TEACHER_ROLES),
+        countDistinctUsersWithAnyRole(ADMINISTRATOR_ROLES),
+    ]);
+    return { totalStaff, teachers, administrators };
+}
 
 /**
  * GET /api/v1/dashboard/super-manager/enhanced
@@ -29,23 +81,29 @@ export const getEnhancedSuperManagerDashboard = async (req: Request, res: Respon
 /**
  * GET /api/v1/dashboard/manager/enhanced
  * Enhanced Manager Dashboard. Uses the same service as Super Manager but omits
- * fee-collection statistics — the MANAGER role is not scoped to finance.
+ * fee-collection statistics (MANAGER is not scoped to finance) and adds a
+ * headcount breakdown for the overview: total staff, teachers, administrators.
  */
 export const getEnhancedManagerDashboard = async (req: Request, res: Response) => {
     try {
         const academicYearId = req.query.academicYearId ?
             parseInt(req.query.academicYearId as string) : undefined;
 
-        const dashboardData: any = await enhancedDashboardService.getEnhancedSuperManagerDashboard(academicYearId);
+        const [dashboardData, staffBreakdown] = await Promise.all([
+            enhancedDashboardService.getEnhancedSuperManagerDashboard(academicYearId),
+            getStaffBreakdown(),
+        ]);
 
-        delete dashboardData.schoolFees;
-        if (dashboardData.schoolOverview) {
-            delete dashboardData.schoolOverview.finance;
+        const data: any = dashboardData;
+        delete data.schoolFees;
+        if (data.schoolOverview) {
+            delete data.schoolOverview.finance;
         }
+        data.staffBreakdown = staffBreakdown;
 
         res.json({
             success: true,
-            data: dashboardData
+            data
         });
     } catch (error) {
         console.error('Error fetching enhanced Manager dashboard:', error);
@@ -218,6 +276,17 @@ export const getAuditTrail = async (req: Request, res: Response) => {
  */
 export const getFinancialOverview = async (req: Request, res: Response) => {
     try {
+        // MANAGER (as a pure MANAGER, not also SUPER_MANAGER) is intentionally
+        // excluded from finance data. The auth middleware treats MANAGER as a
+        // tier-1 executive peer of SUPER_MANAGER, so we block explicitly here.
+        const callerRoles: string[] = (req as any).user?.role ?? [];
+        if (callerRoles.includes('MANAGER') && !callerRoles.includes('SUPER_MANAGER') && !callerRoles.includes('BURSAR')) {
+            return res.status(403).json({
+                success: false,
+                error: 'Forbidden: financial overview is not available to the MANAGER role',
+            });
+        }
+
         const academicYearId = req.query.academicYearId ?
             parseInt(req.query.academicYearId as string) : undefined;
 
