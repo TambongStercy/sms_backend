@@ -1073,6 +1073,7 @@ enum PaymentMethod {
   CCA
   F3DC
   AFRILAND_FIRST_BANK
+  CASH
 }
 
 enum Audience {
