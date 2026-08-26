@@ -27,6 +27,36 @@ export const getEnhancedSuperManagerDashboard = async (req: Request, res: Respon
 };
 
 /**
+ * GET /api/v1/dashboard/manager/enhanced
+ * Enhanced Manager Dashboard. Uses the same service as Super Manager but omits
+ * fee-collection statistics — the MANAGER role is not scoped to finance.
+ */
+export const getEnhancedManagerDashboard = async (req: Request, res: Response) => {
+    try {
+        const academicYearId = req.query.academicYearId ?
+            parseInt(req.query.academicYearId as string) : undefined;
+
+        const dashboardData: any = await enhancedDashboardService.getEnhancedSuperManagerDashboard(academicYearId);
+
+        delete dashboardData.schoolFees;
+        if (dashboardData.schoolOverview) {
+            delete dashboardData.schoolOverview.finance;
+        }
+
+        res.json({
+            success: true,
+            data: dashboardData
+        });
+    } catch (error) {
+        console.error('Error fetching enhanced Manager dashboard:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch enhanced dashboard data'
+        });
+    }
+};
+
+/**
  * GET /api/v1/dashboard/bursar/enhanced
  * Enhanced Bursar Dashboard with student registration and payment analytics
  */
