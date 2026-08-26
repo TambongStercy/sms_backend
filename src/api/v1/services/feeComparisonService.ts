@@ -306,7 +306,12 @@ export async function getStudentFeeComparison(studentId: number, academicYearId?
                     academic_year_id: yearId
                 },
                 include: {
-                    payment_transactions: true
+                    payment_transactions: {
+                        include: {
+                            recorded_by: { select: { id: true, name: true, matricule: true } }
+                        },
+                        orderBy: { payment_date: 'asc' }
+                    }
                 }
             },
             control_school_fees: {
@@ -314,7 +319,12 @@ export async function getStudentFeeComparison(studentId: number, academicYearId?
                     academic_year_id: yearId
                 },
                 include: {
-                    control_payment_transactions: true
+                    control_payment_transactions: {
+                        include: {
+                            recorded_by: { select: { id: true, name: true, matricule: true } }
+                        },
+                        orderBy: { payment_date: 'asc' }
+                    }
                 }
             }
         }
