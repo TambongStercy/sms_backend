@@ -58,6 +58,20 @@ const SYNC_TABLES: string[] = [
     'GeneratedReport',
     // -> AcademicYear, User
     'Announcement',
+    // -> User (sender, receiver)
+    'Message',
+    // -> Subject, User
+    'ChatChannel',
+    // -> ChatChannel, User
+    'ChatChannelMember',
+    // -> ChatChannel, User, ChatMessage (self-ref via parent_message_id -> deferred pass)
+    'ChatMessage',
+    // -> ChatMessage, User
+    'ChatMessageMention',
+    // -> ChatMessage, User
+    'ChatMessageReaction',
+    // -> ChatMessage
+    'ChatMessageAttachment',
 ];
 
 // Deferred records are retried until a pass applies nothing new. The cap is a

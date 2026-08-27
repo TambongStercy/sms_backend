@@ -916,6 +916,8 @@ model Message {
   deleted_by_receiver Boolean       @default(false)
   created_at          DateTime      @default(now())
   updated_at          DateTime      @updatedAt
+  server_id           String?
+  checksum            String?
   sender              User          @relation("SentMessages", fields: [sender_id], references: [id])
   receiver            User          @relation("ReceivedMessages", fields: [receiver_id], references: [id])
 }
@@ -933,6 +935,8 @@ model ChatChannel {
   created_by_id Int?
   created_at    DateTime    @default(now())
   updated_at    DateTime    @updatedAt
+  server_id     String?
+  checksum      String?
 
   subject    Subject?            @relation(fields: [subject_id], references: [id])
   created_by User?               @relation("ChatChannelCreatedBy", fields: [created_by_id], references: [id])
@@ -952,6 +956,9 @@ model ChatChannelMember {
   joined_at    DateTime   @default(now())
   last_read_at DateTime?
   muted        Boolean    @default(false)
+  updated_at   DateTime   @updatedAt
+  server_id    String?
+  checksum     String?
 
   channel ChatChannel @relation(fields: [channel_id], references: [id], onDelete: Cascade)
   user    User        @relation(fields: [user_id], references: [id])
@@ -970,6 +977,8 @@ model ChatMessage {
   deleted_at        DateTime?
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
+  server_id         String?
+  checksum          String?
 
   channel        ChatChannel             @relation(fields: [channel_id], references: [id], onDelete: Cascade)
   sender         User                    @relation("ChatMessageSender", fields: [sender_id], references: [id])
@@ -988,6 +997,9 @@ model ChatMessageMention {
   message_id Int
   user_id    Int
   created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
 
   message ChatMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
   user    User        @relation(fields: [user_id], references: [id])
@@ -1002,6 +1014,9 @@ model ChatMessageReaction {
   user_id    Int
   emoji      String
   created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
 
   message ChatMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
   user    User        @relation(fields: [user_id], references: [id])
@@ -1020,6 +1035,10 @@ model ChatMessageAttachment {
   duration_secs Int? // Duration in seconds for AUDIO kind (voice notes)
   width         Int? // Pixel width for IMAGE kind
   height        Int? // Pixel height for IMAGE kind
+  created_at    DateTime           @default(now())
+  updated_at    DateTime           @updatedAt
+  server_id     String?
+  checksum      String?
 
   message ChatMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
 }
