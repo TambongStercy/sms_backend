@@ -173,8 +173,10 @@ export const authorize = (roles: string[]) => {
             return res.status(401).json({ error: 'Unauthorized: User or role not found' });
         }
 
-        // Super managers have access to everything
-        if (user.role.includes('SUPER_MANAGER')) {
+        // Tier-1 executives (SUPER_MANAGER, MANAGER) have access to everything.
+        // MANAGER is a documented peer of SUPER_MANAGER in the role hierarchy;
+        // treating them equivalently here avoids having to list MANAGER on every route.
+        if (user.role.includes('SUPER_MANAGER') || user.role.includes('MANAGER')) {
             return next();
         }
 

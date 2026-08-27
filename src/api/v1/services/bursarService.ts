@@ -320,6 +320,93 @@ export async function createStudentWithParent(data: StudentWithParentData): Prom
 }
 
 /**
+ * Create a brand-new parent account and link it to an existing student.
+ * Used by the edit-student flow when the secretary needs to add a new
+ * contact for a student that has already been registered.
+ */
+export interface CreateParentForStudentData {
+    student_id: number;
+    name: string;
+    phone: string;
+    address?: string;
+    phone_is_whatsapp?: boolean;
+    whatsapp?: string;
+    relationship?: string;
+    academic_year_id?: number;
+}
+
+export async function createParentForStudent(
+    data: CreateParentForStudentData,
+): Promise<{ parent: RegistrationParent & { temporary_password: string } }> {
+    const yearId = data.academic_year_id || (await getCurrentAcademicYear())?.id;
+    if (!yearId) throw new Error('No current academic year found and none provided.');
+
+    const student = await prisma.student.findUnique({ where: { id: data.student_id } });
+    if (!student) throw new Error(`Student with ID ${data.student_id} not found.`);
+
+    const name = data.name?.trim();
+    const phone = data.phone?.trim();
+    if (!name || !phone) throw new Error('Parent name and phone are required.');
+
+    // Existing parent-count guard (max 2) to match the create-student flow.
+    const existingLinks = await prisma.parentStudent.count({ where: { student_id: student.id } });
+    if (existingLinks >= 2) {
+        throw new Error('This student already has the maximum of 2 linked contacts.');
+    }
+
+    const whatsappNumber = data.phone_is_whatsapp
+        ? phone
+        : (data.whatsapp?.trim() || null);
+
+    const parentMatricule = await generateStaffMatricule([Role.PARENT]);
+    const generatedEmail = `parent.${phone.replace(/[^\d+]/g, '')}.${student.id}.${Date.now()}@school.local`;
+    const hashedPassword = await bcrypt.hash('defaultPassword123', 10);
+    const relationshipEnum = normalizeRelationship(data.relationship);
+
+    const result = await prisma.$transaction(async (tx) => {
+        const parentUser = await tx.user.create({
+            data: {
+                name,
+                email: generatedEmail,
+                phone,
+                whatsapp_number: whatsappNumber,
+                address: data.address?.trim() || '',
+                password: hashedPassword,
+                gender: Gender.Male,
+                date_of_birth: new Date('1980-01-01'),
+                matricule: parentMatricule,
+            },
+        });
+
+        await tx.userRole.create({
+            data: { user_id: parentUser.id, role: Role.PARENT, academic_year_id: yearId },
+        });
+
+        await tx.parentStudent.create({
+            data: {
+                parent_id: parentUser.id,
+                student_id: student.id,
+                ...(relationshipEnum ? { relationship: relationshipEnum as Relationship } : {}),
+            },
+        });
+
+        return parentUser;
+    });
+
+    return {
+        parent: {
+            id: result.id,
+            matricule: result.matricule || '',
+            name: result.name,
+            phone: result.phone,
+            whatsapp_number: result.whatsapp_number,
+            relationship: relationshipEnum ?? null,
+            temporary_password: 'defaultPassword123',
+        },
+    };
+}
+
+/**
  * Link an existing student to an existing parent
  */
 export async function linkExistingParent(data: LinkExistingParentData): Promise<any> {

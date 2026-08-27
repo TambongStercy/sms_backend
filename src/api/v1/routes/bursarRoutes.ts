@@ -29,6 +29,14 @@ router.post('/link-existing-parent',
     bursarController.linkExistingParent
 );
 
+// POST /bursar/create-parent-for-student - Create a new parent account and link it to an existing student
+// Used by the edit-student flow when a new contact needs to be added after registration.
+router.post('/create-parent-for-student',
+    authenticate,
+    authorize(['BURSAR', 'SECRETARY', 'SUPER_MANAGER']),
+    bursarController.createParentForStudent
+);
+
 // GET /bursar/dashboard - Get bursar dashboard with financial overview
 // BURSAR and management roles can view dashboard
 router.get('/dashboard',
