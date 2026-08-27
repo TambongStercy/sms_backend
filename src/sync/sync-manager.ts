@@ -17,6 +17,10 @@ const SYNC_TABLES: string[] = [
     'AcademicYear',
     'User',
     'Subject',
+    // -> User, AcademicYear
+    'UserRole',
+    // -> Subject, User
+    'SubjectTeacher',
     // -> AcademicYear
     'Student',
     'PeriodSet',
@@ -28,6 +32,8 @@ const SYNC_TABLES: string[] = [
     'SubClass',
     // -> SubClass, Subject, User
     'SubClassSubject',
+    // -> User, AcademicYear, SubClass, Subject
+    'RoleAssignment',
     // -> AcademicYear, Term
     'ExamSequence',
     // -> AcademicYear, Period, SubClass, Subject

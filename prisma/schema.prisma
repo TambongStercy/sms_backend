@@ -201,6 +201,8 @@ model UserRole {
   academic_year_id Int? // Nullable for global roles like SUPER_MANAGER
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
+  server_id        String?
+  checksum         String?
   user             User          @relation(fields: [user_id], references: [id])
   academic_year    AcademicYear? @relation(fields: [academic_year_id], references: [id])
 
@@ -217,6 +219,8 @@ model RoleAssignment {
   subject_id       Int? // For HOD assignments
   created_at       DateTime       @default(now())
   updated_at       DateTime       @updatedAt
+  server_id        String?
+  checksum         String?
   academic_year    AcademicYear   @relation(fields: [academic_year_id], references: [id])
   user             User           @relation(fields: [user_id], references: [id])
   sub_class        SubClass?      @relation(fields: [sub_class_id], references: [id])
@@ -463,6 +467,8 @@ model SubjectTeacher {
   teacher_id Int
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
   subject    Subject  @relation(fields: [subject_id], references: [id])
   teacher    User     @relation(fields: [teacher_id], references: [id])
 
