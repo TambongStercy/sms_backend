@@ -28,6 +28,8 @@ const SYNC_TABLES: string[] = [
     // -> PeriodSet
     'Period',
     'Class',
+    // -> Term, Class
+    'TermClass',
     // -> Class
     'SubClass',
     // -> SubClass, Subject, User
