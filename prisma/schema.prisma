@@ -679,7 +679,11 @@ enum PeriodType {
 
 model TeacherPeriod {
   id               Int              @id @default(autoincrement())
-  // teacher_id is nullable so a slot can carry a subject without a teacher yet.
+  // Nullable so a timetable slot can carry a subject with no teacher yet
+  // ("subject-only slots" in the timetable UI). The VPS has allowed this for a
+  // while; this node did not, so all 30 such rows failed every pull with
+  // "Argument `academic_year` is missing" — Prisma's way of saying a required
+  // FK scalar arrived null, blaming the first relation it then had to demand.
   teacher_id       Int?
   subject_id       Int
   period_id        Int

@@ -23,6 +23,49 @@ export class DatabaseSyncer {
   // incoming keys onto what Prisma actually accepts.
   private static fieldCache = new Map<string, Set<string>>();
 
+  // Every @@unique on a model, as DMMF reports it.
+  private static uniqueCache = new Map<string, string[][]>();
+
+  // Primary keys are not portable between nodes. Both sides mint
+  // TeacherPeriod.id from their own autoincrement sequence, so one real
+  // timetable slot is id 930 here and id 1523 on the peer. Matching an
+  // incoming row on id alone therefore concludes "new" for a row that already
+  // exists, and the insert then dies on the @@unique it was always going to
+  // hit — 32 rows per run, every run, for as long as both sides keep editing.
+  //
+  // The natural key is what actually identifies the row across nodes, and DMMF
+  // already knows it, so this stays generic instead of hardcoding TeacherPeriod:
+  // Enrollment collides the same way on (student_id, academic_year_id).
+  private naturalKeysOf(tableName: string): string[][] {
+    const cached = DatabaseSyncer.uniqueCache.get(tableName);
+    if (cached) return cached;
+
+    const model = (Prisma as any).dmmf?.datamodel?.models?.find(
+      (m: any) => m.name === tableName
+    );
+    const keys: string[][] = (model?.uniqueFields ?? []).filter(
+      (k: string[]) => Array.isArray(k) && k.length > 0
+    );
+    DatabaseSyncer.uniqueCache.set(tableName, keys);
+    return keys;
+  }
+
+  // The local row an incoming record would collide with, found by natural key
+  // rather than id. A key with a null or absent part is skipped: SQL uniqueness
+  // does not constrain nulls, so it would match the wrong row or none at all.
+  private async findByNaturalKey(model: any, tableName: string, remoteRecord: RemoteRecord) {
+    for (const key of this.naturalKeysOf(tableName)) {
+      if (key.some(f => remoteRecord[f] === undefined || remoteRecord[f] === null)) continue;
+
+      const where: any = {};
+      for (const f of key) where[f] = remoteRecord[f];
+
+      const hit = await model.findFirst({ where });
+      if (hit) return hit;
+    }
+    return null;
+  }
+
   private fieldsOf(tableName: string): Set<string> {
     const cached = DatabaseSyncer.fieldCache.get(tableName);
     if (cached) return cached;
@@ -177,10 +220,17 @@ export class DatabaseSyncer {
         remoteRecord.server_id = peerId;
       }
       try {
-        // Check if record exists locally
-        const localRecord = await model.findUnique({
+        // Check if record exists locally, by id first and then by natural key.
+        // Only a record that is absent under both is genuinely new; anything
+        // found the second way is the same row wearing the peer's id, and has
+        // to be updated in place under the id this node already gave it.
+        let localRecord = await model.findUnique({
           where: { id: remoteRecord.id }
         });
+
+        if (!localRecord) {
+          localRecord = await this.findByNaturalKey(model, tableName, remoteRecord);
+        }
 
         if (!localRecord) {
           // New record - insert. The remote record is a flat Prisma row.
@@ -200,8 +250,10 @@ export class DatabaseSyncer {
               result.recordsProcessed++;
             }
           } else {
-            // No conflict - update
-            await this.updateRecord(model, String(remoteRecord.id), remoteRecord);
+            // No conflict - update. Addressed by the LOCAL id: when the match
+            // came from the natural key the two ids differ, and using the
+            // remote's would update a different row, or none.
+            await this.updateRecord(model, String(localRecord.id), remoteRecord);
             result.recordsProcessed++;
           }
         }
@@ -317,9 +369,15 @@ export class DatabaseSyncer {
   }
 
   private async updateRecord(model: any, id: string, data: any) {
+    // Never carry the incoming id into the update. Where the row was matched
+    // by natural key the peer's id belongs to a different row on this node,
+    // and writing it would renumber the primary key onto a value another row
+    // may already hold. The id to keep is the one being updated.
+    const { id: _incomingId, ...rest } = data;
+
     await model.update({
       where: { id: parseInt(id) },
-      data
+      data: rest
     });
   }
 
