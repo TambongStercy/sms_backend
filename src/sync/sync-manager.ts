@@ -40,6 +40,16 @@ const SYNC_TABLES: string[] = [
     'ExamSequence',
     // -> AcademicYear, Period, SubClass, Subject
     'TeacherPeriod',
+    // -> Subject, Class, AcademicYear, User
+    'SubjectScheme',
+    // -> SubjectScheme
+    'SchemeModule',
+    // -> SchemeModule
+    'SchemeChapter',
+    // -> SchemeChapter, Term
+    'SchemeLesson',
+    // -> TeacherPeriod, SchemeLesson, User
+    'LogbookEntry',
     // -> User, Student
     'ParentStudent',
     // -> AcademicYear, Student, Class, SubClass

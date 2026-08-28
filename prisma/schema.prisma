@@ -1912,6 +1912,8 @@ model SubjectScheme {
   created_by_id         Int
   created_at            DateTime       @default(now())
   updated_at            DateTime       @updatedAt
+  server_id             String?
+  checksum              String?
   subject               Subject        @relation(fields: [subject_id], references: [id])
   class                 Class          @relation(fields: [class_id], references: [id])
   academic_year         AcademicYear   @relation(fields: [academic_year_id], references: [id])
@@ -1930,6 +1932,8 @@ model SchemeModule {
   title             String
   created_at        DateTime        @default(now())
   updated_at        DateTime        @updatedAt
+  server_id         String?
+  checksum          String?
   subject_scheme    SubjectScheme   @relation(fields: [subject_scheme_id], references: [id], onDelete: Cascade)
   chapters          SchemeChapter[]
 
@@ -1945,6 +1949,8 @@ model SchemeChapter {
   title      String
   created_at DateTime       @default(now())
   updated_at DateTime       @updatedAt
+  server_id  String?
+  checksum   String?
   module     SchemeModule   @relation(fields: [module_id], references: [id], onDelete: Cascade)
   lessons    SchemeLesson[]
 
@@ -1967,6 +1973,8 @@ model SchemeLesson {
   periods_count              Int             @default(1)
   created_at                 DateTime        @default(now())
   updated_at                 DateTime        @updatedAt
+  server_id                  String?
+  checksum                   String?
   chapter                    SchemeChapter   @relation(fields: [chapter_id], references: [id], onDelete: Cascade)
   term                       Term?           @relation(fields: [term_id], references: [id])
   logbook_entries            LogbookEntry[]
@@ -1999,6 +2007,8 @@ model LogbookEntry {
   reviewer_notes    String?
   created_at        DateTime           @default(now())
   updated_at        DateTime           @updatedAt
+  server_id         String?
+  checksum          String?
   teacher_period    TeacherPeriod      @relation(fields: [teacher_period_id], references: [id])
   lesson            SchemeLesson       @relation(fields: [lesson_id], references: [id])
   taught_by         User               @relation("LogbookEntryTaughtBy", fields: [taught_by_id], references: [id])
