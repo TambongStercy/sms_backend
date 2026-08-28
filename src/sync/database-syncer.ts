@@ -462,16 +462,29 @@ export class DatabaseSyncer {
     }
 
     try {
-      // Check if record exists
-      const existing = await model.findUnique({
+      // By id first, then by natural key. Only a record absent under both is
+      // genuinely new; one found the second way is the same row wearing the
+      // peer's id, and belongs under the id this node already gave it.
+      //
+      // pullRemoteChanges has matched this way since the TeacherPeriod
+      // collisions (32 rows dying on the @@unique every single run), but this
+      // path did not — so /sync/receive and the deferred-retry pass kept
+      // rediscovering them. 52 TeacherPeriod slots currently exist on both
+      // nodes under different ids for exactly that reason.
+      let existing = await model.findUnique({
         where: { id: record.id }
       });
 
+      if (!existing) {
+        existing = await this.findByNaturalKey(model, tableName, record as RemoteRecord);
+      }
+
       if (existing) {
-        // Update existing record
-        await this.updateRecord(model, record.id, record);
+        // Addressed by the LOCAL id: where the match came from the natural key
+        // the two ids differ, and writing the peer's would update a different
+        // row, or none at all.
+        await this.updateRecord(model, String(existing.id), record);
       } else {
-        // Insert new record
         await this.insertRecord(model, record);
       }
     } catch (error: any) {
