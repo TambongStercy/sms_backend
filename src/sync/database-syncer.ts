@@ -147,6 +147,11 @@ export class DatabaseSyncer {
       // Pull remote changes to local
       await this.pullRemoteChanges(tableName, remoteChanges, result);
 
+      // The pull just inserted rows carrying the peer's ids, which leaves this
+      // table's sequence behind them. Bring it back in step before any local
+      // create() is handed a duplicate.
+      await this.resyncSequence(tableName);
+
       console.log(`Synced ${tableName}: ${result.recordsProcessed} records`);
 
     } catch (error: any) {
@@ -298,15 +303,20 @@ export class DatabaseSyncer {
   async retryDeferred(deferred: DeferredRecord[]): Promise<{ applied: number; remaining: DeferredRecord[] }> {
     let applied = 0;
     const remaining: DeferredRecord[] = [];
+    // Deferred records insert explicit ids too, on a path syncTable never sees.
+    const touched = new Set<string>();
 
     for (const item of deferred) {
       try {
         await this.processIncomingRecord(item.table, item.record);
         applied++;
+        touched.add(item.table);
       } catch (error: any) {
         remaining.push({ ...item, lastError: this.shortError(error) });
       }
     }
+
+    for (const table of touched) await this.resyncSequence(table);
 
     return { applied, remaining };
   }
@@ -358,6 +368,51 @@ export class DatabaseSyncer {
     }
 
     return conflicts;
+  }
+
+  // A row inserted with its peer's explicit id does not advance this table's
+  // autoincrement sequence: Postgres only bumps it when the id comes from
+  // nextval(). So after a pull the sequence still points wherever the last
+  // *local* insert left it, and the next local create() is handed an id the
+  // peer already occupies -- "Unique constraint failed on the fields: (`id`)".
+  //
+  // Not hypothetical: SubjectTeacher sat at 106 with rows up to 238, so every
+  // attempt to assign a teacher a subject returned a 500, and thirteen other
+  // tables had drifted the same way (TeacherPeriod 277 vs 1693, Enrollment
+  // 7743 vs 7832). Nothing in the sync surfaced it, because the sync itself
+  // works fine -- it is only local inserts afterwards that fail.
+  //
+  // Only ever moved forward. If the sequence is already ahead of max(id) it is
+  // left alone: a concurrent request may hold the next value uncommitted, and
+  // rewinding onto it would hand the same id out twice.
+  async resyncSequence(tableName: string): Promise<void> {
+    // tableName reaches this from a route parameter as well as SYNC_TABLES,
+    // and it is interpolated into raw SQL below.
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tableName)) return;
+
+    try {
+      const seqRow: any[] = await prisma.$queryRawUnsafe(
+        `SELECT pg_get_serial_sequence('"${tableName}"', 'id') AS seq`
+      );
+      const seq = seqRow?.[0]?.seq;
+      if (!seq) return; // no serial id column - nothing to keep in step
+
+      const info: any[] = await prisma.$queryRawUnsafe(
+        `SELECT (SELECT COALESCE(MAX(id), 0) FROM "${tableName}") AS maxid,
+                s.last_value, s.is_called
+           FROM ${seq} s`
+      );
+      const maxId = Number(info[0].maxid);
+      const nextValue = Number(info[0].last_value) + (info[0].is_called ? 1 : 0);
+      if (nextValue > maxId) return;
+
+      await prisma.$executeRawUnsafe(`SELECT setval('${seq}', ${maxId}, true)`);
+      console.log(`Sequence ${tableName}: was handing out ${nextValue}, advanced to ${maxId + 1}`);
+    } catch (error: any) {
+      // Never fail a sync over this. A stale sequence breaks later local
+      // inserts, not the replication, so warn and carry on.
+      console.warn(`Could not resync sequence for ${tableName}: ${error.message}`);
+    }
   }
 
   private async insertRecord(model: any, data: any) {
