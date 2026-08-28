@@ -82,6 +82,106 @@ const SYNC_TABLES: string[] = [
     'ChatMessageReaction',
     // -> ChatMessage
     'ChatMessageAttachment',
+
+    // ---- Student-level extensions (need Enrollment / Student) ----
+    // -> Student
+    'StudentPreviousSchool',
+    // -> AcademicYear, Class, SubClass, Student, User
+    'FeeItem',
+    // -> AcademicYear, Enrollment
+    'ControlSchoolFees',
+
+    // ---- Discipline (all keyed on Enrollment + User) ----
+    // -> Enrollment, User
+    'BrokenProperty',
+    'SaturdayPunishment',
+    'StudentWarning',
+    'ParentSummons',
+    'DisciplineIssue',
+    // -> DisciplineIssue, Enrollment, User
+    'DisciplinaryAction',
+    // -> Enrollment, AcademicYear, User
+    'SeizedItem',
+    // -> SeizedItem, User (self-cluster; deferred pass handles user resolution)
+    'SeizedItemTransfer',
+    // -> Enrollment, Period, User
+    'NurseVisitLog',
+    // -> Student
+    'InterviewMark',
+
+    // ---- Fees / finance extensions (SchoolFees + PaymentTransaction already synced) ----
+    // -> FeeItem, Enrollment, User
+    'FeeItemPayment',
+    // -> SchoolFees, Enrollment, User
+    'Refund',
+    // -> ControlSchoolFees, AcademicYear, Enrollment, User
+    'ControlPaymentTransaction',
+    // -> User, AcademicYear
+    'Expenditure',
+    'BursarCashInjection',
+    'ReamStockLedger',
+    // -> User
+    'FinanceRequest',
+    'Task',
+    'ReportRequest',
+
+    // ---- Attendance (teacher-side; student-side StudentAbsence already synced) ----
+    // -> SubClass, AcademicYear, User
+    'DMRollCall',
+    // -> DMRollCall, Enrollment, StudentAbsence
+    'DMRollCallEntry',
+    // -> TeacherPeriod, AcademicYear, User
+    'TeacherRollCall',
+    // -> TeacherRollCall, Enrollment, StudentAbsence
+    'TeacherRollCallEntry',
+    // -> TeacherPeriod, AcademicYear, User
+    'TeacherPeriodAttendance',
+
+    // ---- Payroll / HR ----
+    // -> AcademicYear, User
+    'PayPeriod',
+    // -> User, AcademicYear
+    'SalaryProfile',
+    // -> SalaryProfile, PayPeriod, User
+    'SalaryAllowance',
+    'SalaryChangeRequest',
+    'SalaryPayment',
+    // -> SalaryPayment, User
+    'SalaryWithholding',
+    // -> User
+    'LeaveRequest',
+    'StaffLoan',
+    // -> StaffLoan, User
+    'StaffLoanRepayment',
+
+    // ---- Inventory ----
+    // -> User
+    'InventoryItem',
+    // -> InventoryItem, User
+    'InventoryHolding',
+    'InventoryTransfer',
+    // -> InventoryItem, User, InventoryTransfer
+    'InventoryLedger',
+
+    // ---- Exam papers / quizzes / forms (curriculum content) ----
+    // -> AcademicYear, Subject
+    'ExamPaper',
+    // -> Subject
+    'Question',
+    // -> ExamPaper, Question (composite PK, both parents already listed)
+    'ExamPaperQuestion',
+    // -> Subject, AcademicYear, User
+    'QuizTemplate',
+    // -> QuizTemplate
+    'QuizQuestion',
+    // -> QuizTemplate, Student, User, AcademicYear
+    'QuizSubmission',
+    // -> QuizSubmission, QuizQuestion
+    'QuizResponse',
+    // (no FKs)
+    'FormTemplate',
+    // -> FormTemplate, User
+    'FormSubmission',
 ];
 
 // Deferred records are retried until a pass applies nothing new. The cap is a
