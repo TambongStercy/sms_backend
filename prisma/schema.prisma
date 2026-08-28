@@ -339,6 +339,8 @@ model StudentPreviousSchool {
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
   student     Student  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  server_id String?
+  checksum  String?
 
   @@index([student_id])
 }
@@ -418,6 +420,8 @@ model ControlSchoolFees {
   control_payment_transactions ControlPaymentTransaction[]
   academic_year                AcademicYear                @relation(fields: [academic_year_id], references: [id])
   enrollment                   Enrollment                  @relation(fields: [enrollment_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@unique([enrollment_id, academic_year_id])
 }
@@ -490,6 +494,8 @@ model DisciplineIssue {
   enrollment           Enrollment           @relation(fields: [enrollment_id], references: [id])
   reviewed_by          User                 @relation("ReviewedDisciplineIssue", fields: [reviewed_by_id], references: [id])
   disciplinary_actions DisciplinaryAction[]
+  server_id String?
+  checksum  String?
 }
 
 model StudentAbsence {
@@ -756,6 +762,8 @@ model ControlPaymentTransaction {
   enrollment          Enrollment        @relation(fields: [enrollment_id], references: [id])
   control_school_fees ControlSchoolFees @relation(fields: [control_fee_id], references: [id])
   recorded_by         User              @relation("RecordedByUserControl", fields: [recorded_by_id], references: [id])
+  server_id String?
+  checksum  String?
 }
 
 model Announcement {
@@ -812,6 +820,8 @@ model Question {
   updated_at           DateTime            @updatedAt
   exam_paper_questions ExamPaperQuestion[]
   subject              Subject             @relation(fields: [subject_id], references: [id])
+  server_id String?
+  checksum  String?
 }
 
 model ExamPaper {
@@ -826,6 +836,8 @@ model ExamPaper {
   academic_year    AcademicYear        @relation(fields: [academic_year_id], references: [id])
   subject          Subject             @relation(fields: [subject_id], references: [id])
   questions        ExamPaperQuestion[]
+  server_id String?
+  checksum  String?
 }
 
 model ExamPaperQuestion {
@@ -834,6 +846,10 @@ model ExamPaperQuestion {
   order         Int?
   exam_paper    ExamPaper @relation(fields: [exam_paper_id], references: [id])
   question      Question  @relation(fields: [question_id], references: [id])
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
 
   @@id([exam_paper_id, question_id])
 }
@@ -896,6 +912,8 @@ model InterviewMark {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   student    Student  @relation(fields: [student_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@unique([student_id])
 }
@@ -1059,6 +1077,8 @@ model FormTemplate {
   created_at       DateTime         @default(now())
   updated_at       DateTime         @updatedAt
   form_submissions FormSubmission[]
+  server_id String?
+  checksum  String?
 }
 
 model FormSubmission {
@@ -1071,6 +1091,8 @@ model FormSubmission {
   updated_at       DateTime         @updatedAt
   form_template    FormTemplate     @relation(fields: [form_template_id], references: [id])
   submitted_by     User             @relation(fields: [submitted_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@unique([form_template_id, submitted_by_id])
 }
@@ -1385,6 +1407,8 @@ model QuizTemplate {
   created_by    User             @relation(fields: [created_by_id], references: [id])
   questions     QuizQuestion[]
   submissions   QuizSubmission[]
+  server_id String?
+  checksum  String?
 
   @@index([subject_id])
   @@index([academic_year_id])
@@ -1406,6 +1430,8 @@ model QuizQuestion {
 
   quiz      QuizTemplate   @relation(fields: [quiz_id], references: [id], onDelete: Cascade)
   responses QuizResponse[]
+  server_id String?
+  checksum  String?
 
   @@index([quiz_id])
 }
@@ -1431,6 +1457,8 @@ model QuizSubmission {
   parent        User           @relation(fields: [parent_id], references: [id])
   academic_year AcademicYear   @relation(fields: [academic_year_id], references: [id])
   responses     QuizResponse[]
+  server_id String?
+  checksum  String?
 
   @@unique([quiz_id, student_id, academic_year_id])
   @@index([quiz_id])
@@ -1450,6 +1478,8 @@ model QuizResponse {
 
   submission QuizSubmission @relation(fields: [submission_id], references: [id], onDelete: Cascade)
   question   QuizQuestion   @relation(fields: [question_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([submission_id])
   @@index([question_id])
@@ -1513,6 +1543,8 @@ model FeeItem {
   created_by                User             @relation("FeeItemCreatedBy", fields: [created_by_id], references: [id])
   payments                  FeeItemPayment[]
   broken_property           BrokenProperty?
+  server_id String?
+  checksum  String?
 
   @@index([academic_year_id, is_active])
   @@index([scope, class_id, sub_class_id])
@@ -1538,6 +1570,8 @@ model FeeItemPayment {
   fee_item                FeeItem       @relation(fields: [fee_item_id], references: [id])
   enrollment              Enrollment    @relation(fields: [enrollment_id], references: [id])
   recorded_by             User          @relation("FeeItemPaymentRecordedBy", fields: [recorded_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([fee_item_id, enrollment_id])
   @@index([enrollment_id])
@@ -1568,6 +1602,8 @@ model Refund {
   enrollment     Enrollment   @relation(fields: [enrollment_id], references: [id])
   school_fees    SchoolFees   @relation(fields: [school_fees_id], references: [id])
   recorded_by    User         @relation("RefundRecordedBy", fields: [recorded_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([enrollment_id])
   @@index([school_fees_id])
@@ -1599,6 +1635,8 @@ model SaturdayPunishment {
   updated_at     DateTime         @updatedAt
   enrollment     Enrollment       @relation(fields: [enrollment_id], references: [id])
   assigned_by    User             @relation("SaturdayPunishmentAssignedBy", fields: [assigned_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([enrollment_id, status])
   @@index([status, scheduled_date])
@@ -1622,6 +1660,8 @@ model StudentWarning {
   updated_at            DateTime      @updatedAt
   enrollment            Enrollment    @relation(fields: [enrollment_id], references: [id])
   issued_by             User          @relation("WarningIssuedBy", fields: [issued_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([enrollment_id, resolved])
   @@index([enrollment_id, warning_level])
@@ -1649,6 +1689,8 @@ model ParentSummons {
   enrollment          Enrollment     @relation(fields: [enrollment_id], references: [id])
   parent              User?          @relation("SummonsParent", fields: [parent_id], references: [id])
   created_by          User           @relation("SummonsCreatedBy", fields: [created_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([enrollment_id, status])
   @@index([status, scheduled_date])
@@ -1669,6 +1711,8 @@ model DMRollCall {
   academic_year    AcademicYear      @relation(fields: [academic_year_id], references: [id])
   recorded_by      User              @relation("DMRollCallRecordedBy", fields: [recorded_by_id], references: [id])
   entries          DMRollCallEntry[]
+  server_id String?
+  checksum  String?
 
   @@unique([sub_class_id, date, slot])
   @@index([academic_year_id, date])
@@ -1685,6 +1729,8 @@ model DMRollCallEntry {
   dm_roll_call      DMRollCall       @relation(fields: [dm_roll_call_id], references: [id], onDelete: Cascade)
   enrollment        Enrollment       @relation(fields: [enrollment_id], references: [id])
   linked_absence    StudentAbsence?  @relation("DMRollCallAbsence", fields: [linked_absence_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@unique([dm_roll_call_id, enrollment_id])
   @@index([enrollment_id])
@@ -1706,6 +1752,8 @@ model BrokenProperty {
   enrollment     Enrollment @relation(fields: [enrollment_id], references: [id])
   fee_item       FeeItem?   @relation(fields: [fee_item_id], references: [id])
   reported_by    User       @relation("BrokenPropertyReportedBy", fields: [reported_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([enrollment_id])
   @@index([reported_by_id])
@@ -1730,6 +1778,8 @@ model NurseVisitLog {
   enrollment        Enrollment  @relation(fields: [enrollment_id], references: [id])
   period            Period?     @relation(fields: [period_id], references: [id])
   logged_by         User        @relation("NurseVisitLoggedBy", fields: [logged_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([enrollment_id])
   @@index([logged_by_id])
@@ -1758,6 +1808,8 @@ model FinanceRequest {
   updated_at      DateTime             @updatedAt
   requested_by    User                 @relation("FinanceRequestRequestedBy", fields: [requested_by_id], references: [id])
   acted_by        User?                @relation("FinanceRequestActedBy", fields: [acted_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([type, status])
   @@index([requested_by_id])
@@ -1797,6 +1849,8 @@ model Expenditure {
   updated_at        DateTime            @updatedAt
   recorded_by       User                @relation("ExpenditureRecordedBy", fields: [recorded_by_id], references: [id])
   recipient_user    User?               @relation("ExpenditureRecipient", fields: [recipient_user_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([date])
   @@index([category, date])
@@ -1832,6 +1886,8 @@ model DisciplinaryAction {
   enrollment          Enrollment               @relation(fields: [enrollment_id], references: [id])
   discipline_issue    DisciplineIssue?         @relation(fields: [discipline_issue_id], references: [id])
   decided_by          User                     @relation("DisciplinaryActionDecidedBy", fields: [decided_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([enrollment_id, status])
   @@index([action_type, status])
@@ -1876,6 +1932,8 @@ model ReportRequest {
   updated_at          DateTime            @updatedAt
   requested_by        User                @relation("ReportRequestRequestedBy", fields: [requested_by_id], references: [id])
   requested_from      User                @relation("ReportRequestRequestedFrom", fields: [requested_from_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([requested_by_id, status])
   @@index([requested_from_id, status])
@@ -2041,6 +2099,8 @@ model TeacherRollCall {
   academic_year  AcademicYear          @relation(fields: [academic_year_id], references: [id])
   recorded_by    User                  @relation("TeacherRollCallRecordedBy", fields: [recorded_by_id], references: [id])
   entries        TeacherRollCallEntry[]
+  server_id String?
+  checksum  String?
 
   @@unique([teacher_period_id, date])
   @@index([academic_year_id, date])
@@ -2060,6 +2120,8 @@ model TeacherRollCallEntry {
   teacher_roll_call TeacherRollCall @relation(fields: [teacher_roll_call_id], references: [id], onDelete: Cascade)
   enrollment        Enrollment      @relation(fields: [enrollment_id], references: [id])
   linked_absence    StudentAbsence? @relation("TeacherRollCallAbsence", fields: [linked_absence_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@unique([teacher_roll_call_id, enrollment_id])
   @@index([enrollment_id])
@@ -2096,6 +2158,8 @@ model TeacherPeriodAttendance {
   teacher_period TeacherPeriod @relation(fields: [teacher_period_id], references: [id], onDelete: Cascade)
   academic_year  AcademicYear  @relation(fields: [academic_year_id], references: [id])
   recorded_by    User          @relation("TeacherPeriodAttendanceRecordedBy", fields: [recorded_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@unique([teacher_period_id, date])
   @@index([academic_year_id, date])
@@ -2140,6 +2204,8 @@ model SeizedItem {
   current_custodian User?                @relation("SeizedItemCustodian", fields: [current_custodian_id], references: [id])
   released_to       User?                @relation("SeizedItemReleasedTo", fields: [released_to_id], references: [id])
   transfers         SeizedItemTransfer[]
+  server_id String?
+  checksum  String?
 
   @@index([enrollment_id, status])
   @@index([current_custodian_id, status])
@@ -2161,6 +2227,10 @@ model SeizedItemTransfer {
   from_user   User       @relation("SeizedItemTransferFrom",       fields: [from_user_id],   references: [id])
   to_user     User       @relation("SeizedItemTransferTo",         fields: [to_user_id],     references: [id])
   resolved_by User?      @relation("SeizedItemTransferResolvedBy", fields: [resolved_by_id], references: [id])
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
 
   @@index([seized_item_id, status])
   @@index([from_user_id, status])
@@ -2199,6 +2269,8 @@ model InventoryItem {
   holdings   InventoryHolding[]
   transfers  InventoryTransfer[]
   ledger     InventoryLedger[]
+  server_id String?
+  checksum  String?
 
   @@index([is_active])
 }
@@ -2212,6 +2284,9 @@ model InventoryHolding {
 
   user User          @relation(fields: [user_id], references: [id])
   item InventoryItem @relation(fields: [item_id], references: [id])
+  created_at DateTime @default(now())
+  server_id  String?
+  checksum   String?
 
   @@unique([user_id, item_id])
   @@index([user_id])
@@ -2235,6 +2310,10 @@ model InventoryTransfer {
   to_user     User          @relation("InventoryTransferTo", fields: [to_user_id], references: [id])
   resolved_by User?         @relation("InventoryTransferResolvedBy", fields: [resolved_by_id], references: [id])
   ledger      InventoryLedger[]
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
 
   @@index([from_user_id, status])
   @@index([to_user_id, status])
@@ -2263,6 +2342,9 @@ model InventoryLedger {
   item     InventoryItem      @relation(fields: [item_id],     references: [id])
   actor    User?              @relation("InventoryLedgerActor", fields: [actor_id],    references: [id])
   transfer InventoryTransfer? @relation(fields: [transfer_id], references: [id])
+  updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
 
   @@index([user_id, created_at])
   @@index([item_id, created_at])
@@ -2309,6 +2391,8 @@ model SalaryProfile {
   change_requests  SalaryChangeRequest[]
   allowances       SalaryAllowance[]
   salary_payments  SalaryPayment[]
+  server_id String?
+  checksum  String?
 
   @@unique([user_id, academic_year_id])
   @@index([status])
@@ -2334,6 +2418,8 @@ model SalaryChangeRequest {
   salary_profile SalaryProfile @relation(fields: [salary_profile_id], references: [id], onDelete: Cascade)
   requested_by   User          @relation("SalaryChangeRequestRequestedBy", fields: [requested_by_id], references: [id])
   approved_by    User?         @relation("SalaryChangeRequestApprovedBy", fields: [approved_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([status])
   @@index([salary_profile_id])
@@ -2358,6 +2444,8 @@ model SalaryAllowance {
   pay_period     PayPeriod?    @relation(fields: [pay_period_id], references: [id])
   requested_by   User          @relation("SalaryAllowanceRequestedBy", fields: [requested_by_id], references: [id])
   approved_by    User?         @relation("SalaryAllowanceApprovedBy", fields: [approved_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([status])
   @@index([salary_profile_id])
@@ -2383,6 +2471,8 @@ model PayPeriod {
   created_by      User              @relation("PayPeriodCreatedBy", fields: [created_by_id], references: [id])
   salary_payments SalaryPayment[]
   allowances      SalaryAllowance[]
+  server_id String?
+  checksum  String?
 
   @@unique([academic_year_id, year, month])
   @@index([status])
@@ -2415,6 +2505,8 @@ model SalaryPayment {
   user           User                @relation("SalaryPaymentUser", fields: [user_id], references: [id])
   paid_by        User?               @relation("SalaryPaymentPaidBy", fields: [paid_by_id], references: [id])
   withholdings   SalaryWithholding[]
+  server_id String?
+  checksum  String?
 
   @@unique([pay_period_id, user_id])
   @@index([status])
@@ -2438,6 +2530,8 @@ model SalaryWithholding {
   salary_payment SalaryPayment @relation(fields: [salary_payment_id], references: [id], onDelete: Cascade)
   requested_by   User          @relation("SalaryWithholdingRequestedBy", fields: [requested_by_id], references: [id])
   approved_by    User?         @relation("SalaryWithholdingApprovedBy", fields: [approved_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([status])
   @@index([salary_payment_id])
@@ -2459,6 +2553,8 @@ model BursarCashInjection {
 
   academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
   injected_by   User         @relation("BursarCashInjectedBy", fields: [injected_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([academic_year_id, created_at])
   @@index([source])
@@ -2531,6 +2627,8 @@ model ReamStockLedger {
 
   recorded_by  User  @relation("ReamStockLedgerRecordedBy", fields: [recorded_by_id], references: [id])
   recipient    User? @relation("ReamStockLedgerRecipient",  fields: [recipient_user_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([type, created_at])
   @@index([recorded_by_id])
@@ -2564,6 +2662,8 @@ model Task {
 
   assigned_to User @relation("TaskAssignedTo", fields: [assigned_to_id], references: [id])
   assigned_by User @relation("TaskAssignedBy", fields: [assigned_by_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([assigned_to_id, status])
   @@index([assigned_by_id])
@@ -2625,6 +2725,8 @@ model StaffLoan {
   borrower   User                 @relation("StaffLoanBorrower", fields: [borrower_id], references: [id])
   approver   User?                @relation("StaffLoanApprover", fields: [approver_id], references: [id])
   repayments StaffLoanRepayment[]
+  server_id String?
+  checksum  String?
 
   @@index([borrower_id])
   @@index([status])
@@ -2642,6 +2744,9 @@ model StaffLoanRepayment {
 
   loan        StaffLoan @relation(fields: [loan_id], references: [id], onDelete: Cascade)
   recorded_by User      @relation("StaffLoanRepaymentRecordedBy", fields: [recorded_by_id], references: [id])
+  updated_at DateTime @updatedAt
+  server_id  String?
+  checksum   String?
 
   @@index([loan_id])
 }
@@ -2683,6 +2788,8 @@ model LeaveRequest {
 
   requester User  @relation("LeaveRequestRequester", fields: [requester_id], references: [id])
   approver  User? @relation("LeaveRequestApprover", fields: [approver_id], references: [id])
+  server_id String?
+  checksum  String?
 
   @@index([requester_id])
   @@index([status])
