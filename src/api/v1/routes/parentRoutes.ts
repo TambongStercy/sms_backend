@@ -8,6 +8,8 @@
 // parent (multi-child support).
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { portalRateLimit } from '../middleware/portalRateLimit.middleware';
+import { portalAudit } from '../middleware/portalAudit.middleware';
 import {
     getChildDashboard,
     getChildDetails,
@@ -37,6 +39,13 @@ import {
 } from '../controllers/parentController';
 
 const router = express.Router();
+
+// Portal hardening — MUST come before any route handlers so blocked requests
+// short-circuit before authentication, business logic, or audit-trail writes.
+// Rate limiter (60 req/min per IP) runs first, then the fire-and-forget audit
+// logger records the request. See middleware files for rationale.
+router.use(portalRateLimit);
+router.use(portalAudit);
 
 // School-wide announcements (no matricule needed).
 router.get('/announcements', getSchoolAnnouncements);
