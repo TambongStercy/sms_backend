@@ -61,6 +61,7 @@ model User {
   id_card_num                   String?
   matricule                     String?                     @unique
   status                        UserStatus                  @default(ACTIVE)
+  must_change_password          Boolean                     @default(false) // Force password change on next login (default parents, bursar-created accounts)
   total_hours_per_week          Int? // For teachers
   last_seen_at                  DateTime? // Presence: updated when a chat websocket disconnects
   created_at                    DateTime                    @default(now())

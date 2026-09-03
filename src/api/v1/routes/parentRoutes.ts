@@ -1,9 +1,13 @@
 // src/api/v1/routes/parentRoutes.ts
 //
-// PARENT PORTAL — all endpoints are UNAUTHENTICATED. Access is gated only
-// by knowledge of the child's matricule (path param). Do not add authenticate
-// / authorize middleware to these routes.
+// PARENT PORTAL — all `/:matricule/*` endpoints are UNAUTHENTICATED. Access
+// is gated only by knowledge of the child's matricule (path param). Do NOT
+// add authenticate / authorize middleware to portal routes.
+//
+// The `/me/*` sub-tree requires JWT auth and is scoped to the authenticated
+// parent (multi-child support).
 import express from 'express';
+import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
     getChildDashboard,
     getChildDetails,
@@ -22,13 +26,25 @@ import {
     getParentUnreadBreakdown,
     markAllParentNotificationsAsRead,
     markParentNotificationAsRead,
-    deleteParentNotification
+    deleteParentNotification,
+    getChildWarnings,
+    getChildSummons,
+    getChildDisciplinaryActions,
+    getChildSaturdayPunishments,
+    getChildHealthVisits,
+    getChildTimetable,
+    getMyChildren
 } from '../controllers/parentController';
 
 const router = express.Router();
 
 // School-wide announcements (no matricule needed).
 router.get('/announcements', getSchoolAnnouncements);
+
+// AUTHENTICATED parent endpoints (/parents/me/*). Order matters — must be
+// declared before the `/:matricule/*` catch-alls so Express doesn't route
+// "me" as a matricule.
+router.get('/me/children', authenticate, authorize(['PARENT']), getMyChildren);
 
 // Child dashboard / details / overview by matricule.
 router.get('/:matricule/dashboard', getChildDashboard);
@@ -38,6 +54,18 @@ router.get('/:matricule/overview', getChildOverview);
 // Academic data.
 router.get('/:matricule/quiz-results', getChildQuizResults);
 router.get('/:matricule/analytics', getChildAnalytics);
+
+// Timetable (weekly class schedule).
+router.get('/:matricule/timetable', getChildTimetable);
+
+// Discipline detail (warnings, summons, actions, saturday punishments).
+router.get('/:matricule/warnings', getChildWarnings);
+router.get('/:matricule/summons', getChildSummons);
+router.get('/:matricule/disciplinary-actions', getChildDisciplinaryActions);
+router.get('/:matricule/saturday-punishments', getChildSaturdayPunishments);
+
+// Health / nurse visit log (paginated).
+router.get('/:matricule/health-visits', getChildHealthVisits);
 
 // Report cards.
 router.get('/:matricule/report-cards', listChildReportCards);

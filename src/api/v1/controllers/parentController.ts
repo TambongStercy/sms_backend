@@ -10,6 +10,7 @@ import * as chatService from '../services/chatService';
 import * as notificationService from '../services/notificationService';
 import * as examController from './examController';
 import { extractPaginationAndFilters } from '../../../utils/pagination';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const readMatricule = (req: Request): string => String(req.params.matricule || '').trim();
 
@@ -340,6 +341,104 @@ export const deleteParentNotification = async (req: Request, res: Response): Pro
         }
         res.status(200).json(result);
     } catch (err) { sendError(res, err, 'Failed to delete notification'); }
+};
+
+/**
+ * GET /parents/:matricule/warnings
+ */
+export const getChildWarnings = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildWarningsByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch warnings'); }
+};
+
+/**
+ * GET /parents/:matricule/summons
+ */
+export const getChildSummons = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildSummonsByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch summons'); }
+};
+
+/**
+ * GET /parents/:matricule/disciplinary-actions
+ */
+export const getChildDisciplinaryActions = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildDisciplinaryActionsByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch disciplinary actions'); }
+};
+
+/**
+ * GET /parents/:matricule/saturday-punishments
+ */
+export const getChildSaturdayPunishments = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildSaturdayPunishmentsByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch saturday punishments'); }
+};
+
+/**
+ * GET /parents/:matricule/health-visits?page&limit
+ * Paginated nurse visit log for the child.
+ */
+export const getChildHealthVisits = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const page = req.query.page ? parseInt(String(req.query.page)) : 1;
+        const limit = req.query.limit ? parseInt(String(req.query.limit)) : 20;
+        const data = await parentService.getChildNurseVisitsByMatricule(matricule, {
+            page,
+            limit,
+            academicYearId: readAcademicYearId(req),
+        });
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch health visits'); }
+};
+
+/**
+ * GET /parents/:matricule/timetable
+ * Weekly class schedule for the child.
+ */
+export const getChildTimetable = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getChildTimetableByMatricule(matricule, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch timetable'); }
+};
+
+/**
+ * GET /parents/me/children  (AUTHENTICATED)
+ * List all children linked to the currently-authenticated parent, with a
+ * family-level summary of fees/attendance/discipline. Requires JWT + PARENT role.
+ */
+export const getMyChildren = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const authReq = req as AuthenticatedRequest;
+        const parentId = authReq.user?.id;
+        if (!parentId) {
+            res.status(401).json({ success: false, error: 'Unauthorized' });
+            return;
+        }
+        const data = await parentService.getLinkedChildrenForParent(parentId, readAcademicYearId(req));
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch children'); }
 };
 
 /**
