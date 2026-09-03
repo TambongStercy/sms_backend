@@ -442,6 +442,64 @@ export const getMyChildren = async (req: Request, res: Response): Promise<void> 
 };
 
 /**
+ * GET /parents/:matricule/profile
+ * Aggregate profile: the linked parent's contact block + the child's
+ * demographic block. Feeds the mobile app's single profile screen with
+ * two editable panels.
+ */
+export const getSelfServiceProfile = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+        const data = await parentService.getParentAndChildProfileFromMatricule(matricule);
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch profile'); }
+};
+
+/**
+ * PUT /parents/:matricule/parent-profile
+ * Body: { phone?, whatsappNumber?, address? }
+ * Updates the first-linked parent's contact info. Email is intentionally
+ * excluded — it is still the login identifier.
+ */
+export const updateParentProfile = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+
+        const { phone, whatsapp_number, address } = req.body ?? {};
+        const patch: parentService.ParentContactPatch = {};
+        if (phone !== undefined) patch.phone = phone;
+        if (whatsapp_number !== undefined) patch.whatsapp_number = whatsapp_number;
+        if (address !== undefined) patch.address = address;
+
+        const data = await parentService.updateParentContactFromMatricule(matricule, patch);
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to update parent profile'); }
+};
+
+/**
+ * PUT /parents/:matricule/child-profile
+ * Body: { residence?, healthConditions?, medicalNotes? }
+ * Updates a small demographic slice of the child's record.
+ */
+export const updateChildProfile = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+
+        const { residence, health_conditions, medical_notes } = req.body ?? {};
+        const patch: parentService.ChildProfilePatch = {};
+        if (residence !== undefined) patch.residence = residence;
+        if (health_conditions !== undefined) patch.health_conditions = health_conditions;
+        if (medical_notes !== undefined) patch.medical_notes = medical_notes;
+
+        const data = await parentService.updateChildProfileFromMatricule(matricule, patch);
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to update child profile'); }
+};
+
+/**
  * GET /parents/announcements
  * School-wide announcements aimed at parents. Requires no matricule.
  */

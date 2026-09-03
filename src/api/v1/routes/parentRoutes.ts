@@ -35,7 +35,10 @@ import {
     getChildSaturdayPunishments,
     getChildHealthVisits,
     getChildTimetable,
-    getMyChildren
+    getMyChildren,
+    getSelfServiceProfile,
+    updateParentProfile,
+    updateChildProfile
 } from '../controllers/parentController';
 
 const router = express.Router();
@@ -85,6 +88,14 @@ router.get('/:matricule/report-card', downloadChildReportCard);
 router.get('/:matricule/contacts', getContacts);
 router.post('/:matricule/message-staff', sendMessageToStaff);
 router.post('/:matricule/contact/:userId', openStaffDirectMessage);
+
+// Self-service profile (parent contact info + child demographic bits).
+// Aggregate GET feeds the mobile app's single profile screen with two panels;
+// each PUT edits one panel independently. Email is intentionally excluded
+// from the parent-side PUT because it is still the login identifier.
+router.get('/:matricule/profile', getSelfServiceProfile);
+router.put('/:matricule/parent-profile', updateParentProfile);
+router.put('/:matricule/child-profile', updateChildProfile);
 
 // Notifications — mirrors /notifications/* but gated by matricule instead of JWT.
 // Parent identity is resolved via ParentStudent link on the matricule's student.

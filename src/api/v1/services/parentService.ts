@@ -5,7 +5,8 @@ import {
     User,
     AcademicYear,
     Enrollment,
-    QuizStatus
+    QuizStatus,
+    HealthCondition
 } from '@prisma/client';
 import prisma from '../../../config/db';
 import { getCurrentAcademicYear, getAcademicYearId } from '../../../utils/academicYear';
@@ -2447,5 +2448,214 @@ export async function getLinkedChildrenForParent(parentId: number, academicYearI
             },
         },
         children,
+    };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELF-SERVICE PROFILE UPDATES (portal — matricule-gated, unauthenticated)
+//
+// Parents can maintain their own contact block and a small demographic slice
+// of the child's record. Email is deliberately excluded from the parent-side
+// patch because it is the login identifier — changing it must go through
+// bursar/admin flows so the audit trail is preserved.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const trimOrUndefined = (value: unknown): string | undefined => {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+};
+
+const sanitizeUser = (user: User) => {
+    const { password, ...safe } = user;
+    return safe;
+};
+
+/**
+ * Validate that a phone-like string contains at least 8 digits.
+ * Local formatting characters (spaces, dashes, +, parens) are allowed but
+ * ignored for the digit count.
+ */
+const isValidPhone = (value: string): boolean => {
+    const digits = value.replace(/\D/g, '');
+    return digits.length >= 8;
+};
+
+export interface ParentContactPatch {
+    phone?: string;
+    whatsapp_number?: string;
+    address?: string;
+}
+
+/**
+ * Update the contact info (phone, whatsapp, address) of the FIRST linked
+ * parent for the given child matricule. Returns the sanitized user profile
+ * (password stripped). Email is intentionally NOT updatable here.
+ */
+export async function updateParentContactFromMatricule(
+    matricule: string,
+    patch: ParentContactPatch
+): Promise<Omit<User, 'password'>> {
+    const parentId = await resolveLinkedParentIdByMatricule(matricule);
+
+    const data: Prisma.UserUpdateInput = {};
+
+    if (patch.phone !== undefined) {
+        const phone = trimOrUndefined(patch.phone);
+        if (!phone || !isValidPhone(phone)) {
+            const err: any = new Error('phone must contain at least 8 digits');
+            err.statusCode = 400;
+            throw err;
+        }
+        data.phone = phone;
+    }
+
+    if (patch.whatsapp_number !== undefined) {
+        // Allow explicit clearing via empty string
+        if (typeof patch.whatsapp_number === 'string' && patch.whatsapp_number.trim() === '') {
+            data.whatsapp_number = null;
+        } else {
+            const whatsapp = trimOrUndefined(patch.whatsapp_number);
+            if (!whatsapp || !isValidPhone(whatsapp)) {
+                const err: any = new Error('whatsappNumber must contain at least 8 digits');
+                err.statusCode = 400;
+                throw err;
+            }
+            data.whatsapp_number = whatsapp;
+        }
+    }
+
+    if (patch.address !== undefined) {
+        const address = trimOrUndefined(patch.address);
+        if (!address) {
+            const err: any = new Error('address must not be empty');
+            err.statusCode = 400;
+            throw err;
+        }
+        data.address = address;
+    }
+
+    if (Object.keys(data).length === 0) {
+        const err: any = new Error('No updatable fields provided (phone, whatsappNumber, address)');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const updated = await prisma.user.update({
+        where: { id: parentId },
+        data
+    });
+
+    return sanitizeUser(updated);
+}
+
+export interface ChildProfilePatch {
+    residence?: string;
+    health_conditions?: HealthCondition[];
+    medical_notes?: string | null;
+}
+
+const VALID_HEALTH_CONDITIONS = new Set<string>([
+    'SICKLE_CELL',
+    'ASTHMATIC',
+    'EPILEPTIC',
+    'DIABETIC',
+    'ALLERGY',
+    'HYPERTENSION',
+    'OTHER'
+]);
+
+/**
+ * Update a small demographic slice of the child's record: residence,
+ * health_conditions, medical_notes. Empty-string medical_notes clears
+ * the field. Every element of health_conditions must be a valid enum value.
+ */
+export async function updateChildProfileFromMatricule(
+    matricule: string,
+    patch: ChildProfilePatch
+): Promise<Student> {
+    const student = await resolveStudentByMatricule(matricule);
+
+    const data: Prisma.StudentUpdateInput = {};
+
+    if (patch.residence !== undefined) {
+        const residence = trimOrUndefined(patch.residence);
+        if (!residence) {
+            const err: any = new Error('residence must not be empty');
+            err.statusCode = 400;
+            throw err;
+        }
+        data.residence = residence;
+    }
+
+    if (patch.health_conditions !== undefined) {
+        if (!Array.isArray(patch.health_conditions)) {
+            const err: any = new Error('healthConditions must be an array');
+            err.statusCode = 400;
+            throw err;
+        }
+        const invalid = patch.health_conditions.filter(
+            c => typeof c !== 'string' || !VALID_HEALTH_CONDITIONS.has(c)
+        );
+        if (invalid.length) {
+            const err: any = new Error(
+                `Invalid healthConditions: ${invalid.join(', ')}. ` +
+                `Allowed: ${Array.from(VALID_HEALTH_CONDITIONS).join(', ')}`
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+        // Dedupe while preserving order
+        const seen = new Set<HealthCondition>();
+        const deduped: HealthCondition[] = [];
+        for (const c of patch.health_conditions) {
+            if (!seen.has(c)) { seen.add(c); deduped.push(c); }
+        }
+        data.health_conditions = { set: deduped };
+    }
+
+    if (patch.medical_notes !== undefined) {
+        if (patch.medical_notes === null || (typeof patch.medical_notes === 'string' && patch.medical_notes.trim() === '')) {
+            data.medical_notes = null;
+        } else if (typeof patch.medical_notes === 'string') {
+            data.medical_notes = patch.medical_notes.trim();
+        } else {
+            const err: any = new Error('medicalNotes must be a string or null');
+            err.statusCode = 400;
+            throw err;
+        }
+    }
+
+    if (Object.keys(data).length === 0) {
+        const err: any = new Error('No updatable fields provided (residence, healthConditions, medicalNotes)');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    return prisma.student.update({
+        where: { id: student.id },
+        data
+    });
+}
+
+/**
+ * Aggregate parent contact block + student demographic block for the parent
+ * portal's profile screen (two editable panels rendered side by side).
+ */
+export async function getParentAndChildProfileFromMatricule(matricule: string): Promise<{
+    parent: Omit<User, 'password'>;
+    student: Student;
+}> {
+    const student = await resolveStudentByMatricule(matricule);
+    const parentId = await resolveLinkedParentIdByMatricule(matricule);
+    const parent = await prisma.user.findUnique({ where: { id: parentId } });
+    if (!parent) {
+        const err: any = new Error('Linked parent user not found');
+        err.statusCode = 404;
+        throw err;
+    }
+    return {
+        parent: sanitizeUser(parent),
+        student
     };
 }
