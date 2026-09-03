@@ -21,6 +21,10 @@ import {
     checkChildReportCardAvailability,
     getContacts,
     sendMessageToStaff,
+    getParentInbox,
+    replyToParentMessage,
+    markParentMessageRead,
+    getParentMessageThread,
     openStaffDirectMessage,
     getSchoolAnnouncements,
     getParentNotifications,
@@ -88,6 +92,13 @@ router.get('/:matricule/report-card', downloadChildReportCard);
 router.get('/:matricule/contacts', getContacts);
 router.post('/:matricule/message-staff', sendMessageToStaff);
 router.post('/:matricule/contact/:userId', openStaffDirectMessage);
+
+// Parent inbox — messages the linked parent has received, plus threaded
+// replies and read receipts. See parentService.ts for authorization notes.
+router.get('/:matricule/inbox', getParentInbox);
+router.get('/:matricule/messages/:messageId/thread', getParentMessageThread);
+router.post('/:matricule/messages/:messageId/reply', replyToParentMessage);
+router.put('/:matricule/messages/:messageId/read', markParentMessageRead);
 
 // Self-service profile (parent contact info + child demographic bits).
 // Aggregate GET feeds the mobile app's single profile screen with two panels;

@@ -208,6 +208,91 @@ export const sendMessageToStaff = async (req: Request, res: Response): Promise<v
 };
 
 /**
+ * GET /parents/:matricule/inbox?page&limit&unreadOnly
+ * Paginated list of messages the linked parent has RECEIVED (newest first).
+ */
+export const getParentInbox = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+
+        const page = req.query.page ? parseInt(req.query.page as string) : 1;
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+        const unreadOnly = req.query.unreadOnly === 'true' || req.query.unread_only === 'true';
+
+        const result = await parentService.getParentInboxByMatricule(matricule, { page, limit, unreadOnly });
+        res.json({ success: true, data: result.data, meta: result.meta });
+    } catch (err) { sendError(res, err, 'Failed to fetch inbox'); }
+};
+
+/**
+ * POST /parents/:matricule/messages/:messageId/reply
+ * Body: { message: string }
+ * Creates a threaded reply on the parent's side of an existing conversation.
+ */
+export const replyToParentMessage = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+
+        const messageId = Number(req.params.messageId);
+        if (Number.isNaN(messageId)) {
+            res.status(400).json({ success: false, error: 'Invalid messageId' });
+            return;
+        }
+
+        const body = String(req.body?.message ?? '').trim();
+        if (!body) {
+            res.status(400).json({ success: false, error: 'message is required' });
+            return;
+        }
+
+        const created = await parentService.replyToMessageAsParent(matricule, messageId, body);
+        res.status(201).json({ success: true, data: created });
+    } catch (err) { sendError(res, err, 'Failed to send reply'); }
+};
+
+/**
+ * PUT /parents/:matricule/messages/:messageId/read
+ * Sets read_at = now(). Parent must be the receiver.
+ */
+export const markParentMessageRead = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+
+        const messageId = Number(req.params.messageId);
+        if (Number.isNaN(messageId)) {
+            res.status(400).json({ success: false, error: 'Invalid messageId' });
+            return;
+        }
+
+        const updated = await parentService.markParentMessageAsRead(matricule, messageId);
+        res.json({ success: true, data: updated });
+    } catch (err) { sendError(res, err, 'Failed to mark message as read'); }
+};
+
+/**
+ * GET /parents/:matricule/messages/:messageId/thread
+ * Returns the target message, its ancestor chain, and its direct replies.
+ */
+export const getParentMessageThread = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const matricule = readMatricule(req);
+        if (!matricule) { res.status(400).json({ success: false, error: 'Matricule is required' }); return; }
+
+        const messageId = Number(req.params.messageId);
+        if (Number.isNaN(messageId)) {
+            res.status(400).json({ success: false, error: 'Invalid messageId' });
+            return;
+        }
+
+        const data = await parentService.getParentMessageThread(matricule, messageId);
+        res.json({ success: true, data });
+    } catch (err) { sendError(res, err, 'Failed to fetch thread'); }
+};
+
+/**
  * POST /parents/:matricule/contact/:userId
  * Open (or reuse) a DM channel between the child's linked parent and a staff user.
  */

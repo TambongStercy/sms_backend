@@ -933,12 +933,16 @@ model Message {
   status              MessageStatus @default(SENT)
   deleted_by_sender   Boolean       @default(false)
   deleted_by_receiver Boolean       @default(false)
+  parent_message_id   Int?
+  read_at             DateTime?
   created_at          DateTime      @default(now())
   updated_at          DateTime      @updatedAt
   server_id           String?
   checksum            String?
   sender              User          @relation("SentMessages", fields: [sender_id], references: [id])
   receiver            User          @relation("ReceivedMessages", fields: [receiver_id], references: [id])
+  parent_message      Message?      @relation("MessageReplies", fields: [parent_message_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies             Message[]     @relation("MessageReplies")
 }
 
 // Slack-style chat workspace

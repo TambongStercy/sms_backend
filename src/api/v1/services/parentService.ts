@@ -1964,6 +1964,239 @@ export async function sendMessageToStaffFromMatricule(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PARENT INBOX (threading + read receipts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fire an in-app notification to a receiver ONLY if they currently hold the
+ * PARENT role. Used at generic staff-side Message.create sites where we can't
+ * cheaply tell whether the receiver is a parent or another staff member — the
+ * role check keeps the notification narrowly scoped to the parent inbox
+ * feature. Failures are swallowed so notification hiccups can never break the
+ * underlying message-send flow.
+ */
+export async function notifyIfReceiverIsParent(
+    receiverId: number,
+    senderId: number,
+    messageId: number,
+    subject: string,
+    senderName?: string
+): Promise<void> {
+    try {
+        const isParent = await prisma.userRole.findFirst({
+            where: { user_id: receiverId, role: 'PARENT' as any },
+            select: { id: true },
+        });
+        if (!isParent) return;
+        const title = senderName ? `New message from ${senderName}` : 'New message';
+        await notificationService.sendNotification({
+            user_id: receiverId,
+            sender_id: senderId,
+            title,
+            message: subject ? `${title}: ${subject}` : title,
+            category: 'GENERAL',
+            priority: 'HIGH',
+            entity_type: 'Message',
+            entity_id: messageId,
+            action_url: `/parents/messages/${messageId}`,
+        });
+    } catch (err) {
+        console.error('notifyIfReceiverIsParent failed:', err);
+    }
+}
+
+/**
+ * Paginated inbox for the parent linked to `matricule`. Returns messages the
+ * parent RECEIVED, newest first, with sender name + reply count. Set
+ * `unreadOnly` to filter to messages the parent has not yet marked as read.
+ */
+export async function getParentInboxByMatricule(
+    matricule: string,
+    opts: { page?: number; limit?: number; unreadOnly?: boolean } = {}
+): Promise<{ data: any[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+    const parentId = await resolveLinkedParentIdByMatricule(matricule);
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.MessageWhereInput = {
+        receiver_id: parentId,
+        deleted_by_receiver: false,
+        ...(opts.unreadOnly ? { read_at: null } : {}),
+    };
+
+    const [total, rows] = await Promise.all([
+        prisma.message.count({ where }),
+        prisma.message.findMany({
+            where,
+            orderBy: { created_at: 'desc' },
+            skip,
+            take: limit,
+            include: {
+                sender: { select: { id: true, name: true, matricule: true } },
+                _count: { select: { replies: true } },
+            },
+        }),
+    ]);
+
+    const data = rows.map(row => ({
+        id: row.id,
+        subject: row.subject,
+        content: row.content,
+        sender_id: row.sender_id,
+        sender_name: row.sender?.name ?? null,
+        sender_matricule: row.sender?.matricule ?? null,
+        parent_message_id: row.parent_message_id,
+        read_at: row.read_at,
+        status: row.status,
+        created_at: row.created_at,
+        reply_count: row._count?.replies ?? 0,
+    }));
+
+    return {
+        data,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit) || 1,
+        },
+    };
+}
+
+/**
+ * Reply to an existing message. The parent must be either the sender or the
+ * receiver of the referenced message. The reply is written with
+ * sender_id = parent, receiver_id = the OTHER party on the original thread,
+ * subject prefixed with `Re: ` (only once) and parent_message_id linking back.
+ */
+export async function replyToMessageAsParent(
+    matricule: string,
+    messageId: number,
+    body: string
+): Promise<any> {
+    if (!body || !body.trim()) {
+        const err: any = new Error('Reply body is required');
+        err.statusCode = 400;
+        throw err;
+    }
+    const parentId = await resolveLinkedParentIdByMatricule(matricule);
+    const original = await prisma.message.findUnique({
+        where: { id: messageId },
+        include: { sender: { select: { id: true, name: true } } },
+    });
+    if (!original) {
+        const err: any = new Error('Message not found');
+        err.statusCode = 404;
+        throw err;
+    }
+    if (original.sender_id !== parentId && original.receiver_id !== parentId) {
+        const err: any = new Error('Not authorized to reply to this message');
+        err.statusCode = 403;
+        throw err;
+    }
+
+    const otherPartyId = original.sender_id === parentId ? original.receiver_id : original.sender_id;
+    const rePrefixed = /^re:\s*/i.test(original.subject)
+        ? original.subject
+        : `Re: ${original.subject}`;
+
+    return prisma.message.create({
+        data: {
+            sender_id: parentId,
+            receiver_id: otherPartyId,
+            subject: rePrefixed,
+            content: body.trim(),
+            parent_message_id: original.id,
+        },
+    });
+}
+
+/**
+ * Mark an incoming message as read. Only the receiver can mark. Idempotent —
+ * repeated calls just refresh read_at.
+ */
+export async function markParentMessageAsRead(
+    matricule: string,
+    messageId: number
+): Promise<any> {
+    const parentId = await resolveLinkedParentIdByMatricule(matricule);
+    const msg = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, receiver_id: true },
+    });
+    if (!msg) {
+        const err: any = new Error('Message not found');
+        err.statusCode = 404;
+        throw err;
+    }
+    if (msg.receiver_id !== parentId) {
+        const err: any = new Error('Not authorized to mark this message as read');
+        err.statusCode = 403;
+        throw err;
+    }
+    return prisma.message.update({
+        where: { id: messageId },
+        data: { read_at: new Date(), status: 'READ' as any },
+    });
+}
+
+/**
+ * Return the full thread for a message: the target message, its ancestor
+ * chain (walked via parent_message_id up to the root), and its direct
+ * replies. The parent must be either the sender or receiver of the target
+ * message.
+ */
+export async function getParentMessageThread(
+    matricule: string,
+    messageId: number
+): Promise<{ message: any; ancestors: any[]; replies: any[] }> {
+    const parentId = await resolveLinkedParentIdByMatricule(matricule);
+
+    const senderSelect = { select: { id: true, name: true, matricule: true } };
+    const receiverSelect = { select: { id: true, name: true, matricule: true } };
+
+    const target = await prisma.message.findUnique({
+        where: { id: messageId },
+        include: { sender: senderSelect, receiver: receiverSelect },
+    });
+    if (!target) {
+        const err: any = new Error('Message not found');
+        err.statusCode = 404;
+        throw err;
+    }
+    if (target.sender_id !== parentId && target.receiver_id !== parentId) {
+        const err: any = new Error('Not authorized to view this thread');
+        err.statusCode = 403;
+        throw err;
+    }
+
+    // Walk ancestors up via parent_message_id. Guard against pathological
+    // loops with a hard cap.
+    const ancestors: any[] = [];
+    let cursor = target.parent_message_id;
+    const guard = new Set<number>();
+    while (cursor && !guard.has(cursor) && ancestors.length < 50) {
+        guard.add(cursor);
+        const anc: any = await prisma.message.findUnique({
+            where: { id: cursor },
+            include: { sender: senderSelect, receiver: receiverSelect },
+        });
+        if (!anc) break;
+        ancestors.unshift(anc);
+        cursor = anc.parent_message_id;
+    }
+
+    const replies = await prisma.message.findMany({
+        where: { parent_message_id: target.id },
+        orderBy: { created_at: 'asc' },
+        include: { sender: senderSelect, receiver: receiverSelect },
+    });
+
+    return { message: target, ancestors, replies };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FEE ITEMS BREAKDOWN
 // ─────────────────────────────────────────────────────────────────────────────
 
