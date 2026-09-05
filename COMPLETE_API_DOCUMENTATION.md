@@ -10505,6 +10505,106 @@ Authorization: Bearer <token>
 }
 ```
 
+### Get Sync Status
+Shows the most recent database-sync run against the remote peer, live peer
+reachability, and the auto-sync configuration read from environment.
+
+```http
+GET /api/v1/system/sync/status
+Authorization: Bearer <token>
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: {
+    lastSync: null | {
+      id: number;
+      syncId: string;
+      startTime: string;                 // ISO
+      endTime: string | null;
+      status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "PARTIAL" | "FAILED";
+      direction: "PUSH" | "PULL" | "BIDIRECTIONAL";
+      recordsProcessed: number;
+      conflicts: any[];
+      errors: string[];
+      createdAt: string;
+    };
+    isOnline: boolean;                   // remote peer reachable right now
+    remotePeerConfigured: boolean;       // REMOTE_SYNC_URL is set
+    autoSyncEnabled: boolean;            // AUTO_SYNC_INTERVAL > 0
+    autoSyncIntervalMinutes: number | null;
+    serverId: string;
+    syncInFlight: boolean;               // true while a manual /trigger is running
+  };
+}
+```
+
+### List Recent Sync Runs
+```http
+GET /api/v1/system/sync/logs?limit=20
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+| Parameter | Type   | Default | Notes                   |
+|-----------|--------|---------|-------------------------|
+| limit     | number | 20      | Clamped to 1..100       |
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  data: Array<{
+    id: number;
+    syncId: string;
+    startTime: string;
+    endTime: string | null;
+    status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "PARTIAL" | "FAILED";
+    direction: "PUSH" | "PULL" | "BIDIRECTIONAL";
+    recordsProcessed: number;
+    conflicts: any[];
+    errors: string[];
+    createdAt: string;
+  }>;
+}
+```
+
+### Trigger Manual Sync
+Runs a bidirectional sync against the remote peer synchronously. Overlapping
+calls are coalesced — a second call while one is in flight returns the same
+result. Returns `409` when `REMOTE_SYNC_URL` is not configured.
+
+```http
+POST /api/v1/system/sync/trigger
+Authorization: Bearer <token>
+```
+
+**Response (200):**
+```typescript
+{
+  success: true;
+  message: "Manual sync run finished";
+  data: {
+    syncLog: {
+      id: string;                       // in-memory run id from SyncManager
+      startTime: string;
+      endTime: string | null;
+      status: "COMPLETED" | "PARTIAL" | "FAILED";
+      direction: "BIDIRECTIONAL";
+      recordsProcessed: number;
+      conflicts: any[];
+      errors: string[];
+    };
+  };
+}
+```
+
+**Error Responses:**
+- `409` — `REMOTE_SYNC_URL` is not configured on this server.
+- `500` — sync failed; `error` field carries the reason.
+
 ---
 
 ## Principal (School-wide Management)
