@@ -7,6 +7,7 @@ import { AddressInfo } from 'net';
 import { SyncService } from './sync/sync-service';
 import { initRealtime } from './realtime/socket';
 import { seedChatChannels } from './scripts/seedChatChannels';
+import { warmUp } from './api/v1/services/aiAssistant/ollamaClient';
 
 // Load environment variables (if not already loaded in app.ts)
 dotenv.config();
@@ -17,6 +18,25 @@ const PORT = parseInt(process.env.PORT || DEFAULT_PORT.toString(), 10);
 
 // Initialize sync service
 const syncService = new SyncService();
+
+// Sync and channel seeding are singleton work: they must run on exactly one
+// process. Under PM2 cluster mode every worker boots this file, so without a
+// gate an N-worker deployment starts N concurrent bidirectional syncs against
+// the same peer — N times the load, interleaved writes to the same rows, and N
+// racing watermark updates.
+//
+// PM2 sets NODE_APP_INSTANCE to the worker ordinal, so worker 0 is elected.
+// SYNC_ENABLED overrides either way for deployments that want a dedicated sync
+// process. A plain `node dist/server.js` sets neither and keeps syncing, so
+// single-process behaviour is unchanged.
+function isSyncInstance(): boolean {
+    if (process.env.SYNC_ENABLED === 'false') return false;
+    if (process.env.SYNC_ENABLED === 'true') return true;
+    const ordinal = process.env.NODE_APP_INSTANCE;
+    return ordinal === undefined || ordinal === '0';
+}
+
+const SYNC_INSTANCE = isSyncInstance();
 
 // Function to start server with automatic port selection if default is in use
 function startServer(port: number) {
@@ -37,11 +57,22 @@ function startServer(port: number) {
         // Start scheduled tasks
         // scheduleAverageCalculations();
 
-        // Initialize sync service
-        syncService.initialize().catch(console.error);
-
-        // Seed department / subject chat channels (idempotent)
-        seedChatChannels().catch(err => console.error('seedChatChannels failed:', err));
+        // Initialize sync service — primary worker only (see isSyncInstance)
+        if (SYNC_INSTANCE) {
+            syncService.initialize().catch(console.error);
+            // Seed department / subject chat channels (idempotent, but there is
+            // no reason for every worker to race on it)
+            seedChatChannels().catch(err => console.error('seedChatChannels failed:', err));
+            // Load the model into each inference lane now rather than making
+            // the first person to ask a question wait ~7 s for it. Primary
+            // worker only: twelve workers warming the same two lanes would
+            // just queue twelve identical loads behind each other.
+            warmUp().catch(() => { /* a cold first question is slow, not broken */ });
+        } else {
+            console.log(
+                `Worker ${process.env.NODE_APP_INSTANCE}: sync and channel seeding skipped (primary only)`
+            );
+        }
     })
         .on('error', (error: NodeJS.ErrnoException) => {
             if (error.code === 'EACCES') {
@@ -62,12 +93,12 @@ startServer(PORT);
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
-  await syncService.shutdown();
+  if (SYNC_INSTANCE) await syncService.shutdown();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully');
-  await syncService.shutdown();
+  if (SYNC_INSTANCE) await syncService.shutdown();
   process.exit(0);
 });

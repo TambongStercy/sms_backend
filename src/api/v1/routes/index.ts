@@ -49,6 +49,7 @@ import salaryRoutes from './salaryRoutes';
 import reamStockRoutes from './reamStockRoutes';
 import taskRoutes from './taskRoutes';
 import superManagerOverviewRoutes from './superManagerOverviewRoutes';
+import aiRoutes from './aiRoutes';
 import staffLoanRoutes from './staffLoanRoutes';
 import leaveRequestRoutes from './leaveRequestRoutes';
 import express from 'express';
@@ -63,6 +64,7 @@ const router = Router();
 import attendanceRoutes from './attendanceRoutes';
 
 // Mount routes with the appropriate base paths
+router.use('/ai', aiRoutes);
 router.use('/auth', authRoutes);
 router.use('/academic-years', academicYearRoutes);
 router.use('/users', userRoutes);

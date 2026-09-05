@@ -1,0 +1,63 @@
+# Local infrastructure only: PostgreSQL + Redis.
+# The backend itself runs natively via `npm run dev` so you get hot reload.
+#
+# Deliberately separate from docker-compose.yml, which points at the shared
+# Neon production database.
+#
+#   docker compose -f docker-compose.local.yml up -d
+#   docker compose -f docker-compose.local.yml down
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sms-postgres
+    restart: unless-stopped
+    # The default max_connections=100 is sized for a single app process. The
+    # PM2 pool runs 12, and Prisma opens a pool per process, so the ceiling has
+    # to account for the whole fleet plus room for psql and backups. 200 leaves
+    # headroom above the 60 the app is capped at (connection_limit=5 in .env).
+    # shared_buffers/work_mem are raised off their tiny defaults because this
+    # box has 128 GB and was running on settings meant for a laptop.
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=2GB
+      - -c
+      - effective_cache_size=6GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=512MB
+    environment:
+      POSTGRES_USER: sms
+      POSTGRES_PASSWORD: sms_local_dev
+      POSTGRES_DB: sms
+    ports:
+      - "5432:5432"
+    volumes:
+      - sms_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sms -d sms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sms-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - sms_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  sms_pgdata:
+  sms_redisdata:
