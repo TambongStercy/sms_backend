@@ -60,6 +60,15 @@ router.put('/summons/:id', authenticate, authorize(DM_AND_ADMIN), disciplineCont
 
 // === DM ROLL CALL (3 fixed daily slots) ===
 
+// List sub-classes the caller may record roll calls for. DMs get their
+// assigned ones, admins get all. No validateDMSubClassAccess — this endpoint
+// IS how the caller learns which sub-classes are accessible.
+router.get('/dm-roll-call/my-subclasses',
+    authenticate,
+    authorize(DM_AND_ADMIN),
+    dmRollCallController.listMySubClasses
+);
+
 router.get('/dm-roll-call/status',
     authenticate,
     authorize(DM_AND_ADMIN),

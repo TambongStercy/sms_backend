@@ -21,6 +21,29 @@ function parseDate(input: any): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
+// GET /discipline/dm-roll-call/my-subclasses
+// Returns the sub-classes the caller may record DM roll calls for. DMs see
+// only their assigned sub-classes; admin/senior roles (VP, Principal, DoD,
+// SDM, MANAGER, SUPER_MANAGER) see every sub-class.
+export const listMySubClasses = async (req: Request, res: Response): Promise<any> => {
+    try {
+        if (!req.user) return res.status(401).json({ success: false, error: 'Unauthenticated' });
+        const roles: string[] = (req.user.role as any) || [];
+        const academicYearId = (req.finalQuery as any)?.academic_year_id
+            ? parseInt((req.finalQuery as any).academic_year_id)
+            : undefined;
+        const subClasses = await dmRollCallService.listAccessibleSubClasses(
+            req.user.id,
+            roles,
+            academicYearId
+        );
+        return res.json({ success: true, data: subClasses });
+    } catch (error: any) {
+        console.error('Error fetching DM accessible sub-classes:', error);
+        return res.status(400).json({ success: false, error: error.message });
+    }
+};
+
 // GET /discipline/dm-roll-call/status?subClassId&date
 export const getStatus = async (req: Request, res: Response): Promise<any> => {
     try {
