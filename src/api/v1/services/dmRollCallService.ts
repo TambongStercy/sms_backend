@@ -180,6 +180,28 @@ export async function getDMRollCallStatus(
 }
 
 /**
+ * Pick the current roll-call slot from wall-clock time in the school's
+ * timezone (defaults to Africa/Douala, UTC+1 year-round, no DST):
+ *   before 12:00  -> SLOT_2  (morning walk after 2nd period)
+ *   12:00-14:59   -> SLOT_5  (after the lunch break, post-5th period)
+ *   15:00 onwards -> SLOT_8  (final walk after 8th period)
+ * Override with SCHOOL_TZ if the deployment ever moves.
+ */
+export function pickCurrentSlot(now: Date = new Date()): RollCallSlot {
+    const timeZone = process.env.SCHOOL_TZ || 'Africa/Douala';
+    const hour = Number(
+        new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            hour: '2-digit',
+            hour12: false,
+        }).format(now)
+    );
+    if (hour < 12) return 'SLOT_2';
+    if (hour < 15) return 'SLOT_5';
+    return 'SLOT_8';
+}
+
+/**
  * Slot-specific timestamp used when creating auto-linked StudentAbsence rows so
  * that per-slot audit still shows a distinct time even though the underlying
  * StudentAbsence unique constraint collapses per-day (teacher_period_id=null).
