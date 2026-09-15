@@ -1531,6 +1531,38 @@ model SyncLog {
   @@index([start_time])
 }
 
+// Per-table sync cursor. Replaces the single global SyncMetadata timestamp so
+// a poison record in one table cannot freeze replication for the other ~80.
+// Cursor is the largest updated_at we have proven "done" for this table --
+// where "done" means either successfully applied or quarantined in SyncFailure.
+// A single unquarantined failure holds the whole table's cursor.
+model SyncCursor {
+  table_name String   @id
+  cursor     DateTime
+  updated_at DateTime @updatedAt
+}
+
+// Cross-tick strike counter. In-tick deferred retries already exist for
+// ordering issues within one run; SyncFailure handles the case where a record
+// simply cannot be placed here run after run (parent deleted on the peer,
+// natural-key collision we cannot resolve, etc.). After MAX_STRIKES (5)
+// consecutive failures the record is quarantined -- still attempted every
+// tick, but no longer blocks its table's cursor from advancing. Any success
+// clears the row so the counter never gets stuck high after transient issues.
+model SyncFailure {
+  id           Int      @id @default(autoincrement())
+  table_name   String
+  record_id    Int
+  direction    String // 'push' or 'pull'
+  strikes      Int      @default(1)
+  last_error   String
+  first_seen   DateTime @default(now())
+  last_attempt DateTime @updatedAt
+
+  @@unique([table_name, record_id, direction])
+  @@index([table_name, strikes])
+}
+
 // Bursar-defined ad-hoc fees (e.g. GCE, trips, uniforms) scoped to all/a class/a subclass.
 // When requires_school_fees_paid = true, any payment first cascades into outstanding school fees.
 model FeeItem {
