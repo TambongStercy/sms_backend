@@ -66,6 +66,28 @@ export class DatabaseSyncer {
     return null;
   }
 
+  // The local row that logically corresponds to this incoming record. Natural
+  // key wins over id where the model has an @@unique composite: primary keys
+  // aren't portable across nodes (each side runs its own autoincrement), so
+  // two nodes will happily mint the same id for two different logical rows.
+  //
+  // Matching by id first turned that into corruption: ChatChannelMember 291
+  // on the VPS is "channel 2, user 756" but on the peer it is "channel 21,
+  // user 394", and the update tried to renumber the VPS row's natural key
+  // onto a pair another local row (id 270) already occupies -- looping every
+  // sync run on the @@unique. Natural key first routes the write to the row
+  // that actually holds that pair.
+  //
+  // Falls back to findUnique(id) when the model has no @@unique (like
+  // PaymentTransaction, where id is the only signal available) or when the
+  // incoming record leaves the natural-key columns unset.
+  private async findLocalMatch(model: any, tableName: string, record: RemoteRecord) {
+    const byNaturalKey = await this.findByNaturalKey(model, tableName, record);
+    if (byNaturalKey) return byNaturalKey;
+    if (record.id === undefined || record.id === null) return null;
+    return await model.findUnique({ where: { id: record.id } });
+  }
+
   private fieldsOf(tableName: string): Set<string> {
     const cached = DatabaseSyncer.fieldCache.get(tableName);
     if (cached) return cached;
@@ -248,17 +270,10 @@ export class DatabaseSyncer {
         remoteRecord.server_id = peerId;
       }
       try {
-        // Check if record exists locally, by id first and then by natural key.
-        // Only a record that is absent under both is genuinely new; anything
-        // found the second way is the same row wearing the peer's id, and has
-        // to be updated in place under the id this node already gave it.
-        let localRecord = await model.findUnique({
-          where: { id: remoteRecord.id }
-        });
-
-        if (!localRecord) {
-          localRecord = await this.findByNaturalKey(model, tableName, remoteRecord);
-        }
+        // Find the local row this remote logically maps to. Natural key wins
+        // over id when the model has an @@unique -- see findLocalMatch for
+        // the collision that motivated the reorder.
+        const localRecord = await this.findLocalMatch(model, tableName, remoteRecord);
 
         if (!localRecord) {
           // New record - insert. The remote record is a flat Prisma row.
@@ -494,22 +509,12 @@ export class DatabaseSyncer {
     }
 
     try {
-      // By id first, then by natural key. Only a record absent under both is
-      // genuinely new; one found the second way is the same row wearing the
-      // peer's id, and belongs under the id this node already gave it.
-      //
-      // pullRemoteChanges has matched this way since the TeacherPeriod
-      // collisions (32 rows dying on the @@unique every single run), but this
-      // path did not — so /sync/receive and the deferred-retry pass kept
-      // rediscovering them. 52 TeacherPeriod slots currently exist on both
-      // nodes under different ids for exactly that reason.
-      let existing = await model.findUnique({
-        where: { id: record.id }
-      });
-
-      if (!existing) {
-        existing = await this.findByNaturalKey(model, tableName, record as RemoteRecord);
-      }
+      // Find the local row this incoming record logically maps to. Natural
+      // key wins over id when the model has an @@unique -- see findLocalMatch
+      // for why. This path used to match by id first, then fall back to
+      // natural key, which is what let ChatChannelMember 291 loop forever on
+      // its @@unique(channel_id, user_id) every sync run.
+      const existing = await this.findLocalMatch(model, tableName, record as RemoteRecord);
 
       if (existing) {
         // Addressed by the LOCAL id: where the match came from the natural key
